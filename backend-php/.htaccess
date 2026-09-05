@@ -1,0 +1,34 @@
+# Apache config for the PHP API backend
+# Place this in C:\xampp\htdocs\api\.htaccess
+
+Options -Indexes
+RewriteEngine On
+RewriteBase /api/
+
+# ── CORS headers on every response ─────────────────────────────────────────
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+Header always set Content-Type "application/json; charset=utf-8"
+
+# Handle OPTIONS preflight immediately
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^ - [R=200,L]
+
+# Don't rewrite real files / directories
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ── Admin routes (must come before generic rules) ──────────────────────────
+RewriteRule ^admin/users/([0-9]+)/promote/?$   admin/users.php?id=$1&action=promote [QSA,L]
+RewriteRule ^admin/bookings/([0-9]+)/status/?$ admin/bookings.php?id=$1&action=status [QSA,L]
+RewriteRule ^admin/stats/?$                    admin/stats.php [QSA,L]
+RewriteRule ^admin/users/?$                    admin/users.php [QSA,L]
+RewriteRule ^admin/bookings/?$                 admin/bookings.php [QSA,L]
+
+# ── Booking routes with ID ──────────────────────────────────────────────────
+RewriteRule ^bookings/([0-9]+)/?$  bookings.php?id=$1 [QSA,L]
+
+# ── Simple routes ───────────────────────────────────────────────────────────
+RewriteRule ^([a-z][a-z0-9-]*)/?$  $1.php [QSA,L]
