@@ -610,7 +610,7 @@ export const api = {
     console.log("[adminGetUsers] Admin token from storage:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN FOUND");
     console.log("[adminGetUsers] Admin token key (salon_admin_token):", localStorage.getItem("salon_admin_token")?.slice(0, 40));
     console.log("[adminGetUsers] Regular token key (salon_token):", localStorage.getItem("salon_token")?.slice(0, 40));
-    return fetch("/api/admin/users", {
+    return fetch(`${API_BASE}/api/admin/users`, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -626,7 +626,7 @@ export const api = {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
     console.log("[adminPromoteUser] Sending token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
-    return fetch(`/api/admin/users/${userId}/promote`, {
+    return fetch(`${API_BASE}/api/admin/users/${userId}/promote`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -643,7 +643,7 @@ export const api = {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
     console.log("[adminSetUserRole] userId:", userId, "role:", role, "token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
-    return fetch(`/api/admin/users/${userId}/role`, {
+    return fetch(`${API_BASE}/api/admin/users/${userId}/role`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -660,7 +660,7 @@ export const api = {
   adminResetPassword: (userId: number) => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
-    return fetch(`/api/admin/users/${userId}/reset-password`, {
+    return fetch(`${API_BASE}/api/admin/users/${userId}/reset-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -678,8 +678,8 @@ export const api = {
     const token = getAdminToken() ?? getToken();
     console.log("[adminGetAllBookings] Sending token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
     const url = status && status !== "all"
-      ? `/api/admin/bookings?status=${encodeURIComponent(status)}`
-      : "/api/admin/bookings";
+      ? `${API_BASE}/api/admin/bookings?status=${encodeURIComponent(status)}`
+      : `${API_BASE}/api/admin/bookings`;
     return fetch(url, {
       headers: {
         "Content-Type": "application/json",
@@ -695,7 +695,7 @@ export const api = {
   adminUpdateBookingStatus: (bookingId: number, status: string) => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
-    return fetch(`/api/admin/bookings/${bookingId}/status`, {
+    return fetch(`${API_BASE}/api/admin/bookings/${bookingId}/status`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -712,7 +712,7 @@ export const api = {
   adminGetStats: () => {
     const token = getAdminToken() ?? getToken();
     console.log("[adminGetStats] Sending token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
-    return fetch("/api/admin/stats", {
+    return fetch(`${API_BASE}/api/admin/stats`, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
