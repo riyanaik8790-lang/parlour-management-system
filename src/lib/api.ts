@@ -452,6 +452,18 @@ export const api = {
       { method: "PUT", body: JSON.stringify(body) }
     ),
 
+  getNotifications: () =>
+    request<{ notifications: AppNotification[]; unread: number }>("/api/notifications"),
+
+  markAllRead: () =>
+    request<{ ok: boolean }>("/api/notifications/read-all", { method: "PUT" }),
+
+  deleteAccount: (password: string) =>
+    request<{ ok: boolean }>("/api/account", {
+      method: "DELETE",
+      body: JSON.stringify({ password }),
+    }),
+
   login: async (body: { email: string; password: string }) => {
     try {
       return await request<{ token: string; user: StoredUser }>("/api/login", {
@@ -769,4 +781,13 @@ export type AdminBooking = {
   service_name: string;
   service_price: string;
   category: string;
+};
+
+export type AppNotification = {
+  id: number;
+  type: "new_booking" | "appointment_reminder" | string;
+  message: string;
+  is_read: boolean;
+  booking_id: number | null;
+  created_at: string;
 };

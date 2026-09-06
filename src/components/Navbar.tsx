@@ -2,8 +2,9 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { clearSession, getUser, type StoredUser } from "@/lib/api";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Settings } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const BURGUNDY = "oklch(0.35 0.15 22)";
 
@@ -99,15 +100,28 @@ export function Navbar() {
 
         {/* Auth buttons */}
         <div className="flex items-center gap-2">
+          {/* Notification bell - any logged-in user */}
+          {user && <NotificationBell />}
+
           <div className="hidden sm:flex items-center gap-2">
             {user ? (
               <>
                 <Link
-                  to="/profile"
-                  className="text-sm font-medium transition-opacity hover:opacity-70"
+                  to="/settings"
+                  className="flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
                   style={{ color: BURGUNDY }}
                 >
                   Hi, {user.name.split(" ")[0]} !
+                </Link>
+                <Link
+                  to="/settings"
+                  className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+                  style={{ color: BURGUNDY }}
+                  title="Settings"
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "oklch(0.35 0.15 22 / 8%)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
+                >
+                  <Settings className="h-4 w-4" />
                 </Link>
                 <Button
                   variant="outline"
@@ -175,11 +189,12 @@ export function Navbar() {
             {user ? (
               <>
                 <Link
-                  to="/profile"
+                  to="/settings"
                   onClick={() => setMenuOpen(false)}
-                  className="px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px] flex items-center"
+                  className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px]"
                 >
-                  My Profile
+                  <Settings className="h-4 w-4" />
+                  Settings
                 </Link>
                 <button
                   onClick={() => {

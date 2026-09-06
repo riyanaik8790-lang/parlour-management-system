@@ -569,12 +569,172 @@ def book():
         )
         booking_id = cur.lastrowid
         db.commit()
+
+        # Notify all admins about the new booking
+        try:
+            cur2 = db.cursor(dictionary=True)
+            cur2.execute("SELECT id FROM users WHERE role = 'ADMIN'")
+            admins = cur2.fetchall()
+            cur2.execute("SELECT name FROM services WHERE id = %s", (service_id,))
+            svc_row = cur2.fetchone()
+            svc_name = svc_row["name"] if svc_row else service_id
+            customer_name = g.current_user["name"]
+            msg = f"New booking: {customer_name} booked {svc_name} on {date_str} at {time_str}"
+            for admin in admins:
+                cur2.execute(
+                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'new_booking', %s, %s)",
+                    (admin["id"], msg, booking_id),
+                )
+            db.commit()
+            cur2.close()
+        except Exception:
+            pass  # never fail the booking because of a notification error
+
         cur.close()
         return jsonify({"id": booking_id}), 201
     except MySQLError as err:
         get_db().rollback()
         if err.errno == 1062:
             return jsonify({"error": "That time slot is already booked. Pick another."}), 409
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+
+def _generate_reminders(db, user_id: int):
+    """Lazily create 24-hour reminder notifications for upcoming appointments."""
+    try:
+        now_utc = datetime.now(timezone.utc)
+        window_end = now_utc + timedelta(hours=24)
+        cur = db.cursor(dictionary=True)
+        cur.execute(
+            """SELECT a.id, a.date, a.time, s.name AS service_name
+               FROM appointments a
+               JOIN services s ON s.id = a.service_id
+               WHERE a.user_id = %s AND a.status = 'confirmed'
+                 AND CONCAT(a.date, ' ', a.time) >= %s
+                 AND CONCAT(a.date, ' ', a.time) <= %s""",
+            (user_id, now_utc.strftime("%Y-%m-%d %H:%M"), window_end.strftime("%Y-%m-%d %H:%M")),
+        )
+        upcoming = cur.fetchall()
+        for appt in upcoming:
+            cur.execute(
+                "SELECT id FROM notifications WHERE user_id=%s AND type='appointment_reminder' AND booking_id=%s",
+                (user_id, appt["id"]),
+            )
+            if not cur.fetchone():
+                appt_dt_str = f"{appt['date']} {appt['time']}"
+                msg = f"Reminder: your {appt['service_name']} appointment is on {appt['date']} at {appt['time']}"
+                cur.execute(
+                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
+                    (user_id, msg, appt["id"]),
+                )
+        db.commit()
+        cur.close()
+    except Exception:
+        pass  # never crash the notifications fetch
+
+
+@app.get("/api/notifications")
+@require_auth
+def get_notifications():
+    user_id = g.current_user["id"]
+    db = get_db()
+    # Lazily generate reminders for customers
+    if g.current_user.get("role") != "ADMIN":
+        _generate_reminders(db, user_id)
+    try:
+        cur = db.cursor(dictionary=True)
+        cur.execute(
+            """SELECT id, type, message, is_read, booking_id,
+                      created_at
+               FROM notifications
+               WHERE user_id = %s
+               ORDER BY created_at DESC
+               LIMIT 30""",
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        unread = sum(1 for r in rows if not r["is_read"])
+        # Serialize booleans & datetimes
+        for r in rows:
+            r["is_read"] = bool(r["is_read"])
+            if isinstance(r["created_at"], datetime):
+                r["created_at"] = r["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+        cur.close()
+        return jsonify({"notifications": rows, "unread": unread})
+    except MySQLError as err:
+        return db_error(err)
+
+
+@app.put("/api/notifications/read-all")
+@require_auth
+def mark_all_read():
+    user_id = g.current_user["id"]
+    try:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("UPDATE notifications SET is_read = TRUE WHERE user_id = %s", (user_id,))
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True})
+    except MySQLError as err:
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
+# Account deletion
+# ---------------------------------------------------------------------------
+
+
+@app.delete("/api/account")
+@require_auth
+def delete_account():
+    user = g.current_user
+    user_id = user["id"]
+    data = request.get_json(silent=True) or {}
+    password = data.get("password") or ""
+
+    try:
+        db = get_db()
+        cur = db.cursor(dictionary=True)
+
+        # Fetch current hashed password for verification
+        cur.execute("SELECT password, role FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            return jsonify({"error": "User not found"}), 404
+
+        if not check_password(password, row["password"]):
+            cur.close()
+            return jsonify({"error": "Incorrect password"}), 400
+
+        # Solo-admin guard
+        if row["role"] == "ADMIN":
+            cur.execute("SELECT COUNT(*) AS cnt FROM users WHERE role = 'ADMIN'", )
+            count_row = cur.fetchone()
+            if count_row["cnt"] <= 1:
+                cur.close()
+                return jsonify({
+                    "error": "You are the only admin. Promote another user to admin before deleting your account."
+                }), 403
+
+        # Cancel upcoming confirmed bookings
+        cur.execute(
+            "UPDATE appointments SET status = 'cancelled' WHERE user_id = %s AND status = 'confirmed' AND date >= CURDATE()",
+            (user_id,),
+        )
+
+        # Delete the user (cascades to appointments, notifications, skin_analyses)
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True})
+    except MySQLError as err:
         return db_error(err)
 
 
