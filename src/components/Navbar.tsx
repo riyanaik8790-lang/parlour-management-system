@@ -188,6 +188,9 @@ export function Navbar() {
             <div className="h-px w-full bg-border/40 my-1" />
             {user ? (
               <>
+                <div className="px-3 py-2 text-sm font-medium" style={{ color: "oklch(0.35 0.15 22)" }}>
+                  Hi, {user.name.split(" ")[0]} !
+                </div>
                 <Link
                   to="/settings"
                   onClick={() => setMenuOpen(false)}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X } from "lucide-react";
 import { api, type AppNotification, getToken } from "@/lib/api";
 import { isPushSupported, getPushPermission, subscribeToPush, isSubscribed } from "@/lib/push";
+import { toast } from "sonner";
 
 const BURGUNDY = "oklch(0.35 0.15 22)";
 const GOLD = "oklch(0.68 0.13 68)";
@@ -130,12 +131,14 @@ export function NotificationBell() {
       if (result === "granted") {
         setShowPushPrompt(false);
         localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+        toast.success("Push notifications enabled!");
       } else if (result === "denied") {
-        // User denied in the native dialog — hide banner so we don't pester them
         setShowPushPrompt(false);
         localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+        toast.info("Push notifications were denied.");
+      } else if (result === "error") {
+        toast.error("Failed to enable push notifications. Check your VAPID keys or console.");
       }
-      // "error" — leave banner visible; user can retry by toggling bell again
     } finally {
       setPushEnabling(false);
     }
