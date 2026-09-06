@@ -58,6 +58,7 @@ if "DATABASE_URL" in os.environ:
         "password": url.password,
         "database": url.path[1:], # strip leading slash
         "autocommit": False,
+        "ssl_disabled": False,   # Aiven MySQL requires SSL
     }
 else:
     # Fallback to local XAMPP config
