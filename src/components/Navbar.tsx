@@ -163,6 +163,19 @@ export function Navbar() {
       {menuOpen && (
         <div className="border-t md:hidden" style={{ background: "oklch(0.968 0.018 85)", borderColor: "oklch(0.84 0.042 80 / 60%)" }}>
           <nav className="flex flex-col px-4 py-3 gap-1">
+            {user && (
+              <div className="mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-sm border" style={{ background: "oklch(0.99 0.01 85)", borderColor: "oklch(0.91 0.025 82)" }}>
+                <div className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-inner text-lg font-semibold" style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.68 0.13 68))" }}>
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "oklch(0.68 0.13 68)" }}>Welcome back</p>
+                  <p className="font-serif text-xl leading-tight" style={{ color: "oklch(0.35 0.15 22)" }}>
+                    {user.name.split(" ")[0]}
+                  </p>
+                </div>
+              </div>
+            )}
             {navLinks.map((ln) => (
               <Link
                 key={ln.to}
@@ -188,9 +201,6 @@ export function Navbar() {
             <div className="h-px w-full bg-border/40 my-1" />
             {user ? (
               <>
-                <div className="px-3 py-2 text-sm font-medium" style={{ color: "oklch(0.35 0.15 22)" }}>
-                  Hi, {user.name.split(" ")[0]} !
-                </div>
                 <Link
                   to="/settings"
                   onClick={() => setMenuOpen(false)}
