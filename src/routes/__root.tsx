@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { registerSW } from "@/lib/push";
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -125,6 +126,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Register the push service worker once on startup (non-blocking, graceful fallback)
+  useEffect(() => {
+    registerSW().catch(() => { /* silently ignore if SW fails to register */ });
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

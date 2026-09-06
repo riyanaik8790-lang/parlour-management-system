@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Bell, CheckCheck, Calendar, Sparkles, Clock } from "lucide-react";
-import { api, type AppNotification } from "@/lib/api";
+import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X } from "lucide-react";
+import { api, type AppNotification, getToken } from "@/lib/api";
+import { isPushSupported, getPushPermission, subscribeToPush, isSubscribed } from "@/lib/push";
 
 const BURGUNDY = "oklch(0.35 0.15 22)";
 const GOLD = "oklch(0.68 0.13 68)";
+
+// ── Local storage key to remember "user dismissed the push prompt" ────────────
+const PUSH_PROMPT_DISMISSED_KEY = "push_prompt_dismissed_v1";
 
 function fmtTime(raw: string) {
   const d = new Date(raw.replace(" ", "T") + (raw.includes("Z") || raw.includes("+") ? "" : "Z"));
@@ -19,12 +23,70 @@ function NotifIcon({ type }: { type: string }) {
   return <Sparkles className="h-4 w-4 flex-shrink-0" style={{ color: GOLD }} />;
 }
 
+// ── Push Permission Banner ────────────────────────────────────────────────────
+
+function PushPromptBanner({ onEnable, onDismiss }: { onEnable: () => void; onDismiss: () => void }) {
+  return (
+    <div
+      className="mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs shadow-md"
+      style={{
+        background: "oklch(0.997 0.006 85)",
+        border: "1px solid oklch(0.86 0.030 82)",
+        boxShadow: "0 4px 16px oklch(0.35 0.15 22 / 10%)",
+        minWidth: 240,
+      }}
+    >
+      <BellRing className="h-4 w-4 shrink-0" style={{ color: BURGUNDY }} />
+      <span className="flex-1 font-medium" style={{ color: "oklch(0.30 0.05 50)" }}>
+        Enable push notifications?
+      </span>
+      <button
+        id="push-enable-btn"
+        onClick={onEnable}
+        className="rounded-lg px-2.5 py-1 font-semibold text-white transition-opacity hover:opacity-85"
+        style={{ background: BURGUNDY, fontSize: 11 }}
+      >
+        Enable
+      </button>
+      <button
+        id="push-dismiss-btn"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-muted"
+        style={{ color: "oklch(0.65 0.03 55)" }}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [marking, setMarking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Push prompt state
+  // Show if: push supported + permission not yet decided + user hasn't permanently dismissed
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [pushEnabling, setPushEnabling] = useState(false);
+
+  // Determine whether to show the push banner on mount
+  useEffect(() => {
+    if (!isPushSupported()) return;
+    if (!getToken()) return; // only for logged-in users
+    if (getPushPermission() !== "default") return; // already decided
+    if (localStorage.getItem(PUSH_PROMPT_DISMISSED_KEY)) return; // permanently dismissed
+
+    // Check if already subscribed (e.g. after page refresh)
+    isSubscribed().then((subscribed) => {
+      if (!subscribed) setShowPushPrompt(true);
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +123,31 @@ export function NotificationBell() {
     finally { setMarking(false); }
   }
 
+  async function handleEnablePush() {
+    setPushEnabling(true);
+    try {
+      const result = await subscribeToPush();
+      if (result === "granted") {
+        setShowPushPrompt(false);
+        localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+      } else if (result === "denied") {
+        // User denied in the native dialog — hide banner so we don't pester them
+        setShowPushPrompt(false);
+        localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+      }
+      // "error" — leave banner visible; user can retry by toggling bell again
+    } finally {
+      setPushEnabling(false);
+    }
+  }
+
+  function handleDismissPush() {
+    setShowPushPrompt(false);
+    // Only session-dismiss (no localStorage): banner can reappear on next login
+    // To permanently dismiss, set the key:
+    // localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+  }
+
   return (
     <div ref={ref} className="relative">
       {/* Bell button */}
@@ -85,7 +172,22 @@ export function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Push permission prompt — shown below bell, outside the notifications dropdown */}
+      {showPushPrompt && !open && (
+        <div className="absolute right-0 top-full z-50">
+          <PushPromptBanner
+            onEnable={handleEnablePush}
+            onDismiss={handleDismissPush}
+          />
+          {pushEnabling && (
+            <p className="mt-1 text-center text-[10px]" style={{ color: "oklch(0.65 0.03 55)" }}>
+              Requesting permission…
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Notifications dropdown */}
       {open && (
         <div
           className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl shadow-2xl"
@@ -115,6 +217,36 @@ export function NotificationBell() {
               </button>
             )}
           </div>
+
+          {/* Push enable row — inside dropdown when open */}
+          {showPushPrompt && (
+            <div
+              className="flex items-center gap-2 border-b px-4 py-2.5"
+              style={{ borderColor: "oklch(0.91 0.025 82)", background: "oklch(0.35 0.15 22 / 3%)" }}
+            >
+              <BellRing className="h-3.5 w-3.5 shrink-0" style={{ color: BURGUNDY }} />
+              <span className="flex-1 text-xs" style={{ color: "oklch(0.40 0.05 50)" }}>
+                Enable push notifications?
+              </span>
+              <button
+                id="push-enable-dropdown-btn"
+                onClick={handleEnablePush}
+                disabled={pushEnabling}
+                className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white disabled:opacity-50"
+                style={{ background: BURGUNDY }}
+              >
+                {pushEnabling ? "…" : "Enable"}
+              </button>
+              <button
+                onClick={handleDismissPush}
+                aria-label="Dismiss"
+                className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                style={{ color: "oklch(0.65 0.03 55)" }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
 
           {/* List */}
           <div className="max-h-80 overflow-y-auto">

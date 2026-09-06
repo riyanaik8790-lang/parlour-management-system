@@ -25,6 +25,12 @@ from mysql.connector import Error as MySQLError
 import cv2
 import numpy as np
 
+# Web Push
+try:
+    from pywebpush import webpush, WebPushException
+    PUSH_AVAILABLE = True
+except ImportError:
+    PUSH_AVAILABLE = False
 
 
 
@@ -45,6 +51,11 @@ limiter = Limiter(
 
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-to-a-long-random-string")
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "168"))  # 7 days
+
+# VAPID keys for Web Push (read from env — private key is never in source code)
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY  = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
 
 import urllib.parse as urlparse
 
@@ -587,6 +598,9 @@ def book():
                 )
             db.commit()
             cur2.close()
+            # Send push to each admin (additive — never fails the booking)
+            for admin in admins:
+                _send_push(db, admin["id"], "New Booking", msg, "/admin")
         except Exception:
             pass  # never fail the booking because of a notification error
 
@@ -596,6 +610,125 @@ def book():
         get_db().rollback()
         if err.errno == 1062:
             return jsonify({"error": "That time slot is already booked. Pick another."}), 409
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
+# Web Push — subscription management & send helper
+# ---------------------------------------------------------------------------
+
+
+def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
+    """
+    Send a browser push notification to every stored subscription for user_id.
+    Any per-subscription error is caught and logged; stale 410/404 subscriptions
+    are removed automatically. Never raises — push is always additive.
+    """
+    if not PUSH_AVAILABLE or not VAPID_PRIVATE_KEY:
+        return
+    try:
+        cur = db.cursor(dictionary=True)
+        cur.execute(
+            "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = %s",
+            (user_id,),
+        )
+        subs = cur.fetchall()
+        cur.close()
+    except Exception as e:
+        print(f"[push] DB read error: {e}")
+        return
+
+    import json as _json
+    payload = _json.dumps({"title": title, "body": body, "url": url})
+    stale_ids = []
+
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub["endpoint"],
+                    "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
+                },
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
+            )
+        except WebPushException as e:
+            status = getattr(e.response, "status_code", None)
+            if status in (404, 410):
+                # Subscription expired / user unsubscribed from browser side
+                stale_ids.append(sub["id"])
+            else:
+                print(f"[push] send error for sub {sub['id']}: {e}")
+        except Exception as e:
+            print(f"[push] unexpected error for sub {sub['id']}: {e}")
+
+    if stale_ids:
+        try:
+            cur2 = db.cursor()
+            cur2.executemany(
+                "DELETE FROM push_subscriptions WHERE id = %s",
+                [(sid,) for sid in stale_ids],
+            )
+            db.commit()
+            cur2.close()
+        except Exception:
+            pass
+
+
+# ── VAPID public key endpoint (no auth required — public information) ─────────
+
+@app.get("/api/push/vapid-public-key")
+def push_vapid_public_key():
+    return jsonify({"public_key": VAPID_PUBLIC_KEY})
+
+
+# ── Save/update a push subscription ──────────────────────────────────────────
+
+@app.post("/api/push/subscribe")
+@require_auth
+def push_subscribe():
+    user_id = g.current_user["id"]
+    data = request.get_json(silent=True) or {}
+    endpoint = (data.get("endpoint") or "").strip()
+    p256dh   = (data.get("p256dh")   or "").strip()
+    auth     = (data.get("auth")     or "").strip()
+
+    if not endpoint or not p256dh or not auth:
+        return jsonify({"error": "endpoint, p256dh, and auth are required"}), 400
+
+    try:
+        db = get_db()
+        cur = db.cursor()
+        # INSERT … ON DUPLICATE KEY UPDATE so re-subscribing the same endpoint is idempotent
+        cur.execute(
+            """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+               VALUES (%s, %s, %s, %s)
+               ON DUPLICATE KEY UPDATE user_id = %s, p256dh = %s, auth = %s""",
+            (user_id, endpoint, p256dh, auth, user_id, p256dh, auth),
+        )
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True}), 201
+    except MySQLError as err:
+        return db_error(err)
+
+
+# ── Remove a push subscription ────────────────────────────────────────────────
+
+@app.delete("/api/push/unsubscribe")
+@require_auth
+def push_unsubscribe():
+    user_id = g.current_user["id"]
+    try:
+        db = get_db()
+        cur = db.cursor()
+        # Delete all subscriptions for this user (simple; could target a specific endpoint)
+        cur.execute("DELETE FROM push_subscriptions WHERE user_id = %s", (user_id,))
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True})
+    except MySQLError as err:
         return db_error(err)
 
 
@@ -632,6 +765,11 @@ def _generate_reminders(db, user_id: int):
                     "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
                     (user_id, msg, appt["id"]),
                 )
+                # Send push for new reminders only (additive — never crashes)
+                try:
+                    _send_push(db, user_id, "Appointment Reminder", msg, "/my-bookings")
+                except Exception:
+                    pass
         db.commit()
         cur.close()
     except Exception:

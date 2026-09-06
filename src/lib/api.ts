@@ -458,6 +458,19 @@ export const api = {
   markAllRead: () =>
     request<{ ok: boolean }>("/api/notifications/read-all", { method: "PUT" }),
 
+  // ── Web Push ────────────────────────────────────────────────────────────────
+  getVapidPublicKey: () =>
+    request<{ public_key: string }>("/api/push/vapid-public-key"),
+
+  subscribePush: (sub: { endpoint: string; p256dh: string; auth: string }) =>
+    request<{ ok: boolean }>("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(sub),
+    }),
+
+  unsubscribePush: () =>
+    request<{ ok: boolean }>("/api/push/unsubscribe", { method: "DELETE" }),
+
   deleteAccount: (password: string) =>
     request<{ ok: boolean }>("/api/account", {
       method: "DELETE",
