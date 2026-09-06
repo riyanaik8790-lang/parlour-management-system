@@ -434,6 +434,3 @@ function PwField({ id, label, value, onChange, show, onToggle, error, onClear, h
   );
 }
 
-// expose GOLD_LIGHT used inside
-const GOLD_LIGHT = "oklch(0.80 0.10 72)";
-const SUCCESS_COLOR = "oklch(0.42 0.18 150)";

@@ -13,8 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BookRouteImport } from './routes/book'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyBookingsRouteImport } from './routes/my-bookings'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ServicesRouteImport } from './routes/services'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TryOnRouteImport } from './routes/try-on'
 import { Route as TryOnLAPTOP86KPKNINRouteImport } from './routes/try-on-LAPTOP-86KPKNIN'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
@@ -43,6 +45,11 @@ const MyBookingsRoute = MyBookingsRouteImport.update({
   path: '/my-bookings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -51,6 +58,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TryOnRoute = TryOnRouteImport.update({
@@ -94,8 +106,10 @@ export interface FileRoutesByFullPath {
   '/book': typeof BookRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRoute
+  '/settings': typeof SettingsRoute
   '/try-on': typeof TryOnRoute
   '/try-on-LAPTOP-86KPKNIN': typeof TryOnLAPTOP86KPKNINRoute
   '/admin': typeof AdminLayoutRoute
@@ -109,8 +123,10 @@ export interface FileRoutesByTo {
   '/book': typeof BookRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRoute
+  '/settings': typeof SettingsRoute
   '/try-on': typeof TryOnRoute
   '/try-on-LAPTOP-86KPKNIN': typeof TryOnLAPTOP86KPKNINRoute
   '/admin': typeof AdminIndexRoute
@@ -124,8 +140,10 @@ export interface FileRoutesById {
   '/book': typeof BookRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRoute
+  '/settings': typeof SettingsRoute
   '/try-on': typeof TryOnRoute
   '/try-on-LAPTOP-86KPKNIN': typeof TryOnLAPTOP86KPKNINRoute
   '/admin/_layout': typeof AdminLayoutRoute
@@ -141,8 +159,10 @@ export interface FileRouteTypes {
     | '/book'
     | '/login'
     | '/my-bookings'
+    | '/profile'
     | '/register'
     | '/services'
+    | '/settings'
     | '/try-on'
     | '/try-on-LAPTOP-86KPKNIN'
     | '/admin'
@@ -156,8 +176,10 @@ export interface FileRouteTypes {
     | '/book'
     | '/login'
     | '/my-bookings'
+    | '/profile'
     | '/register'
     | '/services'
+    | '/settings'
     | '/try-on'
     | '/try-on-LAPTOP-86KPKNIN'
     | '/admin'
@@ -170,8 +192,10 @@ export interface FileRouteTypes {
     | '/book'
     | '/login'
     | '/my-bookings'
+    | '/profile'
     | '/register'
     | '/services'
+    | '/settings'
     | '/try-on'
     | '/try-on-LAPTOP-86KPKNIN'
     | '/admin/_layout'
@@ -186,8 +210,10 @@ export interface RootRouteChildren {
   BookRoute: typeof BookRoute
   LoginRoute: typeof LoginRoute
   MyBookingsRoute: typeof MyBookingsRoute
+  ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   ServicesRoute: typeof ServicesRoute
+  SettingsRoute: typeof SettingsRoute
   TryOnRoute: typeof TryOnRoute
   TryOnLAPTOP86KPKNINRoute: typeof TryOnLAPTOP86KPKNINRoute
   AdminLayoutRoute: typeof AdminLayoutRoute
@@ -227,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MyBookingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -239,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/services'
       fullPath: '/services'
       preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/try-on': {
@@ -298,8 +338,10 @@ const rootRouteChildren: RootRouteChildren = {
   BookRoute: BookRoute,
   LoginRoute: LoginRoute,
   MyBookingsRoute: MyBookingsRoute,
+  ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   ServicesRoute: ServicesRoute,
+  SettingsRoute: SettingsRoute,
   TryOnRoute: TryOnRoute,
   TryOnLAPTOP86KPKNINRoute: TryOnLAPTOP86KPKNINRoute,
   AdminLayoutRoute: AdminLayoutRoute,
