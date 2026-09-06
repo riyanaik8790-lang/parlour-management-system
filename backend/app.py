@@ -364,6 +364,114 @@ def login():
 
 
 # ---------------------------------------------------------------------------
+# Profile - view & update own info
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/profile")
+@require_auth
+def get_profile():
+    user = g.current_user
+    try:
+        cur = get_db().cursor(dictionary=True)
+        cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user["id"],))
+        row = cur.fetchone()
+        cur.close()
+    except MySQLError as err:
+        return db_error(err)
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify(row)
+
+
+@app.put("/api/profile")
+@require_auth
+def update_profile():
+    user = g.current_user
+    data = request.get_json(silent=True) or {}
+    errors = {}
+
+    name_raw = (data.get("name") or "").strip()
+    phone_raw = (data.get("phone") or "").strip()
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+
+    # Validate name
+    if name_raw:
+        parts = name_raw.split()
+        if len(name_raw) < 2 or len(name_raw) > 80:
+            errors["name"] = "Full name must be 2–80 characters"
+        elif len(parts) < 2:
+            errors["name"] = "Please enter your first and last name"
+
+    # Validate phone
+    phone = ""
+    if phone_raw:
+        phone = _strip_phone(phone_raw)
+        if not INDIAN_PHONE_RE.match(phone):
+            errors["phone"] = "A valid 10-digit Indian mobile number is required"
+
+    # Validate password change
+    if new_password:
+        if not current_password:
+            errors["current_password"] = "Enter your current password to set a new one"
+        if len(new_password) < 8:
+            errors["new_password"] = "New password must be at least 8 characters"
+        elif len(new_password) > 72:
+            errors["new_password"] = "New password must be at most 72 characters"
+        elif not STRONG_PW_RE.match(new_password):
+            errors["new_password"] = (
+                "Password must contain uppercase, lowercase, number, and special character"
+            )
+
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    try:
+        db = get_db()
+        cur = db.cursor(dictionary=True)
+        cur.execute("SELECT name, email, phone, password FROM users WHERE id = %s", (user["id"],))
+        row = cur.fetchone()
+
+        # Verify current password if changing password
+        if new_password:
+            if not check_password(current_password, row["password"]):
+                cur.close()
+                return jsonify({"errors": {"current_password": "Incorrect current password"}}), 400
+
+        # Build update fields
+        updates = []
+        values = []
+        if name_raw:
+            name = " ".join(w.capitalize() for w in name_raw.split())
+            updates.append("name = %s")
+            values.append(name)
+        if phone:
+            updates.append("phone = %s")
+            values.append(phone)
+        if new_password:
+            updates.append("password = %s")
+            values.append(hash_password(new_password))
+
+        if not updates:
+            cur.close()
+            return jsonify({"error": "Nothing to update"}), 400
+
+        values.append(user["id"])
+        cur.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = %s", values)
+        db.commit()
+
+        # Return updated user
+        cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user["id"],))
+        updated = cur.fetchone()
+        cur.close()
+    except MySQLError as err:
+        return db_error(err)
+
+    return jsonify({"ok": True, "user": user_payload(updated), "profile": updated})
+
+
+# ---------------------------------------------------------------------------
 # Services & booking slots
 # ---------------------------------------------------------------------------
 

@@ -5,6 +5,8 @@ import { clearSession, getUser, type StoredUser } from "@/lib/api";
 import { ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.png";
 
+const BURGUNDY = "oklch(0.35 0.15 22)";
+
 export function Navbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState<StoredUser | null>(null);
@@ -100,9 +102,13 @@ export function Navbar() {
           <div className="hidden sm:flex items-center gap-2">
             {user ? (
               <>
-                <span className="text-sm text-muted-foreground font-medium">
+                <Link
+                  to="/profile"
+                  className="text-sm font-medium transition-opacity hover:opacity-70"
+                  style={{ color: BURGUNDY }}
+                >
                   Hi, {user.name.split(" ")[0]} !
-                </span>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"
@@ -167,15 +173,24 @@ export function Navbar() {
 
             <div className="h-px w-full bg-border/40 my-1" />
             {user ? (
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  handleLogout();
-                }}
-                className="text-left px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px] flex items-center sm:hidden"
-              >
-                Logout
-              </button>
+              <>
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px] flex items-center"
+                >
+                  My Profile
+                </Link>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="text-left px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px] flex items-center sm:hidden"
+                >
+                  Logout
+                </button>
+              </>
             ) : (
               <>
                 <Link
