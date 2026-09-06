@@ -1043,6 +1043,47 @@ def admin_promote_user(target_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Admin - delete user  DELETE /api/admin/users/<id>
+# ---------------------------------------------------------------------------
+
+@app.delete("/api/admin/users/<int:user_id>")
+@require_admin
+def admin_delete_user(user_id: int):
+    try:
+        db = get_db()
+        cur = db.cursor(dictionary=True)
+
+        cur.execute("SELECT id, role FROM users WHERE id = %s", (user_id,))
+        target = cur.fetchone()
+        if not target:
+            cur.close()
+            return jsonify({"error": "User not found"}), 404
+        
+        # Guard against self-deletion or solo-admin deletion?
+        if target["role"] == "ADMIN":
+            cur.execute("SELECT COUNT(*) AS cnt FROM users WHERE role = 'ADMIN'")
+            count_row = cur.fetchone()
+            if count_row["cnt"] <= 1:
+                cur.close()
+                return jsonify({"error": "Cannot delete the only admin."}), 403
+
+        # Cancel their upcoming bookings
+        cur.execute(
+            "UPDATE appointments SET status = 'cancelled' WHERE user_id = %s AND status = 'confirmed' AND date >= CURDATE()",
+            (user_id,)
+        )
+        
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        db.commit()
+        cur.close()
+
+        return jsonify({"ok": True, "message": "User deleted successfully"})
+    except MySQLError as err:
+        get_db().rollback()
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
 # Admin - set a user's role (promote OR demote)  PUT /api/admin/users/<id>/role
 # ---------------------------------------------------------------------------
 

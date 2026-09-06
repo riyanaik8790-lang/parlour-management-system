@@ -699,6 +699,22 @@ export const api = {
     });
   },
 
+  adminDeleteUser: (userId: number) => {
+    if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
+    const token = getAdminToken() ?? getToken();
+    return fetch(`${API_BASE}/api/admin/users/${userId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete user");
+      return data as { ok: boolean; message: string };
+    });
+  },
+
 
   adminGetAllBookings: (status?: string) => {
     const token = getAdminToken() ?? getToken();

@@ -302,20 +302,26 @@ function SettingsPage() {
 
                   {deleteError && <Banner type="error" msg={deleteError} />}
 
-                  <form onSubmit={doDelete} className="space-y-4">
+                  <div className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-semibold uppercase tracking-widest" style={{ color: ERROR_COLOR }}>
                         Type "DELETE" to confirm
                       </label>
                       <input
                         type="text"
+                        name="delete_confirmation_field"
+                        autoComplete="off"
+                        data-form-type="other"
                         value={deleteConfirm}
-                        onChange={(e) => setDeleteConfirm(e.target.value)}
+                        onChange={(e) => {
+                          if (e.target.value.includes("@")) return;
+                          setDeleteConfirm(e.target.value);
+                        }}
                         placeholder="DELETE"
                         className="w-full rounded-xl px-3 py-3 text-sm outline-none transition-all duration-150"
                         style={{
                           background: CARD_BG,
-                          border: `1px solid ${deleteConfirm === "DELETE" ? "oklch(0.577 0.245 27.325)" : BORDER}`,
+                          border: `1px solid ${deleteConfirm === "DELETE" || deleteConfirm === "delete" ? "oklch(0.577 0.245 27.325)" : BORDER}`,
                           color: "oklch(0.25 0.05 50)",
                         }}
                       />
@@ -326,14 +332,15 @@ function SettingsPage() {
                       onClear={() => setDeleteError(null)} danger />
 
                     <button
-                      type="submit"
-                      disabled={deleting || deleteConfirm !== "DELETE" || !deletePw}
+                      type="button"
+                      onClick={doDelete}
+                      disabled={deleting || (deleteConfirm !== "DELETE" && deleteConfirm !== "delete") || !deletePw}
                       className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold shadow-lg transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
                       style={{ background: "linear-gradient(135deg, oklch(0.577 0.245 27.325), oklch(0.65 0.20 28))", color: "white" }}
                     >
                       {deleting ? <><Loader2 className="h-4 w-4 animate-spin" />Deleting…</> : <><Trash2 className="h-4 w-4" />Delete My Account</>}
                     </button>
-                  </form>
+                  </div>
                 </div>
               </div>
             )}

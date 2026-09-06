@@ -13,6 +13,7 @@ import {
   X,
   Key,
   Copy,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,12 +31,13 @@ function ConfirmModal({
   busy,
 }: {
   user: AdminUser;
-  action: "promote" | "demote";
+  action: "promote" | "demote" | "delete";
   onConfirm: () => void;
   onCancel: () => void;
   busy: boolean;
 }) {
   const isPromote = action === "promote";
+  const isDelete = action === "delete";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -63,7 +65,9 @@ function ConfirmModal({
           }}
         >
           <div className="flex items-center gap-2">
-            {isPromote ? (
+            {isDelete ? (
+              <Trash2 className="h-5 w-5" style={{ color: "oklch(0.99 0.01 85)" }} />
+            ) : isPromote ? (
               <ShieldPlus className="h-5 w-5" style={{ color: "oklch(0.99 0.01 85)" }} />
             ) : (
               <ShieldMinus className="h-5 w-5" style={{ color: "oklch(0.99 0.01 85)" }} />
@@ -72,7 +76,7 @@ function ConfirmModal({
               className="font-bold"
               style={{ color: "oklch(0.99 0.01 85)", fontFamily: "var(--font-serif)" }}
             >
-              {isPromote ? "Promote to Admin?" : "Revoke Admin Access?"}
+              {isDelete ? "Delete User?" : isPromote ? "Promote to Admin?" : "Revoke Admin Access?"}
             </h2>
           </div>
         </div>
@@ -80,7 +84,15 @@ function ConfirmModal({
         {/* Body */}
         <div className="p-6">
           <p className="text-sm" style={{ color: "oklch(0.45 0.04 50)" }}>
-            {isPromote ? (
+            {isDelete ? (
+              <>
+                You are about to permanently delete{" "}
+                <span className="font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>
+                  {user.name}
+                </span>{" "}
+                and all their data. This cannot be undone.
+              </>
+            ) : isPromote ? (
               <>
                 You are about to grant{" "}
                 <span className="font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>
@@ -158,16 +170,18 @@ function ConfirmModal({
                       borderTopColor: "oklch(0.99 0.01 85)",
                     }}
                   />
-                  {isPromote ? "Promoting…" : "Revoking…"}
+                  {isDelete ? "Deleting…" : isPromote ? "Promoting…" : "Revoking…"}
                 </>
               ) : (
                 <>
-                  {isPromote ? (
+                  {isDelete ? (
+                    <Trash2 className="h-4 w-4" />
+                  ) : isPromote ? (
                     <ShieldPlus className="h-4 w-4" />
                   ) : (
                     <ShieldMinus className="h-4 w-4" />
                   )}
-                  {isPromote ? "Yes, Make Admin" : "Yes, Revoke Admin"}
+                  {isDelete ? "Yes, Delete User" : isPromote ? "Yes, Make Admin" : "Yes, Revoke Admin"}
                 </>
               )}
             </button>
@@ -307,6 +321,22 @@ function AdminUsersPage() {
 
   async function handleRoleChange() {
     if (!pendingUser) return;
+    
+    if (pendingAction === "delete") {
+      setActionBusy(true);
+      try {
+        const res = await api.adminDeleteUser(pendingUser.id);
+        setUsers((prev) => prev.filter((u) => u.id !== pendingUser.id));
+        toast.success(res.message ?? `${pendingUser.name} deleted successfully.`);
+        setPendingUser(null);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Deletion failed");
+      } finally {
+        setActionBusy(false);
+      }
+      return;
+    }
+
     const newRole = pendingAction === "promote" ? "ADMIN" : "USER";
     setActionBusy(true);
     try {
@@ -576,6 +606,17 @@ function AdminUsersPage() {
                               </button>
                             )
                           )}
+                          {!isSelf && (
+                            <button
+                              id={`delete-user-btn-${u.id}`}
+                              onClick={() => openConfirm(u, "delete")}
+                              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition active:scale-95 min-h-[44px]"
+                              style={{ background: "oklch(0.577 0.245 27.325 / 8%)", color: "oklch(0.45 0.20 27)", border: "1px solid oklch(0.577 0.245 27.325 / 25%)" }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          )}
                           {isSelf && (
                             <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: "oklch(0.68 0.13 68)" }}>
                               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -744,6 +785,23 @@ function AdminUsersPage() {
                                   >
                                     <ShieldPlus className="h-3.5 w-3.5" />
                                     Make Admin
+                                  </button>
+                                )}
+                                {!isSelf && (
+                                  <button
+                                    id={`delete-user-btn-${u.id}`}
+                                    onClick={() => openConfirm(u, "delete")}
+                                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-95 min-h-[44px]"
+                                    style={{
+                                      background: "oklch(0.577 0.245 27.325 / 8%)",
+                                      color: "oklch(0.45 0.20 27)",
+                                      border: "1px solid oklch(0.577 0.245 27.325 / 25%)",
+                                    }}
+                                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.577 0.245 27.325 / 16%)"; }}
+                                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.577 0.245 27.325 / 8%)"; }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete
                                   </button>
                                 )}
                               </div>
