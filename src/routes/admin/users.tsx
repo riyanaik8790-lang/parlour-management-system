@@ -528,7 +528,7 @@ function AdminUsersPage() {
                             <p className="text-xs truncate" style={{ color: "oklch(0.55 0.04 50)" }}>{u.email}</p>
                             <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>{u.phone}</p>
                             <p className="text-[11px] mt-0.5" style={{ color: "oklch(0.60 0.04 50)" }}>
-                              Joined: {new Date(u.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+                              Joined: {new Date(u.created_at.includes("Z") || u.created_at.includes("+") ? u.created_at : u.created_at + " UTC").toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })}
                             </p>
                           </div>
                           {u.role === "ADMIN" ? (
@@ -677,13 +677,14 @@ function AdminUsersPage() {
                               )}
                             </td>
                             <td className="px-6 py-4" style={{ color: "oklch(0.55 0.04 50)" }}>
-                              {new Date(u.created_at).toLocaleString("en-IN", {
+                              {new Date(u.created_at.includes("Z") || u.created_at.includes("+") ? u.created_at : u.created_at + " UTC").toLocaleString("en-IN", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
                                 hour: "2-digit",
                                 minute: "2-digit",
-                                hour12: true
+                                hour12: true,
+                                timeZone: "Asia/Kolkata",
                               })}
                             </td>
                             <td className="px-6 py-4">
