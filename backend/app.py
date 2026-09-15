@@ -15,14 +15,16 @@ from functools import wraps
 
 import bcrypt
 import jwt
-import psycopg2
-import psycopg2.extras
+import pg8000
+import pg8000.native
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from psycopg2 import Error as PGError
+
+# pg8000 doesn't have a single Error class — use base Exception for DB errors
+PGError = Exception
 
 # cv2 / numpy are only needed for the skin-tone analysis endpoint.
 # Guard the import so the server still starts on Render if opencv
@@ -75,14 +77,33 @@ import urllib.parse as urlparse
 _raw_dsn = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
 DB_DSN = _raw_dsn.strip('"').strip("'")
 
-# Ensure sslmode=require is present for Supabase (Postgres on Render requires SSL)
-if DB_DSN.startswith("postgresql://") or DB_DSN.startswith("postgres://"):
-    if "sslmode" not in DB_DSN:
-        DB_DSN += ("&" if "?" in DB_DSN else "?") + "sslmode=require"
+def _parse_dsn(dsn):
+    """Parse a postgresql:// DSN into pg8000 connect kwargs."""
+    dsn = dsn.replace("postgresql://", "").replace("postgres://", "")
+    userinfo, hostinfo = dsn.split("@", 1)
+    user, password = userinfo.split(":", 1)
+    password = urllib.parse.unquote(password)
+    # handle query string
+    if "?" in hostinfo:
+        hostinfo, qs = hostinfo.split("?", 1)
+    host_port, database = hostinfo.split("/", 1)
+    host, port = (host_port.split(":", 1) if ":" in host_port else (host_port, "5432"))
+    return {"host": host, "port": int(port), "user": user, "password": password, "database": database, "ssl_context": True}
+
+_DB_KWARGS = _parse_dsn(DB_DSN)
+
+def _dict_row_factory(cursor, row):
+    """Make pg8000 return rows as dicts like psycopg2's RealDictCursor."""
+    if cursor.description is None:
+        return row
+    return {desc[0]: val for desc, val in zip(cursor.description, row)}
 
 def get_db():
     if "db" not in g:
-        g.db = psycopg2.connect(DB_DSN)
+        conn = pg8000.connect(**_DB_KWARGS)
+        conn.autocommit = False
+        conn.row_factory = _dict_row_factory
+        g.db = conn
     return g.db
 
 
