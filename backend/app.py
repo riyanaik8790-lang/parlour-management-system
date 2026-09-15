@@ -70,11 +70,17 @@ VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 VAPID_PUBLIC_KEY  = os.getenv("VAPID_PUBLIC_KEY", "")
 VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
 
+import ssl
 import urllib.parse as urlparse
 
 # Strip surrounding quotes in case env var was set with quotes in Render dashboard
 _raw_dsn = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
 DB_DSN = _raw_dsn.strip('"').strip("'")
+
+# Build SSL context for Supabase (requires SSL, self-signed cert OK)
+_ssl_ctx = ssl.create_default_context()
+_ssl_ctx.check_hostname = False
+_ssl_ctx.verify_mode = ssl.CERT_NONE
 
 def _parse_dsn(dsn):
     """Parse a postgresql:// DSN into pg8000 connect kwargs."""
@@ -89,7 +95,7 @@ def _parse_dsn(dsn):
         host_port, database = hostinfo.split("/", 1)
         host, port = (host_port.split(":", 1) if ":" in host_port else (host_port, "5432"))
         return {"host": host, "port": int(port), "user": user, "password": password,
-                "database": database, "ssl_context": True}
+                "database": database, "ssl_context": _ssl_ctx}
     except Exception as e:
         print(f"[startup] WARNING: Could not parse DATABASE_URL: {e}")
         return None
@@ -2094,16 +2100,19 @@ def analyze_skin():
 @app.get("/api/health")
 def health():
     db_ok = False
+    db_err = None
     try:
         cur = get_db().cursor()
         cur.execute("SELECT 1")
         cur.close()
         db_ok = True
-    except Exception:
-        pass
+    except Exception as e:
+        db_err = str(e)
+        print(f"[health] DB error: {e}")
     return jsonify({
         "status": "ok",
         "db": "connected" if db_ok else "error",
+        "db_error": db_err,
         "cv2": CV2_AVAILABLE,
     }), 200 if db_ok else 503
 
