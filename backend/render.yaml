@@ -2,14 +2,23 @@ services:
   - type: web
     name: parlour-backend
     env: python
+    plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    startCommand: "gunicorn app:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT"
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: 3.11.0
       - key: DATABASE_URL
-        sync: false
+        sync: false          # Set this in the Render dashboard
       - key: JWT_SECRET
-        sync: false
+        generateValue: true  # Render auto-generates a secure random value
+      - key: JWT_EXPIRY_HOURS
+        value: 168
       - key: CORS_ORIGINS
+        sync: false          # e.g. https://your-frontend.vercel.app
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CLAIMS_EMAIL
         sync: false

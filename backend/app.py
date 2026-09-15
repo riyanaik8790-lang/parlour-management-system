@@ -1,6 +1,7 @@
 """
 Flask API for Hemangi Glam Salon.
-Connects to MySQL (XAMPP) for users, bookings, and salon data.
+Connects to Supabase (Postgres) for users, bookings, and salon data.
+Hosted on Render.
 """
 
 from __future__ import annotations
@@ -14,16 +15,27 @@ from functools import wraps
 
 import bcrypt
 import jwt
-import mysql.connector
+import psycopg2
+import psycopg2.extras
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from mysql.connector import Error as MySQLError
+from psycopg2 import Error as PGError
 
-import cv2
-import numpy as np
+# cv2 / numpy are only needed for the skin-tone analysis endpoint.
+# Guard the import so the server still starts on Render if opencv
+# is unavailable (e.g. build timeout on the free tier).
+try:
+    import cv2
+    import numpy as np
+    CV2_AVAILABLE = True
+except ImportError:
+    cv2 = None  # type: ignore
+    np = None   # type: ignore
+    CV2_AVAILABLE = False
+    print("[startup] WARNING: cv2/numpy not available — skin-tone endpoint disabled.")
 
 # Web Push
 try:
@@ -60,32 +72,13 @@ VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
 import urllib.parse as urlparse
 
 if "DATABASE_URL" in os.environ:
-    # Render / Aiven provide a URL like mysql://user:pass@host:port/dbname
-    url = urlparse.urlparse(os.environ["DATABASE_URL"])
-    MYSQL_CONFIG = {
-        "host": url.hostname,
-        "port": url.port or 3306,
-        "user": url.username,
-        "password": url.password,
-        "database": url.path[1:], # strip leading slash
-        "autocommit": False,
-        "ssl_disabled": False,   # Aiven MySQL requires SSL
-    }
+    DB_DSN = os.environ["DATABASE_URL"]
 else:
-    # Fallback to local XAMPP config
-    MYSQL_CONFIG = {
-        "host": os.getenv("MYSQL_HOST", "localhost"),
-        "port": int(os.getenv("MYSQL_PORT", "3306")),
-        "user": os.getenv("MYSQL_USER", "root"),
-        "password": os.getenv("MYSQL_PASSWORD", ""),
-        "database": os.getenv("MYSQL_DATABASE", "salon_db"),
-        "autocommit": False,
-    }
-
+    DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
 
 def get_db():
     if "db" not in g:
-        g.db = mysql.connector.connect(**MYSQL_CONFIG)
+        g.db = psycopg2.connect(DB_DSN)
     return g.db
 
 
@@ -96,9 +89,9 @@ def close_db(_exc=None):
         db.close()
 
 
-def db_error(err: MySQLError):
+def db_error(err: PGError):
     print(f"[db] {err}")
-    return jsonify({"error": "Database error. Check MySQL is running and schema.sql was imported."}), 500
+    return jsonify({"error": "Database error."}), 500
 
 
 def hash_password(plain: str) -> str:
@@ -151,12 +144,12 @@ def require_auth(f):
             return jsonify({"error": "Invalid or expired session. Please login again."}), 401
 
         try:
-            cur = get_db().cursor(dictionary=True)
+            cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
             user = cur.fetchone()
             cur.close()
             print("[require_auth] DB user:", user)
-        except MySQLError as err:
+        except PGError as err:
             return db_error(err)
 
         if not user:
@@ -202,12 +195,12 @@ def require_admin(f):
             return jsonify({"error": "Invalid or expired session. Please login again."}), 401
 
         try:
-            cur = get_db().cursor(dictionary=True)
+            cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
             user = cur.fetchone()
             cur.close()
             print("[require_admin] DB user:", user)
-        except MySQLError as err:
+        except PGError as err:
             print("[require_admin] ERROR: DB query failed -", err)
             return db_error(err)
 
@@ -304,7 +297,7 @@ def health():
         cur.fetchone()
         cur.close()
         return jsonify({"ok": True, "database": "connected"})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -330,19 +323,19 @@ def register():
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "INSERT INTO users (name, email, password, phone) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO users (name, email, password, phone) VALUES (%s, %s, %s, %s) RETURNING id",
             (name, email, hashed, phone),
         )
-        user_id = cur.lastrowid
+        user_id = cur.fetchone()["id"]
         db.commit()
         cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
         user = cur.fetchone()
         cur.close()
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
-        if err.errno == 1062:  # duplicate email
+        if err.pgcode == '23505':  # duplicate email
             return jsonify({"errors": {"email": "An account with this email already exists"}}), 409
         return db_error(err)
 
@@ -360,11 +353,11 @@ def login():
         return jsonify({"error": "Email and password are required"}), 400
 
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT id, name, email, password, role FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
     if not user or not check_password(password, user["password"]):
@@ -384,11 +377,11 @@ def login():
 def get_profile():
     user = g.current_user
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user["id"],))
         row = cur.fetchone()
         cur.close()
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
     if not row:
         return jsonify({"error": "User not found"}), 404
@@ -440,7 +433,7 @@ def update_profile():
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT name, email, phone, password FROM users WHERE id = %s", (user["id"],))
         row = cur.fetchone()
 
@@ -476,7 +469,7 @@ def update_profile():
         cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user["id"],))
         updated = cur.fetchone()
         cur.close()
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
     return jsonify({"ok": True, "user": user_payload(updated), "profile": updated})
@@ -490,12 +483,12 @@ def update_profile():
 @app.get("/api/services")
 def list_services():
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT id, name, price, category, description FROM services ORDER BY category, name")
         rows = cur.fetchall()
         cur.close()
         return jsonify({"services": rows})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -512,7 +505,7 @@ def slots():
         return jsonify({"taken": [], "closed": True, "message": "We are closed on Fridays."})
 
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT time FROM appointments WHERE date = %s AND status != 'cancelled'",
             (slot_date,),
@@ -520,7 +513,7 @@ def slots():
         taken = [row["time"] for row in cur.fetchall()]
         cur.close()
         return jsonify({"taken": taken})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -559,7 +552,7 @@ def book():
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute("SELECT id FROM services WHERE id = %s", (service_id,))
         if not cur.fetchone():
@@ -575,15 +568,15 @@ def book():
             return jsonify({"error": "That time slot is already booked. Pick another."}), 409
 
         cur.execute(
-            "INSERT INTO appointments (user_id, service_id, date, time, status) VALUES (%s, %s, %s, %s, 'confirmed')",
+            "INSERT INTO appointments (user_id, service_id, date, time, status) VALUES (%s, %s, %s, %s, 'confirmed') RETURNING id",
             (g.current_user["id"], service_id, slot_date, time_str),
         )
-        booking_id = cur.lastrowid
+        booking_id = cur.fetchone()["id"]
         db.commit()
 
         # Notify all admins about the new booking
         try:
-            cur2 = db.cursor(dictionary=True)
+            cur2 = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur2.execute("SELECT id FROM users WHERE role = 'ADMIN'")
             admins = cur2.fetchall()
             cur2.execute("SELECT name FROM services WHERE id = %s", (service_id,))
@@ -606,9 +599,9 @@ def book():
 
         cur.close()
         return jsonify({"id": booking_id}), 201
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
-        if err.errno == 1062:
+        if err.pgcode == '23505':
             return jsonify({"error": "That time slot is already booked. Pick another."}), 409
         return db_error(err)
 
@@ -627,7 +620,7 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
     if not PUSH_AVAILABLE or not VAPID_PRIVATE_KEY:
         return
     try:
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = %s",
             (user_id,),
@@ -704,13 +697,13 @@ def push_subscribe():
         cur.execute(
             """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
                VALUES (%s, %s, %s, %s)
-               ON DUPLICATE KEY UPDATE user_id = %s, p256dh = %s, auth = %s""",
-            (user_id, endpoint, p256dh, auth, user_id, p256dh, auth),
+               ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth""",
+            (user_id, endpoint, p256dh, auth),
         )
         db.commit()
         cur.close()
         return jsonify({"ok": True}), 201
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -728,7 +721,7 @@ def push_unsubscribe():
         db.commit()
         cur.close()
         return jsonify({"ok": True})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -742,14 +735,14 @@ def _generate_reminders(db, user_id: int):
     try:
         now_utc = datetime.now(timezone.utc)
         window_end = now_utc + timedelta(hours=24)
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """SELECT a.id, a.date, a.time, s.name AS service_name
                FROM appointments a
                JOIN services s ON s.id = a.service_id
                WHERE a.user_id = %s AND a.status = 'confirmed'
-                 AND CONCAT(a.date, ' ', a.time) >= %s
-                 AND CONCAT(a.date, ' ', a.time) <= %s""",
+                 AND (a.date::text || ' ' || a.time) >= %s
+                 AND (a.date::text || ' ' || a.time) <= %s""",
             (user_id, now_utc.strftime("%Y-%m-%d %H:%M"), window_end.strftime("%Y-%m-%d %H:%M")),
         )
         upcoming = cur.fetchall()
@@ -785,7 +778,7 @@ def get_notifications():
     if g.current_user.get("role") != "ADMIN":
         _generate_reminders(db, user_id)
     try:
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """SELECT id, type, message, is_read, booking_id,
                       created_at
@@ -804,7 +797,7 @@ def get_notifications():
                 r["created_at"] = r["created_at"].strftime("%Y-%m-%d %H:%M:%S")
         cur.close()
         return jsonify({"notifications": rows, "unread": unread})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -819,7 +812,7 @@ def mark_all_read():
         db.commit()
         cur.close()
         return jsonify({"ok": True})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -838,7 +831,7 @@ def delete_account():
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         # Fetch current hashed password for verification
         cur.execute("SELECT password, role FROM users WHERE id = %s", (user_id,))
@@ -863,7 +856,7 @@ def delete_account():
 
         # Cancel upcoming confirmed bookings
         cur.execute(
-            "UPDATE appointments SET status = 'cancelled' WHERE user_id = %s AND status = 'confirmed' AND date >= CURDATE()",
+            "UPDATE appointments SET status = 'cancelled' WHERE user_id = %s AND status = 'confirmed' AND date >= CURRENT_DATE",
             (user_id,),
         )
 
@@ -872,7 +865,7 @@ def delete_account():
         db.commit()
         cur.close()
         return jsonify({"ok": True})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -880,13 +873,13 @@ def delete_account():
 @require_auth
 def my_bookings():
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """
             SELECT a.id, s.name AS service_name, a.date, a.time, a.status
             FROM appointments a
             JOIN services s ON s.id = a.service_id
-            WHERE a.user_id = %s AND a.status != 'cancelled'
+            WHERE a.user_id = %s
             ORDER BY a.date DESC, a.time DESC
             """,
             (g.current_user["id"],),
@@ -896,7 +889,7 @@ def my_bookings():
         for row in rows:
             row["date"] = row["date"].isoformat()
         return jsonify({"bookings": rows})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -917,7 +910,7 @@ def update_booking(booking_id: int):
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute(
             "SELECT id FROM appointments WHERE id = %s AND user_id = %s AND status != 'cancelled'",
@@ -942,9 +935,9 @@ def update_booking(booking_id: int):
         db.commit()
         cur.close()
         return jsonify({"ok": True})
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
-        if err.errno == 1062:
+        if err.pgcode == '23505':
             return jsonify({"error": "That time slot is already booked"}), 409
         return db_error(err)
 
@@ -965,7 +958,7 @@ def cancel_booking(booking_id: int):
         db.commit()
         cur.close()
         return jsonify({"ok": True})
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1090,14 +1083,14 @@ def save_skin_analysis():
         db = get_db()
         cur = db.cursor()
         cur.execute(
-            "INSERT INTO skin_analyses (user_id, hex, depth, undertone) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO skin_analyses (user_id, hex, depth, undertone) VALUES (%s, %s, %s, %s) RETURNING id",
             (g.current_user["id"], hex_val, depth, undertone),
         )
-        analysis_id = cur.lastrowid
+        analysis_id = cur.fetchone()["id"]
         db.commit()
         cur.close()
         return jsonify({"id": analysis_id, **PALETTES[undertone]}), 201
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1106,7 +1099,7 @@ def save_skin_analysis():
 @require_auth
 def list_skin_analyses():
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """
             SELECT id, hex, depth, undertone, created_at
@@ -1121,7 +1114,7 @@ def list_skin_analyses():
         for row in rows:
             row["created_at"] = row["created_at"].isoformat() if row["created_at"] else None
         return jsonify({"analyses": rows})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -1134,14 +1127,14 @@ def list_skin_analyses():
 @require_admin
 def admin_list_users():
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT id, name, email, phone, role, created_at FROM users ORDER BY created_at DESC")
         rows = cur.fetchall()
         cur.close()
         for row in rows:
             row["created_at"] = row["created_at"].isoformat() if row["created_at"] else None
         return jsonify({"total": len(rows), "users": rows})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -1154,7 +1147,7 @@ def admin_list_users():
 def admin_promote_user(target_id: int):
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (target_id,))
         target = cur.fetchone()
@@ -1175,7 +1168,7 @@ def admin_promote_user(target_id: int):
             "ok": True,
             "message": f"{target['name']} has been promoted to ADMIN",
         })
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1189,7 +1182,7 @@ def admin_promote_user(target_id: int):
 def admin_delete_user(user_id: int):
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute("SELECT id, role FROM users WHERE id = %s", (user_id,))
         target = cur.fetchone()
@@ -1207,7 +1200,7 @@ def admin_delete_user(user_id: int):
 
         # Cancel their upcoming bookings
         cur.execute(
-            "UPDATE appointments SET status = 'cancelled' WHERE user_id = %s AND status = 'confirmed' AND date >= CURDATE()",
+            "UPDATE appointments SET status = 'cancelled' WHERE user_id = %s AND status = 'confirmed' AND date >= CURRENT_DATE",
             (user_id,)
         )
         
@@ -1216,7 +1209,7 @@ def admin_delete_user(user_id: int):
         cur.close()
 
         return jsonify({"ok": True, "message": "User deleted successfully"})
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1245,7 +1238,7 @@ def admin_set_user_role(user_id: int):
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
         target = cur.fetchone()
@@ -1264,7 +1257,7 @@ def admin_set_user_role(user_id: int):
             "message": f"{target['name']} has been {action}.",
             "user": {"id": target["id"], "name": target["name"], "email": target["email"], "role": new_role},
         })
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1278,7 +1271,7 @@ def admin_set_user_role(user_id: int):
 def admin_list_bookings():
     status_filter = request.args.get("status", "")
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         if status_filter and status_filter != "all":
             cur.execute(
                 """
@@ -1311,7 +1304,7 @@ def admin_list_bookings():
             row["date"] = row["date"].isoformat() if row["date"] else None
             row["created_at"] = row["created_at"].isoformat() if row["created_at"] else None
         return jsonify({"total": len(rows), "bookings": rows})
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -1341,7 +1334,7 @@ def admin_update_booking_status(booking_id: int):
         db.commit()
         cur.close()
         return jsonify({"ok": True})
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1354,13 +1347,13 @@ def admin_update_booking_status(booking_id: int):
 @require_admin
 def admin_stats():
     try:
-        cur = get_db().cursor(dictionary=True)
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute("SELECT COUNT(*) AS total FROM users")
         total_users = cur.fetchone()["total"]
 
         cur.execute(
-            "SELECT COUNT(*) AS total FROM appointments WHERE date = CURDATE() AND status != 'cancelled'"
+            "SELECT COUNT(*) AS total FROM appointments WHERE date = CURRENT_DATE AND status != 'cancelled'"
         )
         bookings_today = cur.fetchone()["total"]
 
@@ -1370,8 +1363,8 @@ def admin_stats():
         cur.execute(
             """
             SELECT COUNT(*) AS total FROM appointments
-            WHERE MONTH(date) = MONTH(CURDATE())
-            AND YEAR(date) = YEAR(CURDATE())
+            WHERE EXTRACT(MONTH FROM date) = MONTH(CURRENT_DATE)
+            AND EXTRACT(YEAR FROM date) = YEAR(CURRENT_DATE)
             AND status != 'cancelled'
             """
         )
@@ -1394,7 +1387,7 @@ def admin_stats():
             "bookings_mtd": bookings_mtd,
             "total_bookings": total_bookings,
         })
-    except MySQLError as err:
+    except PGError as err:
         return db_error(err)
 
 
@@ -1407,7 +1400,7 @@ def admin_stats():
 def admin_reset_user_password(user_id: int):
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute("SELECT id, email FROM users WHERE id = %s", (user_id,))
         target = cur.fetchone()
@@ -1442,7 +1435,7 @@ def admin_reset_user_password(user_id: int):
         cur.close()
         
         return jsonify({"password": new_password})
-    except MySQLError as err:
+    except PGError as err:
         get_db().rollback()
         return db_error(err)
 
@@ -1731,6 +1724,9 @@ def analyze_skin():
     - Per-region median L variance + glare signals -> confidence indicator.
     - Depth and undertone thresholds are unchanged.
     """
+    if not CV2_AVAILABLE:
+        return jsonify({"error": "Skin analysis is temporarily unavailable on this server."}), 503
+
     if "image" not in request.files:
         return jsonify({"error": "No image uploaded"}), 400
 
@@ -2013,6 +2009,27 @@ def analyze_skin():
         print(f"[analyze-skin error] {exc}")
         import traceback; traceback.print_exc()
         return jsonify({"error": "Analysis failed. Please try a different photo."}), 500
+
+
+# ---------------------------------------------------------------------------
+# Health check — used by Render uptime monitoring and for manual verification
+# ---------------------------------------------------------------------------
+
+@app.get("/api/health")
+def health():
+    db_ok = False
+    try:
+        cur = get_db().cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        db_ok = True
+    except Exception:
+        pass
+    return jsonify({
+        "status": "ok",
+        "db": "connected" if db_ok else "error",
+        "cv2": CV2_AVAILABLE,
+    }), 200 if db_ok else 503
 
 
 if __name__ == "__main__":
