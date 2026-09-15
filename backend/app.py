@@ -71,10 +71,14 @@ VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
 
 import urllib.parse as urlparse
 
-if "DATABASE_URL" in os.environ:
-    DB_DSN = os.environ["DATABASE_URL"]
-else:
-    DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
+# Strip surrounding quotes in case env var was set with quotes in Render dashboard
+_raw_dsn = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
+DB_DSN = _raw_dsn.strip('"').strip("'")
+
+# Ensure sslmode=require is present for Supabase (Postgres on Render requires SSL)
+if DB_DSN.startswith("postgresql://") or DB_DSN.startswith("postgres://"):
+    if "sslmode" not in DB_DSN:
+        DB_DSN += ("&" if "?" in DB_DSN else "?") + "sslmode=require"
 
 def get_db():
     if "db" not in g:
