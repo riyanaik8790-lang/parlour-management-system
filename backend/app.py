@@ -15,15 +15,14 @@ from functools import wraps
 
 import bcrypt
 import jwt
-import pg8000
+import psycopg2
+import psycopg2.extras
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
-# pg8000 doesn't have a single Error class — use base Exception for DB errors
-PGError = Exception
+from psycopg2 import Error as PGError
 
 # cv2 / numpy are only needed for the skin-tone analysis endpoint.
 # Guard the import so the server still starts on Render if opencv
@@ -70,107 +69,16 @@ VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 VAPID_PUBLIC_KEY  = os.getenv("VAPID_PUBLIC_KEY", "")
 VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
 
-import ssl
-import urllib.parse as urlparse
-
-# Strip surrounding quotes in case env var was set with quotes in Render dashboard
+# Build DATABASE_URL — strip quotes, ensure sslmode=require for Supabase
 _raw_dsn = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
 DB_DSN = _raw_dsn.strip('"').strip("'")
-
-# Build SSL context for Supabase (requires SSL, self-signed cert OK)
-_ssl_ctx = ssl.create_default_context()
-_ssl_ctx.check_hostname = False
-_ssl_ctx.verify_mode = ssl.CERT_NONE
-
-def _parse_dsn(dsn):
-    """Parse a postgresql:// DSN into pg8000 connect kwargs."""
-    try:
-        dsn = dsn.replace("postgresql://", "").replace("postgres://", "")
-        userinfo, hostinfo = dsn.split("@", 1)
-        user, password = userinfo.split(":", 1)
-        password = urlparse.unquote(password)
-        # handle query string
-        if "?" in hostinfo:
-            hostinfo, _ = hostinfo.split("?", 1)
-        host_port, database = hostinfo.split("/", 1)
-        host, port = (host_port.split(":", 1) if ":" in host_port else (host_port, "5432"))
-        return {"host": host, "port": int(port), "user": user, "password": password,
-                "database": database, "ssl_context": _ssl_ctx}
-    except Exception as e:
-        print(f"[startup] WARNING: Could not parse DATABASE_URL: {e}")
-        return None
-
-_DB_KWARGS = _parse_dsn(DB_DSN)
-
-class DictCursor:
-    """Wraps a pg8000 cursor so fetchone/fetchall return dicts like psycopg2 RealDictCursor."""
-    def __init__(self, cursor):
-        self._cur = cursor
-
-    def _to_dict(self, row):
-        if row is None:
-            return None
-        cols = [d[0] for d in self._cur.description]
-        return dict(zip(cols, row))
-
-    def execute(self, query, args=None):
-        self._cur.execute(query, args)
-
-    def executemany(self, query, args):
-        self._cur.executemany(query, args)
-
-    def fetchone(self):
-        return self._to_dict(self._cur.fetchone())
-
-    def fetchall(self):
-        rows = self._cur.fetchall()
-        return [self._to_dict(r) for r in rows] if rows else []
-
-    def fetchmany(self, size=None):
-        rows = self._cur.fetchmany(size)
-        return [self._to_dict(r) for r in rows] if rows else []
-
-    @property
-    def rowcount(self):
-        return self._cur.rowcount
-
-    @property
-    def description(self):
-        return self._cur.description
-
-    def close(self):
-        self._cur.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-class _DictConn:
-    """Wraps pg8000 connection to return DictCursor from .cursor()."""
-    def __init__(self, conn):
-        self._conn = conn
-
-    def cursor(self):
-        return DictCursor(self._conn.cursor())
-
-    def commit(self):
-        self._conn.commit()
-
-    def rollback(self):
-        self._conn.rollback()
-
-    def close(self):
-        self._conn.close()
+if DB_DSN.startswith(("postgresql://", "postgres://")):
+    if "sslmode" not in DB_DSN:
+        DB_DSN += ("&" if "?" in DB_DSN else "?") + "sslmode=require"
 
 def get_db():
     if "db" not in g:
-        if not _DB_KWARGS:
-            raise Exception("DATABASE_URL is not configured correctly.")
-        conn = pg8000.connect(**_DB_KWARGS)
-        conn.autocommit = False
-        g.db = _DictConn(conn)
+        g.db = psycopg2.connect(DB_DSN, cursor_factory=psycopg2.extras.RealDictCursor)
     return g.db
 
 
