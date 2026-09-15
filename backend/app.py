@@ -375,16 +375,6 @@ def validate_register(data: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-@app.get("/api/health")
-def health():
-    try:
-        cur = get_db().cursor()
-        cur.execute("SELECT 1")
-        cur.fetchone()
-        cur.close()
-        return jsonify({"ok": True, "database": "connected"})
-    except PGError as err:
-        return db_error(err)
 
 
 # ---------------------------------------------------------------------------
