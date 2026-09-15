@@ -579,7 +579,11 @@ export const api = {
         const list = readJSON<
           { id: number; service_name: string; date: string; time: string; status: string }[]
         >(MOCK_BOOKINGS_KEY, []);
-        writeJSON(MOCK_BOOKINGS_KEY, list.filter((b) => b.id !== id));
+        const idx = list.findIndex((b) => b.id === id);
+        if (idx >= 0) {
+          list[idx].status = "cancelled";
+          writeJSON(MOCK_BOOKINGS_KEY, list);
+        }
         return { ok: true as const };
       },
     ),
