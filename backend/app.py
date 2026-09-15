@@ -82,7 +82,7 @@ def _parse_dsn(dsn):
     dsn = dsn.replace("postgresql://", "").replace("postgres://", "")
     userinfo, hostinfo = dsn.split("@", 1)
     user, password = userinfo.split(":", 1)
-    password = urllib.parse.unquote(password)
+    password = urlparse.unquote(password)
     # handle query string
     if "?" in hostinfo:
         hostinfo, qs = hostinfo.split("?", 1)
