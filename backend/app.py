@@ -1337,7 +1337,7 @@ def admin_update_booking_status(booking_id: int):
 @require_admin
 def admin_stats():
     try:
-        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = get_db().cursor()
 
         cur.execute("SELECT COUNT(*) AS total FROM users")
         total_users = cur.fetchone()["total"]
@@ -1353,8 +1353,8 @@ def admin_stats():
         cur.execute(
             """
             SELECT COUNT(*) AS total FROM appointments
-            WHERE EXTRACT(MONTH FROM date) = MONTH(CURRENT_DATE)
-            AND EXTRACT(YEAR FROM date) = YEAR(CURRENT_DATE)
+            WHERE EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+            AND EXTRACT(YEAR FROM date) = EXTRACT(YEAR FROM CURRENT_DATE)
             AND status != 'cancelled'
             """
         )
@@ -1377,7 +1377,7 @@ def admin_stats():
             "bookings_mtd": bookings_mtd,
             "total_bookings": total_bookings,
         })
-    except PGError as err:
+    except Exception as err:
         return db_error(err)
 
 
