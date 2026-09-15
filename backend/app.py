@@ -96,12 +96,75 @@ def _parse_dsn(dsn):
 
 _DB_KWARGS = _parse_dsn(DB_DSN)
 
+class DictCursor:
+    """Wraps a pg8000 cursor so fetchone/fetchall return dicts like psycopg2 RealDictCursor."""
+    def __init__(self, cursor):
+        self._cur = cursor
+
+    def _to_dict(self, row):
+        if row is None:
+            return None
+        cols = [d[0] for d in self._cur.description]
+        return dict(zip(cols, row))
+
+    def execute(self, query, args=None):
+        self._cur.execute(query, args)
+
+    def executemany(self, query, args):
+        self._cur.executemany(query, args)
+
+    def fetchone(self):
+        return self._to_dict(self._cur.fetchone())
+
+    def fetchall(self):
+        rows = self._cur.fetchall()
+        return [self._to_dict(r) for r in rows] if rows else []
+
+    def fetchmany(self, size=None):
+        rows = self._cur.fetchmany(size)
+        return [self._to_dict(r) for r in rows] if rows else []
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    def close(self):
+        self._cur.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+class _DictConn:
+    """Wraps pg8000 connection to return DictCursor from .cursor()."""
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return DictCursor(self._conn.cursor())
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
 def get_db():
     if "db" not in g:
         if not _DB_KWARGS:
             raise Exception("DATABASE_URL is not configured correctly.")
-        g.db = pg8000.connect(**_DB_KWARGS)
-        g.db.autocommit = False
+        conn = pg8000.connect(**_DB_KWARGS)
+        conn.autocommit = False
+        g.db = _DictConn(conn)
     return g.db
 
 
