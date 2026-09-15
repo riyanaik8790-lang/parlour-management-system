@@ -16,7 +16,6 @@ from functools import wraps
 import bcrypt
 import jwt
 import pg8000
-import pg8000.native
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
@@ -79,31 +78,30 @@ DB_DSN = _raw_dsn.strip('"').strip("'")
 
 def _parse_dsn(dsn):
     """Parse a postgresql:// DSN into pg8000 connect kwargs."""
-    dsn = dsn.replace("postgresql://", "").replace("postgres://", "")
-    userinfo, hostinfo = dsn.split("@", 1)
-    user, password = userinfo.split(":", 1)
-    password = urlparse.unquote(password)
-    # handle query string
-    if "?" in hostinfo:
-        hostinfo, qs = hostinfo.split("?", 1)
-    host_port, database = hostinfo.split("/", 1)
-    host, port = (host_port.split(":", 1) if ":" in host_port else (host_port, "5432"))
-    return {"host": host, "port": int(port), "user": user, "password": password, "database": database, "ssl_context": True}
+    try:
+        dsn = dsn.replace("postgresql://", "").replace("postgres://", "")
+        userinfo, hostinfo = dsn.split("@", 1)
+        user, password = userinfo.split(":", 1)
+        password = urlparse.unquote(password)
+        # handle query string
+        if "?" in hostinfo:
+            hostinfo, _ = hostinfo.split("?", 1)
+        host_port, database = hostinfo.split("/", 1)
+        host, port = (host_port.split(":", 1) if ":" in host_port else (host_port, "5432"))
+        return {"host": host, "port": int(port), "user": user, "password": password,
+                "database": database, "ssl_context": True}
+    except Exception as e:
+        print(f"[startup] WARNING: Could not parse DATABASE_URL: {e}")
+        return None
 
 _DB_KWARGS = _parse_dsn(DB_DSN)
 
-def _dict_row_factory(cursor, row):
-    """Make pg8000 return rows as dicts like psycopg2's RealDictCursor."""
-    if cursor.description is None:
-        return row
-    return {desc[0]: val for desc, val in zip(cursor.description, row)}
-
 def get_db():
     if "db" not in g:
-        conn = pg8000.connect(**_DB_KWARGS)
-        conn.autocommit = False
-        conn.row_factory = _dict_row_factory
-        g.db = conn
+        if not _DB_KWARGS:
+            raise Exception("DATABASE_URL is not configured correctly.")
+        g.db = pg8000.connect(**_DB_KWARGS)
+        g.db.autocommit = False
     return g.db
 
 
