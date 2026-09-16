@@ -145,7 +145,7 @@ def require_auth(f):
 
         try:
             cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cur.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
+            cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user_id,))
             user = cur.fetchone()
             cur.close()
             print("[require_auth] DB user:", user)
@@ -586,6 +586,36 @@ def book():
                 _send_push(db, admin["id"], "New Booking", msg, "/admin")
         except Exception:
             pass  # never fail the booking because of a notification error
+
+        # -------------------------------------------------------------
+        # TWILIO SMS INTEGRATION
+        # -------------------------------------------------------------
+        try:
+            twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            twilio_auth = os.getenv("TWILIO_AUTH_TOKEN")
+            twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
+            user_phone = g.current_user.get("phone")
+
+            if twilio_sid and twilio_auth and twilio_number and user_phone:
+                from twilio.rest import Client
+                client = Client(twilio_sid, twilio_auth)
+                
+                # SMS Body
+                sms_body = f"Confirmed! Your appointment at Hemangi Makeover is set for {date_str} at {time_str}."
+                
+                # Basic E.164 formatting fallback if missing '+' (e.g. India)
+                if not user_phone.startswith('+'):
+                    user_phone = '+91' + user_phone.lstrip('0')
+
+                client.messages.create(
+                    body=sms_body,
+                    from_=twilio_number,
+                    to=user_phone
+                )
+                print(f"[Twilio] SMS sent to {user_phone}")
+        except Exception as e:
+            # Failsafe: Do NOT crash the booking if Twilio fails
+            print(f"[Twilio Error] Failed to send SMS: {e}")
 
         cur.close()
         return jsonify({"id": booking_id}), 201
