@@ -5,7 +5,7 @@
  * early without throwing so callers never need to guard individually.
  */
 
-import { getToken } from "./api";
+import { api } from "./api";
 
 const VITE_VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
@@ -91,23 +91,13 @@ export async function subscribeToPush(): Promise<"granted" | "denied" | "already
     });
 
     const json = sub.toJSON();
-    const token = getToken();
-    if (!token) return "error";
 
-    const res = await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        endpoint: json.endpoint,
-        p256dh: json.keys?.p256dh,
-        auth: json.keys?.auth,
-      }),
+    await api.subscribePush({
+      endpoint: json.endpoint!,
+      p256dh: json.keys?.p256dh || "",
+      auth: json.keys?.auth || "",
     });
 
-    if (!res.ok) return "error";
     return "granted";
   } catch (err) {
     console.warn("[push] subscribe error:", err);
@@ -126,12 +116,7 @@ export async function unsubscribeFromPush(): Promise<void> {
     if (!sub) return;
     await sub.unsubscribe();
 
-    const token = getToken();
-    if (!token) return;
-    await fetch("/api/push/unsubscribe", {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await api.unsubscribePush();
   } catch (err) {
     console.warn("[push] unsubscribe error:", err);
   }
