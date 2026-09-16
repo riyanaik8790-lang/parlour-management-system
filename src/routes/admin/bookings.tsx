@@ -396,7 +396,7 @@ function AdminBookingsPage() {
                 ))}
               </div>
               {/* Desktop table (hidden on mobile) */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden sm:block overflow-x-visible pb-40">
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: "1px solid oklch(0.90 0.030 83)" }}>
