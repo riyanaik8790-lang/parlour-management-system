@@ -276,30 +276,40 @@ function SettingsPage() {
                     type="button"
                     disabled={savingPush}
                     onClick={async () => {
+                      if (savingPush) return;
+                      const previousState = pushEnabled;
+                      
+                      // Optimistic UI update: instantly toggle visually
+                      setPushEnabled(!previousState);
                       setSavingPush(true);
+                      
                       try {
-                        if (!pushEnabled) {
-                          // Toggling ON
+                        if (!previousState) {
+                          // Backend operation: Toggling ON
                           const result = await subscribeToPush();
                           if (result === "granted") {
                             await api.updateProfile({ push_enabled: true });
                             queryClient.invalidateQueries({ queryKey: ["profile"] });
-                            setPushEnabled(true);
                             toast.success("Push notifications enabled!");
-                          } else if (result === "denied") {
-                            toast.error("Push notifications were denied. Please enable them in your browser settings.");
                           } else {
-                            toast.error("Failed to enable push notifications (backend or SW error).");
+                            // Revert on failure
+                            setPushEnabled(false);
+                            if (result === "denied") {
+                              toast.error("Push notifications were denied. Please enable them in your browser settings.");
+                            } else {
+                              toast.error("Failed to enable push notifications.");
+                            }
                           }
                         } else {
-                          // Toggling OFF
+                          // Backend operation: Toggling OFF
                           await unsubscribeFromPush();
                           await api.updateProfile({ push_enabled: false });
                           queryClient.invalidateQueries({ queryKey: ["profile"] });
-                          setPushEnabled(false);
                           toast.success("Push notifications disabled.");
                         }
                       } catch (e) {
+                        // Revert on any API error
+                        setPushEnabled(previousState);
                         console.error(e);
                         toast.error(e instanceof Error ? e.message : "An unexpected error occurred");
                       } finally {
