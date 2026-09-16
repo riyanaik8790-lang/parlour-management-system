@@ -212,6 +212,12 @@
   to   { transform: rotate(360deg); }
 }
 
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+
 /* ============================================================
    UTILITY ANIMATION CLASSES
    ============================================================ */

@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -163,7 +163,64 @@ function MyBookingsPage() {
       <h1 className="font-serif text-3xl sm:text-4xl text-primary">My bookings</h1>
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-      {!bookings && !error && <p className="mt-4 text-muted-foreground">Loadingâ€¦</p>}
+
+      {/* Skeleton shimmer while bookings are fetching */}
+      {!bookings && !error && (
+        <ul className="mt-6 space-y-3" aria-busy="true" aria-label="Loading bookings">
+          {[1, 2, 3].map((n) => (
+            <li
+              key={n}
+              className="rounded-2xl border bg-card px-4 py-4 shadow-sm overflow-hidden relative"
+              style={{ borderColor: BORDER }}
+            >
+              {/* shimmer sweep */}
+              <div
+                className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_infinite]"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent 0%, oklch(0.92 0.020 80 / 70%) 50%, transparent 100%)",
+                }}
+              />
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-2 flex-1">
+                  {/* service name bar */}
+                  <div
+                    className="h-4 rounded-full animate-pulse"
+                    style={{
+                      width: `${55 + n * 10}%`,
+                      background: "oklch(0.88 0.030 82)",
+                    }}
+                  />
+                  {/* date/time bar */}
+                  <div
+                    className="h-3 rounded-full animate-pulse"
+                    style={{
+                      width: `${30 + n * 5}%`,
+                      background: "oklch(0.91 0.020 82)",
+                    }}
+                  />
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  {/* status badge skeleton */}
+                  <div
+                    className="h-6 w-20 rounded-full animate-pulse"
+                    style={{ background: "oklch(0.91 0.020 82)" }}
+                  />
+                  {/* button skeletons */}
+                  <div
+                    className="h-9 w-14 rounded-lg animate-pulse"
+                    style={{ background: "oklch(0.89 0.025 82)" }}
+                  />
+                  <div
+                    className="h-9 w-16 rounded-lg animate-pulse"
+                    style={{ background: "oklch(0.89 0.025 82)" }}
+                  />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {bookings && bookings.length === 0 && (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card p-8 text-center">
