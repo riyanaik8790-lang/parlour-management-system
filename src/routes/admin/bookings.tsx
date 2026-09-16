@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { api, type AdminBooking } from "@/lib/api";
 import {
   CalendarCheck,
@@ -74,7 +75,19 @@ function StatusDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [coords, setCoords] = useState({ top: 0, right: 0 });
   const options = ["confirmed", "completed", "cancelled", "no-show"];
+
+  useEffect(() => {
+    if (open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY,
+        right: document.documentElement.clientWidth - rect.right - window.scrollX,
+      });
+    }
+  }, [open]);
 
   async function pick(s: string) {
     if (s === booking.status) { setOpen(false); return; }
@@ -87,6 +100,7 @@ function StatusDropdown({
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
         className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition disabled:opacity-40 min-h-[44px]"
@@ -99,12 +113,14 @@ function StatusDropdown({
         {busy ? <span className="h-3 w-3 animate-spin rounded-full" style={{ border: "1px solid oklch(0.84 0.042 80)", borderTopColor: "oklch(0.35 0.15 22)" }} /> : <ChevronDown className="h-3 w-3" />}
         Edit
       </button>
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-50" onClick={() => setOpen(false)} />
           <div
-            className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-xl shadow-2xl"
+            className="absolute z-50 mt-1 w-36 overflow-hidden rounded-xl shadow-2xl"
             style={{
+              top: coords.top,
+              right: coords.right,
               background: "oklch(0.998 0.004 85)",
               border: "1px solid oklch(0.84 0.042 80 / 80%)",
               boxShadow: "0 16px 48px oklch(0.35 0.15 22 / 12%)",
@@ -130,7 +146,8 @@ function StatusDropdown({
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
@@ -396,7 +413,7 @@ function AdminBookingsPage() {
                 ))}
               </div>
               {/* Desktop table (hidden on mobile) */}
-              <div className="hidden sm:block overflow-x-visible pb-40">
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: "1px solid oklch(0.90 0.030 83)" }}>
