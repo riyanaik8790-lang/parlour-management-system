@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { CalendarIcon, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIME_SLOTS } from "@/lib/services-data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/my-bookings")({
   head: () => ({
@@ -293,7 +294,7 @@ function MyBookingsPage() {
                     <p className="text-[11px] text-muted-foreground">No Fridays. No past dates.</p>
                   </div>
 
-                  {/* Time slots - horizontal scroll on mobile, grid on sm+ */}
+                  {/* Time slots - Dropdown to save space */}
                   <div className="space-y-1">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                       Time
@@ -302,39 +303,27 @@ function MyBookingsPage() {
 
                     {!editDate ? (
                       <div
-                        className="h-10 rounded-xl flex items-center justify-center text-xs text-muted-foreground"
+                        className="h-10 rounded-md flex items-center justify-center text-xs text-muted-foreground"
                         style={{ background: "oklch(0.96 0.010 82)", border: "1px dashed oklch(0.84 0.042 80)" }}
                       >
                         Select a date first
                       </div>
                     ) : (
-                      /* Horizontal scroll on mobile, wrap on sm+ */
-                      <div className="overflow-x-auto pb-1 -mx-0.5">
-                        <div className="flex gap-1.5 sm:flex-wrap px-0.5">
+                      <Select value={editTime} onValueChange={setEditTime}>
+                        <SelectTrigger className="w-full h-10 bg-background">
+                          <SelectValue placeholder="Select time" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
                           {TIME_SLOTS.map((t) => {
                             const isTaken = takenSlots.includes(t);
-                            const isSelected = editTime === t;
                             return (
-                              <button
-                                key={t}
-                                type="button"
-                                disabled={isTaken}
-                                onClick={() => setEditTime(t)}
-                                className={cn(
-                                  "shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all select-none whitespace-nowrap",
-                                  isTaken
-                                    ? "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through opacity-40"
-                                    : isSelected
-                                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                                    : "border-border bg-background hover:border-primary/50 hover:text-primary",
-                                )}
-                              >
-                                {t}
-                              </button>
+                              <SelectItem key={t} value={t} disabled={isTaken}>
+                                {t} {isTaken ? "(Booked)" : ""}
+                              </SelectItem>
                             );
                           })}
-                        </div>
-                      </div>
+                        </SelectContent>
+                      </Select>
                     )}
                   </div>
                 </div>
@@ -398,20 +387,6 @@ function MyBookingsPage() {
                   >
                     {b.status}
                   </span>
-
-                  {/* Mobile: dot indicator instead of full badge */}
-                  <span
-                    className="sm:hidden h-2 w-2 rounded-full shrink-0"
-                    style={{
-                      background:
-                        b.status === "confirmed"
-                          ? BURGUNDY
-                          : b.status === "cancelled"
-                          ? "oklch(0.50 0.22 27)"
-                          : GOLD,
-                    }}
-                    title={b.status}
-                  />
 
                   {b.status === "confirmed" && (
                     <Button
