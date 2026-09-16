@@ -291,7 +291,7 @@ function MyBookingsPage() {
                         />
                       </PopoverContent>
                     </Popover>
-                    <p className="text-[11px] text-muted-foreground">No Fridays. No past dates.</p>
+                    <p className="text-[11px] text-muted-foreground">No Fridays.</p>
                   </div>
 
                   {/* Time slots - Dropdown to save space */}
