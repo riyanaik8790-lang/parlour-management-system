@@ -721,10 +721,15 @@ def push_unsubscribe():
 
 
 def _generate_reminders(db, user_id: int):
-    """Lazily create 24-hour reminder notifications for upcoming appointments."""
+    """Lazily create 24-hour reminder notifications for upcoming appointments.
+
+    Appointment times are stored in IST (Asia/Kolkata = UTC+5:30) so we
+    compare against current IST time, not UTC, to avoid a 5h30m drift.
+    """
     try:
-        now_utc = datetime.now(timezone.utc)
-        window_end = now_utc + timedelta(hours=24)
+        IST = timezone(timedelta(hours=5, minutes=30))
+        now_ist = datetime.now(IST)
+        window_end_ist = now_ist + timedelta(hours=24)
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """SELECT a.id, a.date, a.time, s.name AS service_name
@@ -733,7 +738,7 @@ def _generate_reminders(db, user_id: int):
                WHERE a.user_id = %s AND a.status = 'confirmed'
                  AND (a.date::text || ' ' || a.time) >= %s
                  AND (a.date::text || ' ' || a.time) <= %s""",
-            (user_id, now_utc.strftime("%Y-%m-%d %H:%M"), window_end.strftime("%Y-%m-%d %H:%M")),
+            (user_id, now_ist.strftime("%Y-%m-%d %H:%M"), window_end_ist.strftime("%Y-%m-%d %H:%M")),
         )
         upcoming = cur.fetchall()
         for appt in upcoming:
@@ -742,7 +747,6 @@ def _generate_reminders(db, user_id: int):
                 (user_id, appt["id"]),
             )
             if not cur.fetchone():
-                appt_dt_str = f"{appt['date']} {appt['time']}"
                 msg = f"Reminder: your {appt['service_name']} appointment is on {appt['date']} at {appt['time']}"
                 cur.execute(
                     "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
@@ -750,13 +754,51 @@ def _generate_reminders(db, user_id: int):
                 )
                 # Send push for new reminders only (additive — never crashes)
                 try:
-                    _send_push(db, user_id, "Appointment Reminder", msg, "/my-bookings")
+                    _send_push(db, user_id, "Appointment Reminder 🔔", msg, "/my-bookings")
                 except Exception:
                     pass
         db.commit()
         cur.close()
     except Exception:
         pass  # never crash the notifications fetch
+
+
+def _generate_reminders_all(db):
+    """Generate 24h reminders for ALL users with upcoming appointments.
+
+    Safe to call from a cron / scheduled task — never raises.
+    """
+    try:
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT DISTINCT user_id FROM appointments WHERE status = 'confirmed' AND date >= CURRENT_DATE"
+        )
+        user_ids = [row["user_id"] for row in cur.fetchall()]
+        cur.close()
+        for uid in user_ids:
+            _generate_reminders(db, uid)
+    except Exception as e:
+        print(f"[reminders] _generate_reminders_all error: {e}")
+
+
+
+
+# ── Admin: manually trigger reminders for all users ──────────────────────────
+
+@app.post("/api/push/send-reminders")
+@require_admin
+def push_send_reminders():
+    """Trigger 24-hour push reminders for all users with upcoming appointments.
+
+    Safe to call repeatedly — each reminder is only sent once per appointment.
+    Intended for use by a cron job or the admin panel.
+    """
+    try:
+        db = get_db()
+        _generate_reminders_all(db)
+        return jsonify({"ok": True, "message": "Reminders dispatched."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.get("/api/notifications")
@@ -1313,15 +1355,52 @@ def admin_update_booking_status(booking_id: int):
 
     try:
         db = get_db()
-        cur = db.cursor()
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Fetch booking details (user + service) before updating so we can notify
+        cur.execute(
+            """SELECT a.id, a.date, a.time, a.user_id,
+                      u.name AS user_name, s.name AS service_name
+               FROM appointments a
+               JOIN users u ON u.id = a.user_id
+               JOIN services s ON s.id = a.service_id
+               WHERE a.id = %s""",
+            (booking_id,),
+        )
+        booking = cur.fetchone()
+        if not booking:
+            cur.close()
+            return jsonify({"error": "Booking not found"}), 404
+
         cur.execute(
             "UPDATE appointments SET status = %s WHERE id = %s",
             (new_status, booking_id),
         )
-        if cur.rowcount == 0:
-            cur.close()
-            return jsonify({"error": "Booking not found"}), 404
         db.commit()
+
+        # Notify the customer about the status change (additive — never fails the request)
+        try:
+            status_labels = {
+                "confirmed": "confirmed ✅",
+                "cancelled": "cancelled ❌",
+                "completed": "marked as completed",
+                "no-show": "marked as no-show",
+            }
+            label = status_labels.get(new_status, new_status)
+            msg = (
+                f"Your {booking['service_name']} appointment on "
+                f"{booking['date']} at {booking['time']} has been {label} by the salon."
+            )
+            notif_type = "booking_status_update"
+            cur.execute(
+                "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, %s, %s, %s)",
+                (booking["user_id"], notif_type, msg, booking_id),
+            )
+            db.commit()
+            _send_push(db, booking["user_id"], "Appointment Update", msg, "/my-bookings")
+        except Exception as e:
+            print(f"[notify] Failed to notify user on status change: {e}")
+
         cur.close()
         return jsonify({"ok": True})
     except PGError as err:

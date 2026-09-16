@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Users, CalendarCheck, TrendingUp, Scissors, ArrowRight, Sparkles } from "lucide-react";
+import { Users, CalendarCheck, TrendingUp, Scissors, ArrowRight, Sparkles, BellRing } from "lucide-react";
+import { toast } from "sonner";
 
 // ── Brand palette tokens ──────────────────────────────────────────────────────
 const BURGUNDY = "oklch(0.35 0.15 22)";
@@ -28,12 +29,25 @@ type Stats = {
 function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   useEffect(() => {
     api.adminGetStats()
       .then(setStats)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load stats"));
   }, []);
+
+  async function handleSendReminders() {
+    setSendingReminders(true);
+    try {
+      await api.adminSendReminders();
+      toast.success("Reminders dispatched to all users with upcoming appointments!");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to send reminders");
+    } finally {
+      setSendingReminders(false);
+    }
+  }
 
   // All icons use brand burgundy→gold spectrum - no clashing blues/greens
   const STATS = [
@@ -242,7 +256,7 @@ function AdminDashboard() {
         >
           Quick Actions
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
           {/* Manage Users card */}
           <Link
@@ -271,10 +285,7 @@ function AdminDashboard() {
               <Users className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1">
-              <p
-                className="font-semibold"
-                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-              >
+              <p className="font-semibold" style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}>
                 Manage Users
               </p>
               <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
@@ -316,10 +327,7 @@ function AdminDashboard() {
               <CalendarCheck className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1">
-              <p
-                className="font-semibold"
-                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-              >
+              <p className="font-semibold" style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}>
                 Manage Bookings
               </p>
               <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
@@ -333,6 +341,47 @@ function AdminDashboard() {
               style={{ color: GOLD }}
             />
           </Link>
+
+          {/* Send Reminders card */}
+          <button
+            onClick={handleSendReminders}
+            disabled={sendingReminders}
+            className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300 text-left w-full disabled:opacity-60"
+            style={{
+              background: CARD_WHITE,
+              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+              backdropFilter: "blur(8px)",
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              if (!sendingReminders) el.style.boxShadow = "0 12px 40px oklch(0.68 0.13 68 / 14%)";
+              el.style.transform = sendingReminders ? "none" : "translateY(-3px)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
+              el.style.transform = "translateY(0)";
+            }}
+          >
+            <div
+              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+              style={{ background: "linear-gradient(135deg, oklch(0.42 0.14 18), oklch(0.55 0.12 28))" }}
+            >
+              <BellRing className={`h-6 w-6 text-white ${sendingReminders ? "animate-pulse" : ""}`} />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold" style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}>
+                {sendingReminders ? "Sending Reminders…" : "Send Appointment Reminders"}
+              </p>
+              <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
+                Push 24h reminders to all users with upcoming bookings
+              </p>
+            </div>
+            <ArrowRight
+              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
+              style={{ color: GOLD }}
+            />
+          </button>
         </div>
       </div>
     </div>

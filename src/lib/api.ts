@@ -789,6 +789,22 @@ export const api = {
     });
   },
 
+  adminSendReminders: () => {
+    if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
+    const token = getAdminToken() ?? getToken();
+    return fetch(`${API_BASE}/api/push/send-reminders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reminders");
+      return data as { ok: boolean; message: string };
+    });
+  },
+
 };
 
 export type AdminUser = {

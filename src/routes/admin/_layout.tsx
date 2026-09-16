@@ -9,6 +9,7 @@ import {
   getToken,
   setAdminSession,
 } from "@/lib/api";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   LayoutDashboard,
   Users,
@@ -244,6 +245,8 @@ function AdminLayout() {
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex-1" />
+          {/* Notification bell - auto-polls every 30s for new booking alerts */}
+          <NotificationBell autoRefreshMs={30_000} />
           <span
             className="hidden sm:block text-sm font-medium"
             style={{ color: "oklch(0.55 0.04 50)" }}

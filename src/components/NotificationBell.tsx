@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X } from "lucide-react";
+import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X, Info } from "lucide-react";
 import { api, type AppNotification, getToken } from "@/lib/api";
 import { isPushSupported, getPushPermission, subscribeToPush, isSubscribed } from "@/lib/push";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ function fmtTime(raw: string) {
 function NotifIcon({ type }: { type: string }) {
   if (type === "new_booking") return <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: BURGUNDY }} />;
   if (type === "appointment_reminder") return <Clock className="h-4 w-4 flex-shrink-0" style={{ color: GOLD }} />;
+  if (type === "booking_status_update") return <Info className="h-4 w-4 flex-shrink-0" style={{ color: BURGUNDY }} />;
   return <Sparkles className="h-4 w-4 flex-shrink-0" style={{ color: GOLD }} />;
 }
 
@@ -64,7 +65,7 @@ function PushPromptBanner({ onEnable, onDismiss }: { onEnable: () => void; onDis
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function NotificationBell() {
+export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } = {}) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -99,6 +100,13 @@ export function NotificationBell() {
 
   // Fetch on mount
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh (for admin panel live updates)
+  useEffect(() => {
+    if (!autoRefreshMs) return;
+    const id = setInterval(load, autoRefreshMs);
+    return () => clearInterval(id);
+  }, [autoRefreshMs, load]);
 
   // Close on outside click
   useEffect(() => {
