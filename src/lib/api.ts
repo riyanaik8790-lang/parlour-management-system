@@ -13,7 +13,7 @@ import { SERVICE_CATEGORIES } from "./services-data";
 export const API_BASE =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
   (import.meta.env.VITE_API_BASE as string | undefined) ??
-  ""; // Empty = use Vite proxy (/api → http://localhost:5000)
+  "http://localhost:5000"; // fallback for local dev
 
 const TOKEN_KEY = "salon_token";
 const USER_KEY = "salon_user";
@@ -23,7 +23,8 @@ const ADMIN_TOKEN_KEY = "salon_admin_token";
 const ADMIN_USER_KEY = "salon_admin_user";
 const MOCK_BOOKINGS_KEY = "salon_mock_bookings";
 const MOCK_ANALYSES_KEY = "salon_mock_analyses";
-const REQUEST_TIMEOUT_MS = 8000;
+// Wait 60s to allow Render free tier to wake up from sleep
+const REQUEST_TIMEOUT_MS = 60000;
 
 // Once we've confirmed the backend is unreachable, skip further fetch attempts
 // so login/register/etc. respond instantly with mock data instead of stalling.
