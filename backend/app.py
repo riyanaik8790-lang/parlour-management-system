@@ -373,7 +373,7 @@ def get_profile():
     user = g.current_user
     try:
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user["id"],))
+        cur.execute("SELECT id, name, email, phone, role, push_enabled FROM users WHERE id = %s", (user["id"],))
         row = cur.fetchone()
         cur.close()
     except PGError as err:
@@ -394,6 +394,7 @@ def update_profile():
     phone_raw = (data.get("phone") or "").strip()
     current_password = data.get("current_password") or ""
     new_password = data.get("new_password") or ""
+    push_enabled = data.get("push_enabled")
 
     # Validate name
     if name_raw:
@@ -451,6 +452,9 @@ def update_profile():
         if new_password:
             updates.append("password = %s")
             values.append(hash_password(new_password))
+        if push_enabled is not None:
+            updates.append("push_enabled = %s")
+            values.append(bool(push_enabled))
 
         if not updates:
             cur.close()
@@ -461,7 +465,7 @@ def update_profile():
         db.commit()
 
         # Return updated user
-        cur.execute("SELECT id, name, email, phone, role FROM users WHERE id = %s", (user["id"],))
+        cur.execute("SELECT id, name, email, phone, role, push_enabled FROM users WHERE id = %s", (user["id"],))
         updated = cur.fetchone()
         cur.close()
     except PGError as err:
@@ -2165,7 +2169,14 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             cur.execute(
-                "SELECT id, user_id FROM appointments WHERE status = 'confirmed' AND reminder_sent = false AND date = %s AND time = %s",
+                """SELECT a.id, a.user_id 
+                   FROM appointments a
+                   JOIN users u ON a.user_id = u.id
+                   WHERE a.status = 'confirmed' 
+                     AND a.reminder_sent = false 
+                     AND a.date = %s 
+                     AND a.time = %s 
+                     AND u.push_enabled = true""",
                 (target_date, target_time)
             )
             matches = cur.fetchall()

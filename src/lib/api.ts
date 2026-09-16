@@ -807,14 +807,17 @@ export const api = {
 
 };
 
-export type AdminUser = {
+export interface UserProfile {
   id: number;
   name: string;
   email: string;
   phone: string;
-  role: string;
+  role: "USER" | "ADMIN";
+  push_enabled?: boolean;
   created_at: string;
-};
+}
+
+export type AdminUser = UserProfile;
 
 export type AdminBooking = {
   id: number;

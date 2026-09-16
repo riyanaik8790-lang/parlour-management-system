@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone      VARCHAR(20)  NOT NULL,
   role       VARCHAR(10)  NOT NULL DEFAULT 'USER'
                CHECK (role IN ('USER', 'ADMIN')),
+  push_enabled BOOLEAN    NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ  DEFAULT NOW()
 );
 

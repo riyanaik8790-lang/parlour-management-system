@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api, clearSession, getUser, setSession, getToken, getAdminToken } from "@/lib/api";
+import { subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import {
   User, Phone, Lock, Eye, EyeOff, CheckCircle2, XCircle,
-  Loader2, ShieldCheck, Save, AlertTriangle, Trash2, Settings as SettingsIcon,
+  Loader2, ShieldCheck, Save, AlertTriangle, Trash2, Settings as SettingsIcon, Bell
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -31,7 +32,7 @@ const STRONG_PW_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
 
 // ── Section enum ──────────────────────────────────────────────────────────────
-type Section = "profile" | "password" | "danger";
+type Section = "profile" | "notifications" | "password" | "danger";
 
 function SettingsPage() {
   const navigate = useNavigate();
@@ -48,6 +49,8 @@ function SettingsPage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole]   = useState("");
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [savingPush, setSavingPush] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Info save state
@@ -79,7 +82,7 @@ function SettingsPage() {
   // Load profile
   useEffect(() => {
     api.getProfile()
-      .then((p) => { setName(p.name); setPhone(p.phone); setEmail(p.email); setRole(p.role); })
+      .then((p) => { setName(p.name); setPhone(p.phone); setEmail(p.email); setRole(p.role); setPushEnabled(p.push_enabled ?? false); })
       .catch(() => {
         const u = getUser();
         if (u) { setName(u.name); setEmail(u.email); setRole(u.role); }
@@ -156,6 +159,7 @@ function SettingsPage() {
 
   const tabs: { id: Section; label: string; icon: React.ReactNode }[] = [
     { id: "profile",  label: "Edit Profile",     icon: <User className="h-4 w-4" /> },
+    { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
     { id: "password", label: "Change Password",  icon: <Lock className="h-4 w-4" /> },
     { id: "danger",   label: "Danger Zone",       icon: <AlertTriangle className="h-4 w-4" /> },
   ];
@@ -252,6 +256,67 @@ function SettingsPage() {
                     </button>
                   </form>
                 )}
+              </Card>
+            )}
+
+            {/* ── Notifications ── */}
+            {activeSection === "notifications" && (
+              <Card gradient={`linear-gradient(90deg, ${BURGUNDY}, ${GOLD})`}>
+                <h2 className="mb-5 text-base font-semibold" style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}>
+                  Notification Preferences
+                </h2>
+                
+                <div className="flex items-center justify-between rounded-xl p-4" style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Appointment Reminders (Web Push)</h3>
+                    <p className="text-xs text-gray-500 mt-1">Receive a notification on your device 30 minutes before your appointment starts.</p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    disabled={savingPush}
+                    onClick={async () => {
+                      setSavingPush(true);
+                      try {
+                        if (!pushEnabled) {
+                          // Toggling ON
+                          const result = await subscribeToPush();
+                          if (result === "granted") {
+                            await api.updateProfile({ push_enabled: true });
+                            setPushEnabled(true);
+                          } else if (result === "denied") {
+                            alert("Push notifications were denied. Please enable them in your browser settings.");
+                          } else {
+                            alert("Failed to enable push notifications.");
+                          }
+                        } else {
+                          // Toggling OFF
+                          await unsubscribeFromPush();
+                          await api.updateProfile({ push_enabled: false });
+                          setPushEnabled(false);
+                        }
+                      } catch (e) {
+                        console.error(e);
+                      } finally {
+                        setSavingPush(false);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50`}
+                    style={{
+                      backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
+                      boxShadow: pushEnabled ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}` : 'none'
+                    }}
+                    role="switch"
+                    aria-checked={pushEnabled}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        pushEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </Card>
             )}
 
