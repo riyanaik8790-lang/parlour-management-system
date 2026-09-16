@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   date       DATE         NOT NULL,
   time       VARCHAR(5)   NOT NULL,
   status     VARCHAR(20)  NOT NULL DEFAULT 'confirmed',
+  reminder_sent BOOLEAN   NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ  DEFAULT NOW(),
   CONSTRAINT fk_appt_user    FOREIGN KEY (user_id)    REFERENCES users(id)    ON DELETE CASCADE,
   CONSTRAINT fk_appt_service FOREIGN KEY (service_id) REFERENCES services(id),

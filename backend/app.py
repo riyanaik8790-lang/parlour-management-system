@@ -44,6 +44,11 @@ try:
 except ImportError:
     PUSH_AVAILABLE = False
 
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    SCHEDULER_AVAILABLE = True
+except ImportError:
+    SCHEDULER_AVAILABLE = False
 
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -2132,6 +2137,76 @@ def health():
         "db_error": db_err,
         "cv2": CV2_AVAILABLE,
     }), 200 if db_ok else 503
+
+# ---------------------------------------------------------------------------
+# Background Scheduler (30-Minute Reminders)
+# ---------------------------------------------------------------------------
+
+if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    def check_30min_reminders():
+        """Check for appointments 30 minutes away and send Web Push reminders."""
+        try:
+            # We must create a fresh DB connection because this runs in a background thread, outside Flask's app context.
+            db_url = os.getenv("DATABASE_URL")
+            if not db_url: return
+            
+            db = psycopg2.connect(db_url)
+            IST = timezone(timedelta(hours=5, minutes=30))
+            now_ist = datetime.now(IST)
+            
+            # Look ahead exactly 30 minutes
+            target_ist = now_ist + timedelta(minutes=30)
+            target_date = target_ist.strftime("%Y-%m-%d")
+            
+            # Since appointments are at strict 30-min intervals (e.g. 09:00, 09:30), 
+            # we just format the target time to HH:MM.
+            target_time = target_ist.strftime("%H:%M")
+
+            cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            cur.execute(
+                "SELECT id, user_id FROM appointments WHERE status = 'confirmed' AND reminder_sent = false AND date = %s AND time = %s",
+                (target_date, target_time)
+            )
+            matches = cur.fetchall()
+            
+            if matches:
+                print(f"[scheduler] Found {len(matches)} appointments starting at {target_time}. Sending pushes...")
+            
+            for appt in matches:
+                # 1. Update the flag first so we don't spam if something fails halfway
+                cur.execute("UPDATE appointments SET reminder_sent = true WHERE id = %s", (appt["id"],))
+                
+                # 2. Add to in-app notifications
+                msg = f"Your appointment starts in exactly 30 minutes!"
+                cur.execute(
+                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
+                    (appt["user_id"], msg, appt["id"]),
+                )
+                
+                # 3. Send Web Push
+                try:
+                    _send_push(db, appt["user_id"], "Appointment Starting Soon ⏰", msg, "/my-bookings")
+                except Exception as e:
+                    print(f"[scheduler] Push error for user {appt['user_id']}: {e}")
+
+            db.commit()
+            cur.close()
+            db.close()
+        except Exception as e:
+            print(f"[scheduler] 30min reminder error: {e}")
+
+    try:
+        scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+        scheduler.add_job(func=check_30min_reminders, trigger="interval", minutes=1)
+        scheduler.start()
+        print("[startup] APScheduler started: 30-minute reminder job is active.")
+        
+        # Ensure it shuts down gracefully when the process exits
+        import atexit
+        atexit.register(lambda: scheduler.shutdown())
+    except Exception as e:
+        print(f"[startup] Failed to start APScheduler: {e}")
 
 
 if __name__ == "__main__":
