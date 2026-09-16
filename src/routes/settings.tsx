@@ -268,7 +268,7 @@ function SettingsPage() {
                 
                 <div className="flex items-center justify-between rounded-xl p-4" style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Appointment Reminders (Web Push)</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">Appointment Reminders</h3>
                     <p className="text-xs text-gray-500 mt-1">Receive a notification on your device 30 minutes before your appointment starts.</p>
                   </div>
                   
@@ -284,19 +284,22 @@ function SettingsPage() {
                           if (result === "granted") {
                             await api.updateProfile({ push_enabled: true });
                             setPushEnabled(true);
+                            toast.success("Push notifications enabled!");
                           } else if (result === "denied") {
-                            alert("Push notifications were denied. Please enable them in your browser settings.");
+                            toast.error("Push notifications were denied. Please enable them in your browser settings.");
                           } else {
-                            alert("Failed to enable push notifications.");
+                            toast.error("Failed to enable push notifications (backend or SW error).");
                           }
                         } else {
                           // Toggling OFF
                           await unsubscribeFromPush();
                           await api.updateProfile({ push_enabled: false });
                           setPushEnabled(false);
+                          toast.success("Push notifications disabled.");
                         }
                       } catch (e) {
                         console.error(e);
+                        toast.error(e instanceof Error ? e.message : "An unexpected error occurred");
                       } finally {
                         setSavingPush(false);
                       }
