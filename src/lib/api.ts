@@ -203,6 +203,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...init,
       headers,
       signal: controller.signal,
+      cache: "no-store",
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) : {};

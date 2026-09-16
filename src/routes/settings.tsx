@@ -283,6 +283,7 @@ function SettingsPage() {
                           const result = await subscribeToPush();
                           if (result === "granted") {
                             await api.updateProfile({ push_enabled: true });
+                            queryClient.invalidateQueries({ queryKey: ["profile"] });
                             setPushEnabled(true);
                             toast.success("Push notifications enabled!");
                           } else if (result === "denied") {
@@ -294,6 +295,7 @@ function SettingsPage() {
                           // Toggling OFF
                           await unsubscribeFromPush();
                           await api.updateProfile({ push_enabled: false });
+                          queryClient.invalidateQueries({ queryKey: ["profile"] });
                           setPushEnabled(false);
                           toast.success("Push notifications disabled.");
                         }
