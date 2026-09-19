@@ -279,29 +279,37 @@ function SettingsPage() {
                       if (savingPush) return;
                       const previousState = pushEnabled;
                       
-                      // Optimistic UI update: instantly toggle visually
-                      setPushEnabled(!previousState);
-                      setSavingPush(true);
-                      
                       try {
                         if (!previousState) {
-                          // Backend operation: Toggling ON
-                          const result = await subscribeToPush();
-                          if (result === "granted") {
-                            await api.updateProfile({ push_enabled: true });
-                            queryClient.invalidateQueries({ queryKey: ["profile"] });
-                            toast.success("Push notifications enabled!");
-                          } else {
-                            // Revert on failure
+                          // Turning ON: Request permission FIRST to satisfy browser gesture requirements
+                          const permission = await Notification.requestPermission();
+                          
+                          if (permission === "denied") {
+                            toast.error("Notifications blocked in browser.");
                             setPushEnabled(false);
-                            if (result === "denied") {
-                              toast.error("Push notifications were denied. Please enable them in your browser settings.");
+                            return;
+                          }
+                          
+                          if (permission === "granted") {
+                            // Optimistic UI update
+                            setPushEnabled(true);
+                            setSavingPush(true);
+                            
+                            const result = await subscribeToPush();
+                            if (result === "granted" || result === "already") {
+                              await api.updateProfile({ push_enabled: true });
+                              queryClient.invalidateQueries({ queryKey: ["profile"] });
+                              toast.success("Push notifications enabled!");
                             } else {
+                              setPushEnabled(false);
                               toast.error("Failed to enable push notifications.");
                             }
                           }
                         } else {
-                          // Backend operation: Toggling OFF
+                          // Turning OFF
+                          setPushEnabled(false);
+                          setSavingPush(true);
+                          
                           await unsubscribeFromPush();
                           await api.updateProfile({ push_enabled: false });
                           queryClient.invalidateQueries({ queryKey: ["profile"] });
