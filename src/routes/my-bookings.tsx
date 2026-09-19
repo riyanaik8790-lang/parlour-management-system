@@ -357,7 +357,7 @@ function MyBookingsPage() {
 
                             return (
                               <SelectItem key={t} value={t} disabled={isDisabled}>
-                                {t} {isTaken ? "(Booked)" : isBuffer ? "(Buffer)" : isPast ? "(Passed)" : ""}
+                                {t} {isTaken || isBuffer ? "(Booked)" : ""}
                               </SelectItem>
                             );
                           })}

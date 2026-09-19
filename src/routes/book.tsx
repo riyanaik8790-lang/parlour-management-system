@@ -200,8 +200,11 @@ function BookPage() {
               Time {loadingSlots && <span className="text-xs text-muted-foreground">(loading…)</span>}
             </label>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {TIME_SLOTS.map((t) => {
+              {TIME_SLOTS.map((t, index) => {
                 const isTaken = taken.includes(t);
+                const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
+                const isBuffer = prevSlot ? taken.includes(prevSlot) : false;
+                
                 const isSelected = time === t;
                 
                 // Past time validation for today (in IST)
@@ -217,7 +220,7 @@ function BookPage() {
                   }
                 }
                 
-                const isDisabled = isTaken || !date || isPastTime;
+                const isDisabled = isTaken || isBuffer || !date || isPastTime;
 
                 return (
                   <button
@@ -227,8 +230,8 @@ function BookPage() {
                     onClick={() => setTime(t)}
                     className={cn(
                       "rounded-md border px-1 sm:px-2 py-2.5 text-xs sm:text-sm transition min-h-[44px]",
-                      isTaken && "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
-                      isPastTime && !isTaken && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      (isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
+                      isPastTime && !(isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
                       !isDisabled && !isSelected && "border-border bg-background hover:border-accent hover:text-primary",
                       isSelected && "border-primary bg-primary text-primary-foreground",
                       !date && "opacity-60",
