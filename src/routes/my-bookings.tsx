@@ -143,6 +143,28 @@ function MyBookingsPage() {
       toast.error("Please pick a date and a time slot.");
       return;
     }
+
+    const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const midnightIST = new Date(istNow);
+    midnightIST.setHours(0, 0, 0, 0);
+
+    if (editDate! < midnightIST) {
+      toast.error("Cannot book an appointment in the past.");
+      return;
+    }
+
+    if (
+      editDate!.getDate() === istNow.getDate() &&
+      editDate!.getMonth() === istNow.getMonth() &&
+      editDate!.getFullYear() === istNow.getFullYear()
+    ) {
+      const [h, m] = editTime.split(":").map(Number);
+      if (h * 60 + m <= istNow.getHours() * 60 + istNow.getMinutes()) {
+        toast.error("Cannot book an appointment in the past.");
+        return;
+      }
+    }
+
     setBusyId(id);
     try {
       await api.updateBooking(id, { date: editIsoDate, time: editTime });
@@ -314,11 +336,28 @@ function MyBookingsPage() {
                           <SelectValue placeholder="Select time" />
                         </SelectTrigger>
                         <SelectContent className="max-h-60">
-                          {TIME_SLOTS.map((t) => {
+                          {TIME_SLOTS.map((t, index) => {
+                            const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                            const isToday =
+                              editDate?.getDate() === istNow.getDate() &&
+                              editDate?.getMonth() === istNow.getMonth() &&
+                              editDate?.getFullYear() === istNow.getFullYear();
+
+                            const [slotH, slotM] = t.split(":").map(Number);
+                            const slotMinutes = slotH * 60 + slotM;
+                            const currentMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+                            
+                            const isPast = isToday && slotMinutes <= currentMinutes;
+                            
+                            const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
+                            const isBuffer = prevSlot ? takenSlots.includes(prevSlot) : false;
+                            
                             const isTaken = takenSlots.includes(t);
+                            const isDisabled = isTaken || isPast || isBuffer;
+
                             return (
-                              <SelectItem key={t} value={t} disabled={isTaken}>
-                                {t} {isTaken ? "(Booked)" : ""}
+                              <SelectItem key={t} value={t} disabled={isDisabled}>
+                                {t} {isTaken ? "(Booked)" : isBuffer ? "(Buffer)" : isPast ? "(Passed)" : ""}
                               </SelectItem>
                             );
                           })}
