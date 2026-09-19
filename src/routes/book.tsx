@@ -27,6 +27,11 @@ export const Route = createFileRoute("/book")({
   component: BookPage,
 });
 
+function getISTNow(): Date {
+  const str = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  return new Date(str);
+}
+
 function BookPage() {
   const navigate = useNavigate();
   const { service: preselectedService } = Route.useSearch();
@@ -71,6 +76,24 @@ function BookPage() {
 
   async function submit() {
     if (!serviceId || !isoDate || !time) { toast.error("Please select a service, date and time."); return; }
+    
+    // Strict IST Time check
+    const istNow = getISTNow();
+    const istTodayStr = format(istNow, "yyyy-MM-dd");
+    if (isoDate < istTodayStr) {
+      toast.error("Cannot book an appointment in the past.");
+      return;
+    }
+    if (isoDate === istTodayStr) {
+      const [h, m] = time.split(":").map(Number);
+      const slotMinutes = h * 60 + m;
+      const currentMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+      if (slotMinutes <= currentMinutes) {
+        toast.error("Cannot book an appointment in the past.");
+        return;
+      }
+    }
+
     const user = getUser();
     if (!user) { toast.error("Please login first."); navigate({ to: "/login" }); return; }
     setSubmitting(true);
@@ -161,7 +184,11 @@ function BookPage() {
                   mode="single"
                   selected={date}
                   onSelect={(d) => { setDate(d); setTime(""); }}
-                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0)) || d.getDay() === 5}
+                  disabled={(d) => {
+                    const istToday = getISTNow();
+                    istToday.setHours(0, 0, 0, 0);
+                    return d < istToday || d.getDay() === 5;
+                  }}
                   initialFocus
                   className={cn("p-3 pointer-events-auto")}
                 />
@@ -176,16 +203,33 @@ function BookPage() {
               {TIME_SLOTS.map((t) => {
                 const isTaken = taken.includes(t);
                 const isSelected = time === t;
+                
+                // Past time validation for today (in IST)
+                let isPastTime = false;
+                if (isoDate) {
+                  const istNow = getISTNow();
+                  const istTodayStr = format(istNow, "yyyy-MM-dd");
+                  if (isoDate === istTodayStr) {
+                    const [h, m] = t.split(":").map(Number);
+                    const slotMinutes = h * 60 + m;
+                    const currentMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+                    isPastTime = slotMinutes <= currentMinutes;
+                  }
+                }
+                
+                const isDisabled = isTaken || !date || isPastTime;
+
                 return (
                   <button
                     key={t}
                     type="button"
-                    disabled={isTaken || !date}
+                    disabled={isDisabled}
                     onClick={() => setTime(t)}
                     className={cn(
                       "rounded-md border px-1 sm:px-2 py-2.5 text-xs sm:text-sm transition min-h-[44px]",
                       isTaken && "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
-                      !isTaken && !isSelected && "border-border bg-background hover:border-accent hover:text-primary",
+                      isPastTime && !isTaken && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      !isDisabled && !isSelected && "border-border bg-background hover:border-accent hover:text-primary",
                       isSelected && "border-primary bg-primary text-primary-foreground",
                       !date && "opacity-60",
                     )}
