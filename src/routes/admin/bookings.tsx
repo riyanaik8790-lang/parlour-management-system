@@ -194,9 +194,9 @@ function AdminBookingsPage() {
   const filtered = bookings.filter((b) => {
     const q = query.toLowerCase();
     return (
-      b.user_name.toLowerCase().includes(q) ||
+      (b.offline_name ?? b.user_name).toLowerCase().includes(q) ||
       b.user_email.toLowerCase().includes(q) ||
-      b.user_phone.includes(q) ||
+      (b.offline_phone ?? b.user_phone ?? "").includes(q) ||
       b.service_name.toLowerCase().includes(q) ||
       String(b.id).includes(q)
     );
@@ -370,15 +370,31 @@ function AdminBookingsPage() {
                         <div
                           className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold"
                           style={{
-                            background: "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
+                            background: b.offline_name
+                              ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
+                              : "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
                             color: "oklch(0.99 0.01 85)",
                           }}
                         >
-                          {b.user_name[0]?.toUpperCase()}
+                          {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>{b.user_name}</p>
-                          <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>{b.user_email}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>
+                              {b.offline_name ?? b.user_name}
+                            </p>
+                            {b.offline_name && (
+                              <span
+                                className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{ background: "oklch(0.68 0.13 68 / 15%)", color: "oklch(0.50 0.12 65)" }}
+                              >
+                                Walk-in
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                            {b.offline_phone ?? b.user_email}
+                          </p>
                         </div>
                       </div>
                       <span className="font-mono text-xs" style={{ color: "oklch(0.70 0.04 50)" }}>#{b.id}</span>
@@ -443,16 +459,38 @@ function AdminBookingsPage() {
                             <div
                               className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md"
                               style={{
-                                background: "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
+                                background: b.offline_name
+                                  ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
+                                  : "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
                                 color: "oklch(0.99 0.01 85)",
                               }}
                             >
-                              {b.user_name[0]?.toUpperCase()}
+                              {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-medium" style={{ color: "oklch(0.25 0.05 50)" }}>{b.user_name}</p>
-                              <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>{b.user_email}</p>
-                              <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>{b.user_phone}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium" style={{ color: "oklch(0.25 0.05 50)" }}>
+                                  {b.offline_name ?? b.user_name}
+                                </p>
+                                {b.offline_name && (
+                                  <span
+                                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                    style={{ background: "oklch(0.68 0.13 68 / 15%)", color: "oklch(0.50 0.12 65)" }}
+                                  >
+                                    Walk-in
+                                  </span>
+                                )}
+                              </div>
+                              {b.offline_name ? (
+                                <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                                  {b.offline_phone ? `📞 ${b.offline_phone}` : "No phone"}
+                                </p>
+                              ) : (
+                                <>
+                                  <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>{b.user_email}</p>
+                                  <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>{b.user_phone}</p>
+                                </>
+                              )}
                             </div>
                           </div>
                         </td>

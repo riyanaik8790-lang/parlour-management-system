@@ -1415,14 +1415,19 @@ def admin_list_bookings():
     status_filter = request.args.get("status", "")
     try:
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # LEFT JOIN users so offline bookings (user_id IS NULL) are also returned.
         if status_filter and status_filter != "all":
             cur.execute(
                 """
                 SELECT a.id, a.date, a.time, a.status, a.created_at,
-                       u.id AS user_id, u.name AS user_name, u.email AS user_email, u.phone AS user_phone,
+                       a.offline_name, a.offline_phone,
+                       u.id AS user_id,
+                       COALESCE(a.offline_name, u.name, 'Unknown')  AS user_name,
+                       COALESCE(u.email, '')                        AS user_email,
+                       COALESCE(a.offline_phone, u.phone, '')       AS user_phone,
                        s.id AS service_id, s.name AS service_name, s.price AS service_price, s.category
                 FROM appointments a
-                JOIN users u ON u.id = a.user_id
+                LEFT JOIN users u ON u.id = a.user_id
                 JOIN services s ON s.id = a.service_id
                 WHERE a.status = %s
                 ORDER BY a.date DESC, a.time DESC
@@ -1433,10 +1438,14 @@ def admin_list_bookings():
             cur.execute(
                 """
                 SELECT a.id, a.date, a.time, a.status, a.created_at,
-                       u.id AS user_id, u.name AS user_name, u.email AS user_email, u.phone AS user_phone,
+                       a.offline_name, a.offline_phone,
+                       u.id AS user_id,
+                       COALESCE(a.offline_name, u.name, 'Unknown')  AS user_name,
+                       COALESCE(u.email, '')                        AS user_email,
+                       COALESCE(a.offline_phone, u.phone, '')       AS user_phone,
                        s.id AS service_id, s.name AS service_name, s.price AS service_price, s.category
                 FROM appointments a
-                JOIN users u ON u.id = a.user_id
+                LEFT JOIN users u ON u.id = a.user_id
                 JOIN services s ON s.id = a.service_id
                 ORDER BY a.date DESC, a.time DESC
                 """
@@ -1448,6 +1457,141 @@ def admin_list_bookings():
             row["created_at"] = row["created_at"].isoformat() if row["created_at"] else None
         return jsonify({"total": len(rows), "bookings": rows})
     except PGError as err:
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
+# Admin - manually log a walk-in / offline booking
+# ---------------------------------------------------------------------------
+
+@app.post("/api/admin/book-offline")
+@require_admin
+def admin_book_offline():
+    """Create an appointment for a walk-in or phone customer.
+    Runs the exact same validation chain as /api/book so all business rules
+    (slot conflict, 30-min buffer, Pre-Bridal one-per-day) are enforced.
+    user_id is left NULL; offline_name / offline_phone are stored instead.
+    """
+    data = request.get_json(silent=True) or {}
+    service_id    = (data.get("service_id")    or "").strip()
+    date_str      = (data.get("date")          or "").strip()
+    time_str      = (data.get("time")          or "").strip()
+    offline_name  = (data.get("offline_name")  or "").strip()
+    offline_phone = (data.get("offline_phone") or "").strip() or None
+
+    # ── Required field checks ────────────────────────────────────────────────
+    if not service_id or not date_str or not time_str:
+        return jsonify({"error": "service_id, date, and time are required"}), 400
+    if not offline_name:
+        return jsonify({"error": "Customer name is required for offline bookings"}), 400
+
+    try:
+        slot_date = date.fromisoformat(date_str)
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
+
+    # ── Same date/time guardrails as /api/book ───────────────────────────────
+    if slot_date < date.today():
+        return jsonify({"error": "Cannot book a past date"}), 400
+
+    if slot_date.weekday() == 4:   # Friday
+        return jsonify({"error": "We are closed on Fridays. Please choose another day."}), 400
+
+    VALID_TIMES = [
+        f"{str(h).zfill(2)}:{m}"
+        for h in range(9, 17)
+        for m in ("00", "30")
+        if not (h == 16 and m == "30")
+    ] + ["16:30"]
+    if time_str not in VALID_TIMES:
+        return jsonify({"error": "Booking time must be between 09:00 and 16:30."}), 400
+
+    try:
+        db = get_db()
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # ── Validate service exists ──────────────────────────────────────────
+        cur.execute("SELECT id, name FROM services WHERE id = %s", (service_id,))
+        svc_row = cur.fetchone()
+        if not svc_row:
+            cur.close()
+            return jsonify({"error": "Unknown service"}), 400
+        svc_name = svc_row["name"]
+
+        # ── Slot conflict check (30-min unique slot) ──────────────────────────
+        cur.execute(
+            "SELECT id FROM appointments WHERE date = %s AND time = %s AND status != 'cancelled'",
+            (slot_date, time_str),
+        )
+        if cur.fetchone():
+            cur.close()
+            return jsonify({"error": "That time slot is already booked. Pick another."}), 409
+
+        # ── Pre-Bridal Package: only one per day ─────────────────────────────
+        if service_id == "pb-package" or svc_name in ("Complete Pre-Bridal Package", "Pre-Bridal Package"):
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM appointments a
+                JOIN services s ON s.id = a.service_id
+                WHERE a.date = %s
+                  AND a.status != 'cancelled'
+                  AND (
+                        a.service_id IN ('pk-prebridal', 'pb-package')
+                     OR s.name IN ('Pre-Bridal Package', 'Complete Pre-Bridal Package')
+                  )
+                """,
+                (slot_date,),
+            )
+            pb_row = cur.fetchone()
+            if pb_row and pb_row["cnt"] > 0:
+                cur.close()
+                return jsonify({
+                    "error": "The Pre-Bridal Package is already booked for this date. Please select another day."
+                }), 400
+
+        # ── Insert with user_id = NULL ────────────────────────────────────────
+        cur.execute(
+            """
+            INSERT INTO appointments
+              (user_id, service_id, date, time, status, offline_name, offline_phone)
+            VALUES (NULL, %s, %s, %s, 'confirmed', %s, %s)
+            RETURNING id
+            """,
+            (service_id, slot_date, time_str, offline_name, offline_phone),
+        )
+        booking_id = cur.fetchone()["id"]
+        db.commit()
+
+        # ── Notify all admins (best-effort) ──────────────────────────────────
+        try:
+            cur2 = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur2.execute("SELECT id FROM users WHERE role = 'ADMIN'")
+            admins = cur2.fetchall()
+            msg = (
+                f"[Walk-in] {offline_name} booked {svc_name} on {date_str} at {time_str}"
+                + (f" | ☎️ {offline_phone}" if offline_phone else "")
+            )
+            for admin in admins:
+                cur2.execute(
+                    "INSERT INTO notifications (user_id, type, message, booking_id) "
+                    "VALUES (%s, 'new_booking', %s, %s)",
+                    (admin["id"], msg, booking_id),
+                )
+            db.commit()
+            cur2.close()
+            for admin in admins:
+                _send_push(db, admin["id"], "Walk-in Booking", msg, "/admin/bookings")
+        except Exception:
+            pass  # never fail the booking due to notification errors
+
+        cur.close()
+        return jsonify({"id": booking_id}), 201
+
+    except PGError as err:
+        get_db().rollback()
+        if err.pgcode == "23505":
+            return jsonify({"error": "That time slot is already booked. Pick another."}), 409
         return db_error(err)
 
 
@@ -1468,12 +1612,14 @@ def admin_update_booking_status(booking_id: int):
         db = get_db()
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # Fetch booking details (user + service) before updating so we can notify
+        # Fetch booking details (user + service) before updating so we can notify.
+        # LEFT JOIN so offline bookings (user_id=NULL) are handled too.
         cur.execute(
-            """SELECT a.id, a.date, a.time, a.user_id,
-                      u.name AS user_name, s.name AS service_name
+            """SELECT a.id, a.date, a.time, a.user_id, a.offline_name,
+                      COALESCE(a.offline_name, u.name, 'Walk-in Customer') AS user_name,
+                      s.name AS service_name
                FROM appointments a
-               JOIN users u ON u.id = a.user_id
+               LEFT JOIN users u ON u.id = a.user_id
                JOIN services s ON s.id = a.service_id
                WHERE a.id = %s""",
             (booking_id,),

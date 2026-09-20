@@ -811,6 +811,29 @@ export const api = {
     });
   },
 
+  adminBookOffline: (body: {
+    service_id: string;
+    date: string;
+    time: string;
+    offline_name: string;
+    offline_phone?: string;
+  }) => {
+    if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
+    const token = getAdminToken() ?? getToken();
+    return fetch(`${API_BASE}/api/admin/book-offline`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save offline booking");
+      return data as { id: number };
+    });
+  },
+
 };
 
 export interface UserProfile {
@@ -831,7 +854,7 @@ export type AdminBooking = {
   time: string;
   status: string;
   created_at: string;
-  user_id: number;
+  user_id: number | null;
   user_name: string;
   user_email: string;
   user_phone: string;
@@ -839,6 +862,8 @@ export type AdminBooking = {
   service_name: string;
   service_price: string;
   category: string;
+  offline_name: string | null;
+  offline_phone: string | null;
 };
 
 export type AppNotification = {
