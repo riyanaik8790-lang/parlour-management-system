@@ -5,6 +5,7 @@ Frontend built in Lovable (React + Tailwind on TanStack Start). Backend (Flask) 
 ## 1. Design system (from your uploaded flyers)
 
 Palette extracted from the Hemangi Glam Salon flyers:
+
 - Cream background `#F5EBD7`
 - Warm sand `#E8D4A8`
 - Gold/tan accent `#B8894C`
@@ -61,6 +62,7 @@ backend/
 ```
 
 Endpoints:
+
 - `POST /api/register` - hash password (bcrypt), insert into `users`
 - `POST /api/login` - verify, return JWT
 - `GET  /api/services` - list services (seeded from your flyers)
@@ -70,6 +72,7 @@ Endpoints:
 - `POST /api/chatbot` - NLP: detects service keywords ("haircut", "keratin", "facial"…) + date words ("today", "tomorrow", weekday names) via simple regex + a small synonym map; replies with availability using the same slot logic. Structured so you can later swap in an LLM call.
 
 DB tables exactly as requested:
+
 ```sql
 users(id, name, email UNIQUE, password, phone)
 services(id, name, price, description)

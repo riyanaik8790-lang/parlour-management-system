@@ -17,7 +17,7 @@ export const API_BASE =
 
 const TOKEN_KEY = "salon_token";
 const USER_KEY = "salon_user";
-const REMEMBER_KEY = "salon_remember";      // "1" = remember me was checked
+const REMEMBER_KEY = "salon_remember"; // "1" = remember me was checked
 const SESSION_FLAG_KEY = "salon_session_alive"; // sessionStorage sentinel (gone on full browser close)
 const ADMIN_TOKEN_KEY = "salon_admin_token";
 const ADMIN_USER_KEY = "salon_admin_user";
@@ -29,8 +29,12 @@ const REQUEST_TIMEOUT_MS = 60000;
 // Once we've confirmed the backend is unreachable, skip further fetch attempts
 // so login/register/etc. respond instantly with mock data instead of stalling.
 let backendReachable: boolean | null = null;
-function markBackendDown() { backendReachable = false; }
-function isBackendKnownDown() { return backendReachable === false; }
+function markBackendDown() {
+  backendReachable = false;
+}
+function isBackendKnownDown() {
+  return backendReachable === false;
+}
 
 export type StoredUser = { id: number; name: string; email: string; role?: string };
 
@@ -98,11 +102,11 @@ export function clearSession() {
   window.localStorage.removeItem(USER_KEY);
   window.localStorage.removeItem(REMEMBER_KEY);
   window.sessionStorage.removeItem(SESSION_FLAG_KEY);
-  
+
   // Clear Try-On session state so it doesn't bleed into other accounts
   window.sessionStorage.removeItem("skin-advisor-result");
   window.sessionStorage.removeItem("skin-advisor-image");
-  
+
   window.dispatchEvent(new Event("salon-auth-change"));
 }
 
@@ -194,7 +198,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
   const token = getToken();
-  console.log(`[request] ${init.method ?? "GET"} ${path} | token: ${token ? token.slice(0, 40) + "..." : "NULL - NO TOKEN IN localStorage"}`);
+  console.log(
+    `[request] ${init.method ?? "GET"} ${path} | token: ${token ? token.slice(0, 40) + "..." : "NULL - NO TOKEN IN localStorage"}`,
+  );
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const controller = new AbortController();
@@ -236,7 +242,7 @@ async function withMock<T>(realCall: () => Promise<T>, mock: () => T | Promise<T
   } catch (err) {
     if (isNetworkError(err)) {
       markBackendDown();
-      // eslint-disable-next-line no-console
+
       console.info("[api] backend unreachable - using mock data");
       return await mock();
     }
@@ -274,9 +280,9 @@ export type SkinAnalysisResponse = {
   hex: string;
   /** One-sentence personalised copy for the undertone */
   summary: string;
-  hair:    { name: string; hex: string }[];
-  lips:    { name: string; hex: string }[];
-  blush:   { name: string; hex: string }[];
+  hair: { name: string; hex: string }[];
+  lips: { name: string; hex: string }[];
+  blush: { name: string; hex: string }[];
   outfits: { name: string; hex: string }[];
   services: string[];
   /** How consistent the readings were across sampled face regions */
@@ -441,7 +447,14 @@ export const api = {
   },
 
   getProfile: () =>
-    request<{ id: number; name: string; email: string; phone: string; role: string; push_enabled?: boolean }>("/api/profile"),
+    request<{
+      id: number;
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+      push_enabled?: boolean;
+    }>("/api/profile"),
 
   updateProfile: (body: {
     name?: string;
@@ -450,20 +463,26 @@ export const api = {
     new_password?: string;
     push_enabled?: boolean;
   }) =>
-    request<{ ok: boolean; user: StoredUser; profile: { id: number; name: string; email: string; phone: string; role: string; push_enabled?: boolean } }>(
-      "/api/profile",
-      { method: "PUT", body: JSON.stringify(body) }
-    ),
+    request<{
+      ok: boolean;
+      user: StoredUser;
+      profile: {
+        id: number;
+        name: string;
+        email: string;
+        phone: string;
+        role: string;
+        push_enabled?: boolean;
+      };
+    }>("/api/profile", { method: "PUT", body: JSON.stringify(body) }),
 
   getNotifications: () =>
     request<{ notifications: AppNotification[]; unread: number }>("/api/notifications"),
 
-  markAllRead: () =>
-    request<{ ok: boolean }>("/api/notifications/read-all", { method: "PUT" }),
+  markAllRead: () => request<{ ok: boolean }>("/api/notifications/read-all", { method: "PUT" }),
 
   // ── Web Push ────────────────────────────────────────────────────────────────
-  getVapidPublicKey: () =>
-    request<{ public_key: string }>("/api/push/vapid-public-key"),
+  getVapidPublicKey: () => request<{ public_key: string }>("/api/push/vapid-public-key"),
 
   subscribePush: (sub: { endpoint: string; p256dh: string; auth: string }) =>
     request<{ ok: boolean }>("/api/push/subscribe", {
@@ -471,8 +490,7 @@ export const api = {
       body: JSON.stringify(sub),
     }),
 
-  unsubscribePush: () =>
-    request<{ ok: boolean }>("/api/push/unsubscribe", { method: "DELETE" }),
+  unsubscribePush: () => request<{ ok: boolean }>("/api/push/unsubscribe", { method: "DELETE" }),
 
   deleteAccount: (password: string) =>
     request<{ ok: boolean }>("/api/account", {
@@ -496,7 +514,10 @@ export const api = {
 
   slots: (date: string) =>
     withMock(
-      () => request<{ taken: string[]; pre_bridal_booked: boolean }>(`/api/slots?date=${encodeURIComponent(date)}`),
+      () =>
+        request<{ taken: string[]; pre_bridal_booked: boolean }>(
+          `/api/slots?date=${encodeURIComponent(date)}`,
+        ),
       () => {
         // Deterministic "taken" slots for the given date so the UI feels real.
         const seed = date.split("-").reduce((a, b) => a + Number(b), 0);
@@ -580,8 +601,7 @@ export const api = {
 
   cancelBooking: (id: number) =>
     withMock(
-      () =>
-        request<{ ok: true }>(`/api/bookings/${id}`, { method: "DELETE" }),
+      () => request<{ ok: true }>(`/api/bookings/${id}`, { method: "DELETE" }),
       () => {
         const list = readJSON<
           { id: number; service_name: string; date: string; time: string; status: string }[]
@@ -594,8 +614,6 @@ export const api = {
         return { ok: true as const };
       },
     ),
-
-
 
   recommendations: (undertone: "warm" | "cool" | "neutral") =>
     withMock(
@@ -657,9 +675,18 @@ export const api = {
     // SSR guard: localStorage is not available server-side
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
-    console.log("[adminGetUsers] Admin token from storage:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN FOUND");
-    console.log("[adminGetUsers] Admin token key (salon_admin_token):", localStorage.getItem("salon_admin_token")?.slice(0, 40));
-    console.log("[adminGetUsers] Regular token key (salon_token):", localStorage.getItem("salon_token")?.slice(0, 40));
+    console.log(
+      "[adminGetUsers] Admin token from storage:",
+      token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN FOUND",
+    );
+    console.log(
+      "[adminGetUsers] Admin token key (salon_admin_token):",
+      localStorage.getItem("salon_admin_token")?.slice(0, 40),
+    );
+    console.log(
+      "[adminGetUsers] Regular token key (salon_token):",
+      localStorage.getItem("salon_token")?.slice(0, 40),
+    );
     return fetch(`${API_BASE}/api/admin/users`, {
       headers: {
         "Content-Type": "application/json",
@@ -675,7 +702,10 @@ export const api = {
   adminPromoteUser: (userId: number) => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
-    console.log("[adminPromoteUser] Sending token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
+    console.log(
+      "[adminPromoteUser] Sending token:",
+      token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN",
+    );
     return fetch(`${API_BASE}/api/admin/users/${userId}/promote`, {
       method: "PUT",
       headers: {
@@ -692,7 +722,14 @@ export const api = {
   adminSetUserRole: (userId: number, role: "ADMIN" | "USER") => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
-    console.log("[adminSetUserRole] userId:", userId, "role:", role, "token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
+    console.log(
+      "[adminSetUserRole] userId:",
+      userId,
+      "role:",
+      role,
+      "token:",
+      token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN",
+    );
     return fetch(`${API_BASE}/api/admin/users/${userId}/role`, {
       method: "PUT",
       headers: {
@@ -703,7 +740,11 @@ export const api = {
     }).then(async (res) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update user role");
-      return data as { ok: boolean; message: string; user: { id: number; name: string; email: string; role: string } };
+      return data as {
+        ok: boolean;
+        message: string;
+        user: { id: number; name: string; email: string; role: string };
+      };
     });
   },
 
@@ -739,13 +780,16 @@ export const api = {
     });
   },
 
-
   adminGetAllBookings: (status?: string) => {
     const token = getAdminToken() ?? getToken();
-    console.log("[adminGetAllBookings] Sending token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
-    const url = status && status !== "all"
-      ? `${API_BASE}/api/admin/bookings?status=${encodeURIComponent(status)}`
-      : `${API_BASE}/api/admin/bookings`;
+    console.log(
+      "[adminGetAllBookings] Sending token:",
+      token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN",
+    );
+    const url =
+      status && status !== "all"
+        ? `${API_BASE}/api/admin/bookings?status=${encodeURIComponent(status)}`
+        : `${API_BASE}/api/admin/bookings`;
     return fetch(url, {
       headers: {
         "Content-Type": "application/json",
@@ -777,7 +821,10 @@ export const api = {
 
   adminGetStats: () => {
     const token = getAdminToken() ?? getToken();
-    console.log("[adminGetStats] Sending token:", token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN");
+    console.log(
+      "[adminGetStats] Sending token:",
+      token ? `${token.slice(0, 40)}...` : "❌ NO TOKEN",
+    );
     return fetch(`${API_BASE}/api/admin/stats`, {
       headers: {
         "Content-Type": "application/json",
@@ -834,7 +881,6 @@ export const api = {
       return data as { id: number };
     });
   },
-
 };
 
 export interface UserProfile {

@@ -61,7 +61,10 @@ export function Navbar() {
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
           <div className="relative">
-            <div className="absolute inset-0 rounded-full animate-pulse-glow" style={{ opacity: 0.6 }} />
+            <div
+              className="absolute inset-0 rounded-full animate-pulse-glow"
+              style={{ opacity: 0.6 }}
+            />
             <img
               src={logo}
               alt="Hemangi Makeover logo"
@@ -69,7 +72,9 @@ export function Navbar() {
             />
           </div>
           <span className="leading-tight">
-            <span className="block font-serif text-lg" style={{ color: "oklch(0.35 0.15 22)" }}>Hemangi</span>
+            <span className="block font-serif text-lg" style={{ color: "oklch(0.35 0.15 22)" }}>
+              Hemangi
+            </span>
             <span className="font-script -mt-1 block text-sm gold-shimmer">Makeover</span>
           </span>
         </Link>
@@ -81,7 +86,9 @@ export function Navbar() {
               key={ln.to}
               to={ln.to}
               className="relative px-3 py-1.5 text-sm text-foreground/75 hover:text-primary transition-colors duration-200 rounded-full hover:bg-secondary/60 font-medium"
-              activeProps={{ className: "text-primary font-semibold bg-secondary/60 px-3 py-1.5 rounded-full" }}
+              activeProps={{
+                className: "text-primary font-semibold bg-secondary/60 px-3 py-1.5 rounded-full",
+              }}
             >
               {ln.label}
             </Link>
@@ -118,8 +125,13 @@ export function Navbar() {
                   className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
                   style={{ color: BURGUNDY }}
                   title="Settings"
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "oklch(0.35 0.15 22 / 8%)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.background =
+                      "oklch(0.35 0.15 22 / 8%)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+                  }}
                 >
                   <Settings className="h-4 w-4" />
                 </Link>
@@ -135,10 +147,19 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <Button asChild variant="ghost" size="sm" className="rounded-full text-sm min-h-[44px]">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full text-sm min-h-[44px]"
+                >
                   <Link to="/login">Login</Link>
                 </Button>
-                <Button asChild size="sm" className="btn-maroon rounded-full text-sm px-4 min-h-[44px]">
+                <Button
+                  asChild
+                  size="sm"
+                  className="btn-maroon rounded-full text-sm px-4 min-h-[44px]"
+                >
                   <Link to="/register">Register</Link>
                 </Button>
               </>
@@ -152,25 +173,53 @@ export function Navbar() {
             onClick={() => setMenuOpen((p) => !p)}
             aria-label="Toggle menu"
           >
-            <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-2" : ""}`} style={{ background: "oklch(0.35 0.15 22)" }} />
-            <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "opacity-0" : ""}`} style={{ background: "oklch(0.35 0.15 22)" }} />
-            <span className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`} style={{ background: "oklch(0.35 0.15 22)" }} />
+            <span
+              className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-2" : ""}`}
+              style={{ background: "oklch(0.35 0.15 22)" }}
+            />
+            <span
+              className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "opacity-0" : ""}`}
+              style={{ background: "oklch(0.35 0.15 22)" }}
+            />
+            <span
+              className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`}
+              style={{ background: "oklch(0.35 0.15 22)" }}
+            />
           </button>
         </div>
       </div>
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="border-t md:hidden" style={{ background: "oklch(0.968 0.018 85)", borderColor: "oklch(0.84 0.042 80 / 60%)" }}>
+        <div
+          className="border-t md:hidden"
+          style={{ background: "oklch(0.968 0.018 85)", borderColor: "oklch(0.84 0.042 80 / 60%)" }}
+        >
           <nav className="flex flex-col px-4 py-3 gap-1">
             {user && (
-              <div className="mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-sm border" style={{ background: "oklch(0.99 0.01 85)", borderColor: "oklch(0.91 0.025 82)" }}>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-inner text-lg font-semibold" style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.68 0.13 68))" }}>
+              <div
+                className="mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-sm border"
+                style={{ background: "oklch(0.99 0.01 85)", borderColor: "oklch(0.91 0.025 82)" }}
+              >
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-inner text-lg font-semibold"
+                  style={{
+                    background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.68 0.13 68))",
+                  }}
+                >
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "oklch(0.68 0.13 68)" }}>Welcome back</p>
-                  <p className="font-serif text-xl leading-tight" style={{ color: "oklch(0.35 0.15 22)" }}>
+                  <p
+                    className="text-[11px] uppercase tracking-wider font-semibold"
+                    style={{ color: "oklch(0.68 0.13 68)" }}
+                  >
+                    Welcome back
+                  </p>
+                  <p
+                    className="font-serif text-xl leading-tight"
+                    style={{ color: "oklch(0.35 0.15 22)" }}
+                  >
                     {user.name.split(" ")[0]}
                   </p>
                 </div>
@@ -182,7 +231,10 @@ export function Navbar() {
                 to={ln.to}
                 onClick={() => setMenuOpen(false)}
                 className="px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px] flex items-center"
-                activeProps={{ className: "text-primary font-semibold bg-secondary/60 px-3 py-2.5 rounded-xl min-h-[44px] flex items-center" }}
+                activeProps={{
+                  className:
+                    "text-primary font-semibold bg-secondary/60 px-3 py-2.5 rounded-xl min-h-[44px] flex items-center",
+                }}
               >
                 {ln.label}
               </Link>
@@ -232,7 +284,9 @@ export function Navbar() {
                   to="/register"
                   onClick={() => setMenuOpen(false)}
                   className="px-3 py-2.5 text-sm rounded-xl font-semibold text-white bg-primary hover:bg-primary/90 transition-all min-h-[44px] flex items-center sm:hidden"
-                  style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))" }}
+                  style={{
+                    background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+                  }}
                 >
                   Register
                 </Link>

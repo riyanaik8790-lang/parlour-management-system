@@ -18,7 +18,6 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TryOnRouteImport } from './routes/try-on'
-import { Route as TryOnLAPTOP86KPKNINRouteImport } from './routes/try-on-LAPTOP-86KPKNIN'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminLayoutRouteImport } from './routes/admin/_layout'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
@@ -70,11 +69,6 @@ const TryOnRoute = TryOnRouteImport.update({
   path: '/try-on',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TryOnLAPTOP86KPKNINRoute = TryOnLAPTOP86KPKNINRouteImport.update({
-  id: '/try-on-LAPTOP-86KPKNIN',
-  path: '/try-on-LAPTOP-86KPKNIN',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -111,7 +105,6 @@ export interface FileRoutesByFullPath {
   '/services': typeof ServicesRoute
   '/settings': typeof SettingsRoute
   '/try-on': typeof TryOnRoute
-  '/try-on-LAPTOP-86KPKNIN': typeof TryOnLAPTOP86KPKNINRoute
   '/admin': typeof AdminLayoutRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/login': typeof AdminLoginRoute
@@ -128,7 +121,6 @@ export interface FileRoutesByTo {
   '/services': typeof ServicesRoute
   '/settings': typeof SettingsRoute
   '/try-on': typeof TryOnRoute
-  '/try-on-LAPTOP-86KPKNIN': typeof TryOnLAPTOP86KPKNINRoute
   '/admin': typeof AdminIndexRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/login': typeof AdminLoginRoute
@@ -145,7 +137,6 @@ export interface FileRoutesById {
   '/services': typeof ServicesRoute
   '/settings': typeof SettingsRoute
   '/try-on': typeof TryOnRoute
-  '/try-on-LAPTOP-86KPKNIN': typeof TryOnLAPTOP86KPKNINRoute
   '/admin/_layout': typeof AdminLayoutRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/login': typeof AdminLoginRoute
@@ -164,7 +155,6 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/try-on'
-    | '/try-on-LAPTOP-86KPKNIN'
     | '/admin'
     | '/admin/bookings'
     | '/admin/login'
@@ -181,7 +171,6 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/try-on'
-    | '/try-on-LAPTOP-86KPKNIN'
     | '/admin'
     | '/admin/bookings'
     | '/admin/login'
@@ -197,7 +186,6 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/try-on'
-    | '/try-on-LAPTOP-86KPKNIN'
     | '/admin/_layout'
     | '/admin/bookings'
     | '/admin/login'
@@ -215,7 +203,6 @@ export interface RootRouteChildren {
   ServicesRoute: typeof ServicesRoute
   SettingsRoute: typeof SettingsRoute
   TryOnRoute: typeof TryOnRoute
-  TryOnLAPTOP86KPKNINRoute: typeof TryOnLAPTOP86KPKNINRoute
   AdminLayoutRoute: typeof AdminLayoutRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminLoginRoute: typeof AdminLoginRoute
@@ -288,13 +275,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TryOnRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/try-on-LAPTOP-86KPKNIN': {
-      id: '/try-on-LAPTOP-86KPKNIN'
-      path: '/try-on-LAPTOP-86KPKNIN'
-      fullPath: '/try-on-LAPTOP-86KPKNIN'
-      preLoaderRoute: typeof TryOnLAPTOP86KPKNINRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/': {
       id: '/admin/'
       path: '/admin'
@@ -343,7 +323,6 @@ const rootRouteChildren: RootRouteChildren = {
   ServicesRoute: ServicesRoute,
   SettingsRoute: SettingsRoute,
   TryOnRoute: TryOnRoute,
-  TryOnLAPTOP86KPKNINRoute: TryOnLAPTOP86KPKNINRoute,
   AdminLayoutRoute: AdminLayoutRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminLoginRoute: AdminLoginRoute,

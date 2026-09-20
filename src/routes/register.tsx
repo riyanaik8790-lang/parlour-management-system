@@ -13,16 +13,20 @@ export const Route = createFileRoute("/register")({
   head: () => ({
     meta: [
       { title: "Create Account - Hemangi Glam Salon" },
-      { name: "description", content: "Register to book salon appointments online at Hemangi Glam Salon." },
+      {
+        name: "description",
+        content: "Register to book salon appointments online at Hemangi Glam Salon.",
+      },
     ],
   }),
   component: RegisterPage,
 });
 
 // ─── Validation rules (mirrors the backend exactly) ─────────────────────────
-const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
-const STRONG_PW_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?`~]).{8,72}$/;
+const STRONG_PW_RE =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]).{8,72}$/;
 
 type FieldErrors = { name?: string; email?: string; phone?: string; password?: string };
 
@@ -68,7 +72,7 @@ function getPasswordStrength(pw: string): { score: 0 | 1 | 2 | 3; label: string 
   let score = 0;
   if (pw.length >= 8) score++;
   if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
-  if (/\d/.test(pw) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?`~]/.test(pw)) score++;
+  if (/\d/.test(pw) && /[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]/.test(pw)) score++;
   const labels = ["", "Weak", "Medium", "Strong"] as const;
   return { score: score as 0 | 1 | 2 | 3, label: labels[score] };
 }
@@ -82,11 +86,10 @@ const SUCCESS_COLOR = "oklch(0.52 0.18 150)";
 
 const strengthColors: Record<0 | 1 | 2 | 3, string> = {
   0: "oklch(0.88 0.025 82)",
-  1: "oklch(0.55 0.22 27)",   // red
-  2: "oklch(0.68 0.16 70)",   // amber/gold
-  3: "oklch(0.52 0.18 150)",  // green
+  1: "oklch(0.55 0.22 27)", // red
+  2: "oklch(0.68 0.16 70)", // amber/gold
+  3: "oklch(0.52 0.18 150)", // green
 };
-
 
 // ─── PhoneField - static +91 badge, input holds only raw digits ──────────────
 function PhoneField({
@@ -142,7 +145,10 @@ function PhoneField({
       >
         +91
       </span>
-      <span className="mr-2 h-4 w-px flex-shrink-0" style={{ background: "oklch(0.82 0.025 82)" }} />
+      <span
+        className="mr-2 h-4 w-px flex-shrink-0"
+        style={{ background: "oklch(0.82 0.025 82)" }}
+      />
       <input
         id="phone"
         type="tel"
@@ -163,7 +169,9 @@ function PhoneField({
       >
         {value.length}/10
       </span>
-      {hasError && <XCircle className="ml-1 h-4 w-4 flex-shrink-0" style={{ color: ERROR_COLOR }} />}
+      {hasError && (
+        <XCircle className="ml-1 h-4 w-4 flex-shrink-0" style={{ color: ERROR_COLOR }} />
+      )}
     </div>
   );
 }
@@ -176,7 +184,10 @@ function RegisterPage() {
   // phone is stored as raw digits only (no +91 prefix); +91 is shown as a static badge
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<keyof FieldErrors, boolean>>({
-    name: false, email: false, phone: false, password: false,
+    name: false,
+    email: false,
+    phone: false,
+    password: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -245,7 +256,9 @@ function RegisterPage() {
             setErrors((e) => ({ ...e, ...parsed.errors }));
             return;
           }
-        } catch {/* not JSON */ }
+        } catch {
+          /* not JSON */
+        }
         setServerError(err.message);
       } else {
         setServerError("Registration failed. Please try again.");
@@ -361,7 +374,9 @@ function RegisterPage() {
               <label
                 htmlFor="phone"
                 className="block text-xs font-semibold uppercase tracking-widest"
-                style={{ color: touched.phone && errors.phone ? ERROR_COLOR : "oklch(0.50 0.06 48)" }}
+                style={{
+                  color: touched.phone && errors.phone ? ERROR_COLOR : "oklch(0.50 0.06 48)",
+                }}
               >
                 Mobile Number
               </label>
@@ -438,7 +453,8 @@ function RegisterPage() {
                   <p
                     className="mt-1 text-xs font-medium"
                     style={{
-                      color: pwStrength.score > 0 ? strengthColors[pwStrength.score] : "transparent",
+                      color:
+                        pwStrength.score > 0 ? strengthColors[pwStrength.score] : "transparent",
                     }}
                   >
                     {pwStrength.label} password
@@ -460,7 +476,10 @@ function RegisterPage() {
                     { label: "Uppercase (A–Z)", ok: /[A-Z]/.test(form.password) },
                     { label: "Lowercase (a–z)", ok: /[a-z]/.test(form.password) },
                     { label: "Number (0–9)", ok: /\d/.test(form.password) },
-                    { label: "Special char (!@#…)", ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?`~]/.test(form.password) },
+                    {
+                      label: "Special char (!@#…)",
+                      ok: /[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]/.test(form.password),
+                    },
                   ].map(({ label, ok }) => (
                     <span
                       key={label}
@@ -470,7 +489,10 @@ function RegisterPage() {
                       {ok ? (
                         <CheckCircle className="h-3 w-3 flex-shrink-0" />
                       ) : (
-                        <div className="h-3 w-3 flex-shrink-0 rounded-full border" style={{ borderColor: "oklch(0.75 0.030 60)" }} />
+                        <div
+                          className="h-3 w-3 flex-shrink-0 rounded-full border"
+                          style={{ borderColor: "oklch(0.75 0.030 60)" }}
+                        />
                       )}
                       {label}
                     </span>
@@ -491,7 +513,9 @@ function RegisterPage() {
                 boxShadow: `0 6px 24px ${BURGUNDY}35`,
               }}
               onMouseEnter={(e) => {
-                if (!busy) (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 32px ${BURGUNDY}50`;
+                if (!busy)
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    `0 8px 32px ${BURGUNDY}50`;
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 24px ${BURGUNDY}35`;
@@ -597,9 +621,7 @@ function FieldWrapper({
         {/* Validation indicator */}
         {!suffix && (
           <span className="flex-shrink-0">
-            {hasError ? (
-              <XCircle className="h-4 w-4" style={{ color: ERROR_COLOR }} />
-            ) : null}
+            {hasError ? <XCircle className="h-4 w-4" style={{ color: ERROR_COLOR }} /> : null}
           </span>
         )}
       </div>

@@ -37,15 +37,18 @@ function AdminLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   // Reactive auth state - recalculated whenever salon-auth-change fires
-  const [isAuthed, setIsAuthed] = useState(() =>
-    isAdminAuthenticated() || getUser()?.role === "ADMIN"
+  const [isAuthed, setIsAuthed] = useState(
+    () => isAdminAuthenticated() || getUser()?.role === "ADMIN",
   );
 
   // ── Auth: accept regular session if user is ADMIN ───────────────────────
   useEffect(() => {
     function checkAuth() {
       // Already have a valid admin session
-      if (isAdminAuthenticated()) { setIsAuthed(true); return; }
+      if (isAdminAuthenticated()) {
+        setIsAuthed(true);
+        return;
+      }
 
       // Promote regular session if it has ADMIN role
       const regularUser = getUser();
@@ -74,7 +77,7 @@ function AdminLayout() {
 
   function handleLogout() {
     clearAdminSession(); // clear admin token
-    clearSession();      // clear regular user token too
+    clearSession(); // clear regular user token too
     navigate({ to: "/" }); // always go back to homepage
   }
 
@@ -110,18 +113,27 @@ function AdminLayout() {
         >
           <div
             className="flex h-9 w-9 items-center justify-center rounded-xl shadow-lg"
-            style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))" }}
+            style={{
+              background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+            }}
           >
             <Scissors className="h-4 w-4" style={{ color: "oklch(0.99 0.01 85)" }} />
           </div>
           <div>
             <p
               className="text-sm font-bold leading-none"
-              style={{ color: "oklch(0.25 0.05 50)", fontFamily: "var(--font-serif)", letterSpacing: "-0.01em" }}
+              style={{
+                color: "oklch(0.25 0.05 50)",
+                fontFamily: "var(--font-serif)",
+                letterSpacing: "-0.01em",
+              }}
             >
               Hemangi Glam
             </p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "oklch(0.68 0.13 68)" }}>
+            <p
+              className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: "oklch(0.68 0.13 68)" }}
+            >
               Admin Panel
             </p>
           </div>
@@ -150,15 +162,16 @@ function AdminLayout() {
                 style={
                   active
                     ? {
-                      background: "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
-                      color: "oklch(0.35 0.15 22)",
-                      border: "1px solid oklch(0.35 0.15 22 / 15%)",
-                      boxShadow: "0 2px 10px oklch(0.35 0.15 22 / 6%)",
-                    }
+                        background:
+                          "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
+                        color: "oklch(0.35 0.15 22)",
+                        border: "1px solid oklch(0.35 0.15 22 / 15%)",
+                        boxShadow: "0 2px 10px oklch(0.35 0.15 22 / 6%)",
+                      }
                     : {
-                      color: "oklch(0.50 0.04 50)",
-                      border: "1px solid transparent",
-                    }
+                        color: "oklch(0.50 0.04 50)",
+                        border: "1px solid transparent",
+                      }
                 }
               >
                 <Icon
@@ -196,21 +209,28 @@ function AdminLayout() {
               {adminUser?.name?.[0]?.toUpperCase() ?? "A"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>
+              <p
+                className="truncate text-xs font-semibold"
+                style={{ color: "oklch(0.25 0.05 50)" }}
+              >
                 {adminUser?.name ?? "Admin"}
               </p>
               <p className="truncate text-[10px]" style={{ color: "oklch(0.55 0.04 50)" }}>
                 {adminUser?.email}
               </p>
             </div>
-            <Shield className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "oklch(0.68 0.13 68)" }} />
+            <Shield
+              className="h-3.5 w-3.5 flex-shrink-0"
+              style={{ color: "oklch(0.68 0.13 68)" }}
+            />
           </div>
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all"
             style={{ color: "oklch(0.50 0.04 50)" }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.577 0.245 27.325 / 8%)";
+              (e.currentTarget as HTMLButtonElement).style.background =
+                "oklch(0.577 0.245 27.325 / 8%)";
               (e.currentTarget as HTMLButtonElement).style.color = "oklch(0.45 0.18 22)";
             }}
             onMouseLeave={(e) => {
@@ -254,7 +274,7 @@ function AdminLayout() {
             {NAV_LINKS.find((l) =>
               l.to === "/admin/"
                 ? pathname === "/admin" || pathname === "/admin/"
-                : pathname.startsWith(l.to)
+                : pathname.startsWith(l.to),
             )?.label ?? "Admin"}
           </span>
           <div
@@ -264,7 +284,8 @@ function AdminLayout() {
           <span
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
             style={{
-              background: "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
+              background:
+                "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
               color: "oklch(0.35 0.15 22)",
               border: "1px solid oklch(0.35 0.15 22 / 18%)",
             }}

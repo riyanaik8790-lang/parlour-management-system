@@ -4,8 +4,18 @@ import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { SERVICE_CATEGORIES, TIME_SLOTS } from "@/lib/services-data";
 import {
-  Users, CalendarCheck, TrendingUp, Scissors, ArrowRight, Sparkles,
-  PlusCircle, X, CalendarIcon, Loader2, Phone, User,
+  Users,
+  CalendarCheck,
+  TrendingUp,
+  Scissors,
+  ArrowRight,
+  Sparkles,
+  PlusCircle,
+  X,
+  CalendarIcon,
+  Loader2,
+  Phone,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,21 +24,30 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select, SelectContent, SelectGroup, SelectItem,
-  SelectLabel, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 // ── Brand palette tokens ──────────────────────────────────────────────────────
-const BURGUNDY     = "oklch(0.35 0.15 22)";
+const BURGUNDY = "oklch(0.35 0.15 22)";
 const BURGUNDY_MID = "oklch(0.45 0.13 25)";
-const GOLD         = "oklch(0.68 0.13 68)";
-const GOLD_LIGHT   = "oklch(0.80 0.10 72)";
-const CARD_WHITE   = "rgba(255,255,255,0.92)";
-const TEXT_DARK    = "oklch(0.25 0.05 50)";
-const TEXT_MUTED   = "oklch(0.58 0.04 60)";
+const GOLD = "oklch(0.68 0.13 68)";
+const GOLD_LIGHT = "oklch(0.80 0.10 72)";
+const CARD_WHITE = "rgba(255,255,255,0.92)";
+const TEXT_DARK = "oklch(0.25 0.05 50)";
+const TEXT_MUTED = "oklch(0.58 0.04 60)";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Dashboard - Admin | Hemangi Glam Salon" }] }),
@@ -45,7 +64,7 @@ type Stats = {
 
 // ── Walk-in Booking Modal ─────────────────────────────────────────────────────
 function getISTNow(): Date {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 }
 
 function WalkinModal({
@@ -57,58 +76,89 @@ function WalkinModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [offlineName, setOfflineName]   = useState("");
+  const [offlineName, setOfflineName] = useState("");
   const [offlinePhone, setOfflinePhone] = useState("");
-  const [serviceId, setServiceId]       = useState("");
-  const [date, setDate]                 = useState<Date | undefined>(undefined);
-  const [time, setTime]                 = useState("");
-  const [taken, setTaken]               = useState<string[]>([]);
+  const [serviceId, setServiceId] = useState("");
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [time, setTime] = useState("");
+  const [taken, setTaken] = useState<string[]>([]);
   const [preBridalBooked, setPreBridalBooked] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [submitting, setSubmitting]     = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isoDate = useMemo(() => (date ? format(date, "yyyy-MM-dd") : ""), [date]);
 
   // Reset form when modal opens/closes
   useEffect(() => {
     if (!open) {
-      setOfflineName(""); setOfflinePhone(""); setServiceId("");
-      setDate(undefined); setTime(""); setTaken([]); setPreBridalBooked(false);
+      setOfflineName("");
+      setOfflinePhone("");
+      setServiceId("");
+      setDate(undefined);
+      setTime("");
+      setTaken([]);
+      setPreBridalBooked(false);
     }
   }, [open]);
 
   // Fetch taken slots + pre-bridal flag whenever date changes
   useEffect(() => {
-    if (!isoDate) { setTaken([]); setPreBridalBooked(false); return; }
+    if (!isoDate) {
+      setTaken([]);
+      setPreBridalBooked(false);
+      return;
+    }
     let alive = true;
     setLoadingSlots(true);
     setTime("");
-    api.slots(isoDate)
+    api
+      .slots(isoDate)
       .then((res) => {
         if (alive) {
           setTaken(res.taken);
           setPreBridalBooked(res.pre_bridal_booked ?? false);
         }
       })
-      .catch(() => { if (alive) { setTaken([]); setPreBridalBooked(false); } })
-      .finally(() => { if (alive) setLoadingSlots(false); });
-    return () => { alive = false; };
+      .catch(() => {
+        if (alive) {
+          setTaken([]);
+          setPreBridalBooked(false);
+        }
+      })
+      .finally(() => {
+        if (alive) setLoadingSlots(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [isoDate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!offlineName.trim()) { toast.error("Customer name is required."); return; }
-    if (!serviceId)          { toast.error("Please select a service."); return; }
-    if (!isoDate)            { toast.error("Please select a date."); return; }
-    if (!time)               { toast.error("Please select a time slot."); return; }
+    if (!offlineName.trim()) {
+      toast.error("Customer name is required.");
+      return;
+    }
+    if (!serviceId) {
+      toast.error("Please select a service.");
+      return;
+    }
+    if (!isoDate) {
+      toast.error("Please select a date.");
+      return;
+    }
+    if (!time) {
+      toast.error("Please select a time slot.");
+      return;
+    }
 
     setSubmitting(true);
     try {
       await api.adminBookOffline({
-        service_id:    serviceId,
-        date:          isoDate,
+        service_id: serviceId,
+        date: isoDate,
         time,
-        offline_name:  offlineName.trim(),
+        offline_name: offlineName.trim(),
         offline_phone: offlinePhone.trim() || undefined,
       });
       toast.success(`Walk-in booking saved for ${offlineName.trim()}!`);
@@ -121,11 +171,18 @@ function WalkinModal({
     }
   }
 
-  const selectedService = SERVICE_CATEGORIES.flatMap((c) => c.items).find((s) => s.id === serviceId);
+  const selectedService = SERVICE_CATEGORIES.flatMap((c) => c.items).find(
+    (s) => s.id === serviceId,
+  );
   const isPreBridalSelected = serviceId === "pk-prebridal" || serviceId === "pb-package";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent
         className="max-h-[92vh] w-full max-w-lg overflow-y-auto p-0 gap-0"
         style={{
@@ -165,10 +222,12 @@ function WalkinModal({
 
         {/* Form body */}
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
-
           {/* Customer Name */}
           <div className="space-y-1.5">
-            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
+              style={{ color: TEXT_MUTED }}
+            >
               <User className="h-3 w-3" /> Customer Name <span style={{ color: BURGUNDY }}>*</span>
             </label>
             <Input
@@ -183,8 +242,14 @@ function WalkinModal({
 
           {/* Customer Phone */}
           <div className="space-y-1.5">
-            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
-              <Phone className="h-3 w-3" /> Customer Phone <span className="font-normal normal-case" style={{ color: TEXT_MUTED }}>(optional)</span>
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
+              style={{ color: TEXT_MUTED }}
+            >
+              <Phone className="h-3 w-3" /> Customer Phone{" "}
+              <span className="font-normal normal-case" style={{ color: TEXT_MUTED }}>
+                (optional)
+              </span>
             </label>
             <Input
               id="offline-customer-phone"
@@ -198,10 +263,19 @@ function WalkinModal({
 
           {/* Service */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
+            <label
+              className="text-xs font-semibold uppercase tracking-wide"
+              style={{ color: TEXT_MUTED }}
+            >
               Service <span style={{ color: BURGUNDY }}>*</span>
             </label>
-            <Select value={serviceId} onValueChange={(v) => { setServiceId(v); setTime(""); }}>
+            <Select
+              value={serviceId}
+              onValueChange={(v) => {
+                setServiceId(v);
+                setTime("");
+              }}
+            >
               <SelectTrigger id="offline-service" className="w-full h-10">
                 <SelectValue placeholder="Choose a service" />
               </SelectTrigger>
@@ -211,7 +285,8 @@ function WalkinModal({
                     <SelectLabel>{cat.name}</SelectLabel>
                     {cat.items.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name}{s.price !== "On request" ? ` — ₹${s.price}` : ""}
+                        {s.name}
+                        {s.price !== "On request" ? ` — ₹${s.price}` : ""}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -222,7 +297,10 @@ function WalkinModal({
 
           {/* Date */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
+            <label
+              className="text-xs font-semibold uppercase tracking-wide"
+              style={{ color: TEXT_MUTED }}
+            >
               Date <span style={{ color: BURGUNDY }}>*</span>
             </label>
             <Popover>
@@ -230,7 +308,10 @@ function WalkinModal({
                 <Button
                   id="offline-date"
                   variant="outline"
-                  className={cn("w-full h-10 justify-start text-left font-normal", !date && "text-muted-foreground")}
+                  className={cn(
+                    "w-full h-10 justify-start text-left font-normal",
+                    !date && "text-muted-foreground",
+                  )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" style={{ color: GOLD }} />
                   {date ? format(date, "PPP") : "Pick a date"}
@@ -240,7 +321,10 @@ function WalkinModal({
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={(d) => { setDate(d); setTime(""); }}
+                  onSelect={(d) => {
+                    setDate(d);
+                    setTime("");
+                  }}
                   disabled={(d) => {
                     const today = getISTNow();
                     today.setHours(0, 0, 0, 0);
@@ -251,12 +335,17 @@ function WalkinModal({
                 />
               </PopoverContent>
             </Popover>
-            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Fridays are closed.</p>
+            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+              Fridays are closed.
+            </p>
           </div>
 
           {/* Time slots */}
           <div className="space-y-1.5">
-            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
+              style={{ color: TEXT_MUTED }}
+            >
               Time Slot <span style={{ color: BURGUNDY }}>*</span>
               {loadingSlots && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
             </label>
@@ -264,7 +353,11 @@ function WalkinModal({
             {!date ? (
               <div
                 className="rounded-lg flex items-center justify-center h-12 text-xs"
-                style={{ background: "oklch(0.96 0.010 82)", border: "1px dashed oklch(0.84 0.042 80)", color: TEXT_MUTED }}
+                style={{
+                  background: "oklch(0.96 0.010 82)",
+                  border: "1px dashed oklch(0.84 0.042 80)",
+                  color: TEXT_MUTED,
+                }}
               >
                 Select a date first
               </div>
@@ -299,10 +392,16 @@ function WalkinModal({
                       onClick={() => setTime(t)}
                       className={cn(
                         "rounded-md border py-2 text-xs transition min-h-[36px]",
-                        (isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
-                        isPast && !(isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
-                        !isDisabled && !isSelected && "border-border bg-background hover:border-accent hover:text-primary",
-                        isSelected && "border-primary bg-primary text-primary-foreground font-semibold",
+                        (isTaken || isBuffer) &&
+                          "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
+                        isPast &&
+                          !(isTaken || isBuffer) &&
+                          "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                        !isDisabled &&
+                          !isSelected &&
+                          "border-border bg-background hover:border-accent hover:text-primary",
+                        isSelected &&
+                          "border-primary bg-primary text-primary-foreground font-semibold",
                       )}
                     >
                       {t}
@@ -318,13 +417,18 @@ function WalkinModal({
             <div
               className="rounded-xl px-4 py-3 text-xs space-y-1"
               style={{
-                background: "linear-gradient(135deg, oklch(0.35 0.15 22 / 5%), oklch(0.68 0.13 68 / 5%))",
+                background:
+                  "linear-gradient(135deg, oklch(0.35 0.15 22 / 5%), oklch(0.68 0.13 68 / 5%))",
                 border: "1px solid oklch(0.88 0.030 82)",
               }}
             >
-              <p className="font-semibold" style={{ color: BURGUNDY }}>Booking Summary</p>
+              <p className="font-semibold" style={{ color: BURGUNDY }}>
+                Booking Summary
+              </p>
               <p style={{ color: TEXT_MUTED }}>
-                <span className="font-medium" style={{ color: TEXT_DARK }}>{offlineName || "—"}</span>
+                <span className="font-medium" style={{ color: TEXT_DARK }}>
+                  {offlineName || "—"}
+                </span>
                 {offlinePhone && <> · {offlinePhone}</>}
               </p>
               <p style={{ color: TEXT_MUTED }}>
@@ -337,14 +441,29 @@ function WalkinModal({
           <div className="flex gap-3 pt-1">
             <Button
               type="submit"
-              disabled={submitting || !offlineName || !serviceId || !isoDate || !time || (isPreBridalSelected && preBridalBooked)}
+              disabled={
+                submitting ||
+                !offlineName ||
+                !serviceId ||
+                !isoDate ||
+                !time ||
+                (isPreBridalSelected && preBridalBooked)
+              }
               className="flex-1 min-h-[44px] gap-2 font-semibold"
               style={{
-                background: submitting ? undefined : `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                background: submitting
+                  ? undefined
+                  : `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
                 boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
               }}
             >
-              {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : "Save Booking"}
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                </>
+              ) : (
+                "Save Booking"
+              )}
             </Button>
             <Button
               type="button"
@@ -364,17 +483,20 @@ function WalkinModal({
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 function AdminDashboard() {
-  const [stats, setStats]       = useState<Stats | null>(null);
-  const [error, setError]       = useState<string | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   function loadStats() {
-    api.adminGetStats()
+    api
+      .adminGetStats()
       .then(setStats)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load stats"));
   }
 
-  useEffect(() => { loadStats(); }, []);
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   const STATS = [
     {
@@ -413,13 +535,8 @@ function AdminDashboard() {
 
   return (
     <div className="space-y-10 px-4 sm:px-8 lg:px-12 py-8 max-w-[1400px] mx-auto">
-
       {/* Walk-in modal */}
-      <WalkinModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSuccess={loadStats}
-      />
+      <WalkinModal open={modalOpen} onClose={() => setModalOpen(false)} onSuccess={loadStats} />
 
       {/* Header */}
       <div className="animate-fade-up flex flex-wrap items-start justify-between gap-4">
@@ -427,7 +544,8 @@ function AdminDashboard() {
           <span
             className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
             style={{
-              background: "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
+              background:
+                "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
               color: BURGUNDY,
               border: "1px solid oklch(0.35 0.15 22 / 18%)",
             }}
@@ -456,10 +574,12 @@ function AdminDashboard() {
             boxShadow: `0 6px 24px oklch(0.35 0.15 22 / 30%)`,
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 10px 32px oklch(0.35 0.15 22 / 40%)`;
+            (e.currentTarget as HTMLButtonElement).style.boxShadow =
+              `0 10px 32px oklch(0.35 0.15 22 / 40%)`;
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 24px oklch(0.35 0.15 22 / 30%)`;
+            (e.currentTarget as HTMLButtonElement).style.boxShadow =
+              `0 6px 24px oklch(0.35 0.15 22 / 30%)`;
           }}
         >
           <PlusCircle className="h-4 w-4 transition-transform group-hover:rotate-90 duration-200" />
@@ -526,7 +646,9 @@ function AdminDashboard() {
                   className="inline-block h-9 w-14 animate-pulse rounded-lg"
                   style={{ background: "oklch(0.91 0.025 82)" }}
                 />
-              ) : value}
+              ) : (
+                value
+              )}
             </p>
             <p className="mt-2 text-sm font-medium" style={{ color: TEXT_MUTED }}>
               {label}
@@ -540,7 +662,8 @@ function AdminDashboard() {
         <div
           className="relative overflow-hidden rounded-2xl animate-fade-up delay-300"
           style={{
-            background: "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%) 0%, oklch(0.68 0.13 68 / 8%) 50%, oklch(0.35 0.15 22 / 4%) 100%)",
+            background:
+              "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%) 0%, oklch(0.68 0.13 68 / 8%) 50%, oklch(0.35 0.15 22 / 4%) 100%)",
             boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
             border: "1px solid oklch(0.35 0.15 22 / 10%)",
           }}
@@ -599,7 +722,6 @@ function AdminDashboard() {
           Quick Actions
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
           {/* Manage Users */}
           <Link
             to="/admin/users"
@@ -627,7 +749,10 @@ function AdminDashboard() {
               <Users className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold" style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}>
+              <p
+                className="font-semibold"
+                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+              >
                 Manage Users
               </p>
               <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
@@ -669,7 +794,10 @@ function AdminDashboard() {
               <CalendarCheck className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold" style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}>
+              <p
+                className="font-semibold"
+                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+              >
                 Manage Bookings
               </p>
               <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
@@ -683,7 +811,6 @@ function AdminDashboard() {
               style={{ color: GOLD }}
             />
           </Link>
-
         </div>
       </div>
     </div>

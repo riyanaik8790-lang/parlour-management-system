@@ -27,14 +27,12 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: ICON,
     badge: ICON,
-    tag: data.tag || "hemangi-notification",   // collapses duplicates
+    tag: data.tag || "hemangi-notification", // collapses duplicates
     renotify: true,
     data: { url: data.url || APP_ORIGIN },
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 // ── Notification click ────────────────────────────────────────────────────────
@@ -42,25 +40,24 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = (event.notification.data && event.notification.data.url)
-    ? event.notification.data.url
-    : APP_ORIGIN;
+  const targetUrl =
+    event.notification.data && event.notification.data.url
+      ? event.notification.data.url
+      : APP_ORIGIN;
 
   event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((windowClients) => {
-        // Focus an existing open tab if possible
-        for (const client of windowClients) {
-          if (client.url === targetUrl && "focus" in client) {
-            return client.focus();
-          }
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Focus an existing open tab if possible
+      for (const client of windowClients) {
+        if (client.url === targetUrl && "focus" in client) {
+          return client.focus();
         }
-        // Otherwise open a new tab
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      })
+      }
+      // Otherwise open a new tab
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    }),
   );
 });
 

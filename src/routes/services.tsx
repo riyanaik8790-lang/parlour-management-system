@@ -36,24 +36,22 @@ export const Route = createFileRoute("/services")({
 });
 
 const SERVICE_IMAGES: Record<string, { src: string; position: string }> = {
-  "Facial": { src: facialGoldImg, position: "center 30%" },
+  Facial: { src: facialGoldImg, position: "center 30%" },
   "Hair Spa": { src: hairSpaImg, position: "center 25%" },
   "Bridal Makeup Package": { src: bridalImg, position: "center 20%" },
   "Pre-Bridal Package": { src: preBridalImg, position: "center 20%" },
   "Manicure & Pedicure": { src: pedicureImg, position: "center" },
-  "Nails": { src: nailsJpegImg, position: "center" },
-  "Bleach": { src: bleachImg, position: "center 35%" },
-  "Cleanup": { src: cleanupImg, position: "center" },
+  Nails: { src: nailsJpegImg, position: "center" },
+  Bleach: { src: bleachImg, position: "center 35%" },
+  Cleanup: { src: cleanupImg, position: "center" },
   "D-Tan": { src: facialImg, position: "center 25%" },
-  "Threading": { src: threadingImg, position: "center 15%" },
-  "Waxing": { src: waxingImg, position: "center" },
+  Threading: { src: threadingImg, position: "center 15%" },
+  Waxing: { src: waxingImg, position: "center" },
   "Hair Cuts": { src: hairCutImg, position: "center 60%" },
   "Hair Treatments": { src: hairColor1Img, position: "center 30%" },
   "Hair Colour": { src: hairColor2Img, position: "center 30%" },
-  "Massage": { src: massageImg, position: "center" },
+  Massage: { src: massageImg, position: "center" },
 };
-
-
 
 function useReveal() {
   const ref = useRef<HTMLDivElement>(null);
@@ -61,8 +59,13 @@ function useReveal() {
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { el.classList.add("visible"); obs.disconnect(); } },
-      { threshold: 0.08 }
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("visible");
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.08 },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -70,12 +73,12 @@ function useReveal() {
   return ref;
 }
 
-function CategoryCard({ cat, index }: { cat: typeof SERVICE_CATEGORIES[number]; index: number }) {
+function CategoryCard({ cat, index }: { cat: (typeof SERVICE_CATEGORIES)[number]; index: number }) {
   const ref = useReveal();
   const imgData = SERVICE_IMAGES[cat.name];
   const img = imgData?.src;
   const position = imgData?.position || "center";
-  const delay = (index % 4 + 1) * 100;
+  const delay = ((index % 4) + 1) * 100;
 
   return (
     <div
@@ -86,14 +89,21 @@ function CategoryCard({ cat, index }: { cat: typeof SERVICE_CATEGORIES[number]; 
       {/* Card image */}
       {img && (
         <div className="img-zoom h-44 w-full">
-          <img src={img} alt={cat.name} className="w-full h-full object-cover" style={{ objectPosition: position }} />
+          <img
+            src={img}
+            alt={cat.name}
+            className="w-full h-full object-cover"
+            style={{ objectPosition: position }}
+          />
         </div>
       )}
 
       {/* Content */}
       <div className="p-4 sm:p-5">
         <div className="mb-1">
-          <h2 className="font-serif text-xl sm:text-2xl" style={{ color: "oklch(0.35 0.15 22)" }}>{cat.name}</h2>
+          <h2 className="font-serif text-xl sm:text-2xl" style={{ color: "oklch(0.35 0.15 22)" }}>
+            {cat.name}
+          </h2>
         </div>
         <hr className="gold-divider my-3" />
         <ul className="divide-y text-sm" style={{ borderColor: "oklch(0.84 0.042 80 / 60%)" }}>
@@ -109,7 +119,8 @@ function CategoryCard({ cat, index }: { cat: typeof SERVICE_CATEGORIES[number]; 
                 className="whitespace-nowrap text-xs sm:text-sm font-semibold px-2 sm:px-2.5 py-0.5 rounded-full shrink-0"
                 style={{
                   color: "oklch(0.22 0.04 50)",
-                  background: "linear-gradient(135deg, oklch(0.68 0.13 68 / 20%), oklch(0.82 0.18 85 / 30%))",
+                  background:
+                    "linear-gradient(135deg, oklch(0.68 0.13 68 / 20%), oklch(0.82 0.18 85 / 30%))",
                   border: "1px solid oklch(0.68 0.13 68 / 30%)",
                 }}
               >
@@ -129,22 +140,35 @@ function ServicesPage() {
       {/* Page header */}
       <section
         className="relative py-14 sm:py-20 px-4 text-center overflow-hidden"
-        style={{ background: "linear-gradient(135deg, oklch(0.968 0.018 85), oklch(0.92 0.04 82))" }}
+        style={{
+          background: "linear-gradient(135deg, oklch(0.968 0.018 85), oklch(0.92 0.04 82))",
+        }}
       >
-
-
         <span className="gold-badge mb-4 inline-block animate-fade-up">Full Service Menu</span>
-        <h1 className="font-serif text-2xl sm:text-5xl md:text-6xl animate-fade-up delay-100" style={{ color: "oklch(0.35 0.15 22)" }}>
+        <h1
+          className="font-serif text-2xl sm:text-5xl md:text-6xl animate-fade-up delay-100"
+          style={{ color: "oklch(0.35 0.15 22)" }}
+        >
           Service <span className="gold-shimmer">Menu</span>
         </h1>
         <p className="mt-4 sm:mt-6 mb-6 sm:mb-8 text-sm sm:text-base text-muted-foreground animate-fade-up delay-200 max-w-lg mx-auto leading-relaxed">
           Browse our full menu of beauty and wellness services with transparent pricing.
         </p>
         <div className="mt-4 sm:mt-6 mb-8 sm:mb-12 flex flex-col sm:flex-row justify-center gap-3 px-4 sm:px-0 animate-fade-up delay-300">
-          <Button asChild size="lg" className="btn-maroon rounded-full px-8 w-full sm:w-auto min-h-[44px]">
+          <Button
+            asChild
+            size="lg"
+            className="btn-maroon rounded-full px-8 w-full sm:w-auto min-h-[44px]"
+          >
             <Link to="/book">Book Now</Link>
           </Button>
-          <Button asChild variant="outline" size="lg" className="rounded-full px-8 w-full sm:w-auto min-h-[44px]" style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}>
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="rounded-full px-8 w-full sm:w-auto min-h-[44px]"
+            style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}
+          >
             <Link to="/try-on">Try Skin Analysis</Link>
           </Button>
         </div>
@@ -163,16 +187,31 @@ function ServicesPage() {
         {/* Bottom CTA */}
         <div
           className="mt-10 sm:mt-16 rounded-3xl p-6 sm:p-10 text-center relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.28 0.10 22))" }}
+          style={{
+            background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.28 0.10 22))",
+          }}
         >
           <div className="absolute inset-0 opacity-10">
             <img src={rosesImg} alt="" className="w-full h-full object-cover" />
           </div>
           <div className="relative">
             <span className="gold-badge mb-3 inline-block">Ready?</span>
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mb-2">Book your favourite service</h3>
-            <p className="text-white/60 mb-5 sm:mb-6 text-sm">Real-time slot booking, no waiting on hold.</p>
-            <Button asChild size="lg" className="rounded-full px-8 sm:px-10 w-full sm:w-auto min-h-[44px]" style={{ background: "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.82 0.18 85))", color: "oklch(0.22 0.04 50)", fontWeight: 700 }}>
+            <h3 className="font-serif text-2xl sm:text-3xl text-white mb-2">
+              Book your favourite service
+            </h3>
+            <p className="text-white/60 mb-5 sm:mb-6 text-sm">
+              Real-time slot booking, no waiting on hold.
+            </p>
+            <Button
+              asChild
+              size="lg"
+              className="rounded-full px-8 sm:px-10 w-full sm:w-auto min-h-[44px]"
+              style={{
+                background: "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.82 0.18 85))",
+                color: "oklch(0.22 0.04 50)",
+                fontWeight: 700,
+              }}
+            >
               <Link to="/book">Book an Appointment →</Link>
             </Button>
           </div>

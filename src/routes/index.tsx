@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { CalendarCheck, Sparkles, ShieldCheck, Heart, Award, Clock } from "lucide-react";
 import { SERVICE_CATEGORIES } from "@/lib/services-data";
 
-
 import heroBg from "@/assets/new_salon_hero_bg.jpg";
 import facialImg from "@/assets/facial_service.png";
 import bridalImg from "@/assets/bridal_makeup.png";
@@ -36,16 +35,19 @@ function useReveal() {
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { el.classList.add("visible"); obs.disconnect(); } },
-      { threshold: 0.12 }
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("visible");
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.12 },
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
   return ref;
 }
-
-
 
 const STATS = [
   { icon: <Heart className="h-6 w-6" />, value: "2000+", label: "Happy Clients" },
@@ -55,14 +57,14 @@ const STATS = [
 ];
 
 const SERVICE_IMAGES: Record<string, { src: string; position: string }> = {
-  "Facial": { src: facialGoldImg, position: "center 30%" },
+  Facial: { src: facialGoldImg, position: "center 30%" },
   "Hair Spa": { src: hairSpaImg, position: "center 25%" },
   "Bridal Makeup Package": { src: bridalImg, position: "center 20%" },
   "Manicure & Pedicure": { src: pedicureImg, position: "center" },
-  "Bleach": { src: bleachImg, position: "center 35%" },
-  "Cleanup": { src: cleanupImg, position: "center" },
-  "Threading": { src: threadingImg, position: "center 15%" },
-  "Waxing": { src: waxingImg, position: "center" },
+  Bleach: { src: bleachImg, position: "center 35%" },
+  Cleanup: { src: cleanupImg, position: "center" },
+  Threading: { src: threadingImg, position: "center 15%" },
+  Waxing: { src: waxingImg, position: "center" },
   "D-Tan": { src: facialImg, position: "center 25%" },
 };
 
@@ -76,7 +78,6 @@ function Index() {
 
   return (
     <div className="overflow-x-hidden">
-
       {/* ── HERO ── */}
       <section className="relative min-h-[92vh] flex items-center overflow-hidden">
         {/* Background image */}
@@ -109,13 +110,23 @@ function Index() {
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row flex-wrap justify-center gap-3 animate-fade-up delay-300 w-full sm:w-auto">
-              <Button asChild size="lg" className="btn-maroon rounded-full px-8 shadow-lg text-base w-full sm:w-auto min-h-[44px]">
+              <Button
+                asChild
+                size="lg"
+                className="btn-maroon rounded-full px-8 shadow-lg text-base w-full sm:w-auto min-h-[44px]"
+              >
                 <Link to="/book">
                   <CalendarCheck className="mr-2 h-5 w-5" />
                   Book an Appointment
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="rounded-full px-8 text-base border-2 w-full sm:w-auto min-h-[44px]" style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="rounded-full px-8 text-base border-2 w-full sm:w-auto min-h-[44px]"
+                style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}
+              >
                 <Link to="/services">View Services</Link>
               </Button>
             </div>
@@ -135,11 +146,21 @@ function Index() {
 
       {/* ── STATS ── */}
       <section className="py-12 bg-gradient-to-r from-secondary/60 via-background to-secondary/60">
-        <div ref={statsRef} className="reveal mx-auto max-w-5xl px-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div
+          ref={statsRef}
+          className="reveal mx-auto max-w-5xl px-4 grid grid-cols-2 md:grid-cols-4 gap-4"
+        >
           {STATS.map((s, i) => (
             <div key={s.label} className={`stat-card animate-scale-in delay-${(i + 1) * 100}`}>
-              <div className="flex justify-center mb-2" style={{ color: "oklch(0.68 0.13 68)" }}>{s.icon}</div>
-              <div className="font-serif text-2xl sm:text-3xl font-bold" style={{ color: "oklch(0.35 0.15 22)" }}>{s.value}</div>
+              <div className="flex justify-center mb-2" style={{ color: "oklch(0.68 0.13 68)" }}>
+                {s.icon}
+              </div>
+              <div
+                className="font-serif text-2xl sm:text-3xl font-bold"
+                style={{ color: "oklch(0.35 0.15 22)" }}
+              >
+                {s.value}
+              </div>
               <div className="text-xs sm:text-sm text-muted-foreground mt-1">{s.label}</div>
             </div>
           ))}
@@ -151,7 +172,10 @@ function Index() {
         <div ref={galleryRef} className="reveal">
           <div className="text-center mb-8 sm:mb-10">
             <span className="gold-badge mb-3 inline-block">Our Work</span>
-            <h2 className="font-serif text-3xl sm:text-4xl" style={{ color: "oklch(0.35 0.15 22)" }}>
+            <h2
+              className="font-serif text-3xl sm:text-4xl"
+              style={{ color: "oklch(0.35 0.15 22)" }}
+            >
               A glimpse of <span className="gold-shimmer">glam</span>
             </h2>
             <p className="text-sm text-muted-foreground mt-2">A mood board for your next glow-up</p>
@@ -165,8 +189,16 @@ function Index() {
               { src: cleanupImg, label: "Cleanup", position: "center" },
               { src: hairColor2Img, label: "Hair Treatment", position: "center 30%" },
             ].map((g, i) => (
-              <div key={i} className={`img-zoom group relative aspect-[4/3] cursor-pointer animate-fade-up delay-${(i % 4 + 1) * 100}`}>
-                <img src={g.src} alt={g.label} className="w-full h-full object-cover" style={{ objectPosition: g.position || "center" }} />
+              <div
+                key={i}
+                className={`img-zoom group relative aspect-[4/3] cursor-pointer animate-fade-up delay-${((i % 4) + 1) * 100}`}
+              >
+                <img
+                  src={g.src}
+                  alt={g.label}
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: g.position || "center" }}
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/70%)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3 sm:p-4">
                   <span className="text-white font-serif text-sm sm:text-lg">{g.label}</span>
                 </div>
@@ -177,15 +209,29 @@ function Index() {
       </section>
 
       {/* ── SERVICES ── */}
-      <section className="py-12 sm:py-16" style={{ background: "linear-gradient(180deg, oklch(0.968 0.018 85), oklch(0.94 0.03 82))" }}>
+      <section
+        className="py-12 sm:py-16"
+        style={{
+          background: "linear-gradient(180deg, oklch(0.968 0.018 85), oklch(0.94 0.03 82))",
+        }}
+      >
         <div ref={servicesRef} className="reveal mx-auto max-w-6xl px-4">
           <div className="mb-8 sm:mb-10 flex flex-wrap items-start justify-between gap-3">
             <div>
               <span className="gold-badge mb-2 inline-block">Services</span>
-              <h2 className="font-serif text-3xl sm:text-4xl" style={{ color: "oklch(0.35 0.15 22)" }}>Popular services</h2>
+              <h2
+                className="font-serif text-3xl sm:text-4xl"
+                style={{ color: "oklch(0.35 0.15 22)" }}
+              >
+                Popular services
+              </h2>
               <p className="text-sm text-muted-foreground mt-1">Handpicked from our salon menu</p>
             </div>
-            <Button asChild variant="ghost" className="font-semibold text-[oklch(0.68_0.13_68)] hover:text-accent-foreground shrink-0">
+            <Button
+              asChild
+              variant="ghost"
+              className="font-semibold text-[oklch(0.68_0.13_68)] hover:text-accent-foreground shrink-0"
+            >
               <Link to="/services">See all →</Link>
             </Button>
           </div>
@@ -198,31 +244,54 @@ function Index() {
               return (
                 <div
                   key={cat.name}
-                  className={`service-card rounded-2xl overflow-hidden border bg-card shadow-sm animate-fade-up delay-${(i % 4 + 1) * 100}`}
+                  className={`service-card rounded-2xl overflow-hidden border bg-card shadow-sm animate-fade-up delay-${((i % 4) + 1) * 100}`}
                   style={{ borderColor: "oklch(0.84 0.042 80)" }}
                 >
                   {/* Image header */}
                   {imgSrc && (
                     <div className="img-zoom h-36 sm:h-40 w-full">
-                      <img src={imgSrc} alt={cat.name} className="w-full h-full object-cover" style={{ objectPosition: position }} />
+                      <img
+                        src={imgSrc}
+                        alt={cat.name}
+                        className="w-full h-full object-cover"
+                        style={{ objectPosition: position }}
+                      />
                     </div>
                   )}
                   <div className="p-4 sm:p-5">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-lg"></span>
-                      <h3 className="font-serif text-lg sm:text-xl" style={{ color: "oklch(0.35 0.15 22)" }}>{cat.name}</h3>
+                      <h3
+                        className="font-serif text-lg sm:text-xl"
+                        style={{ color: "oklch(0.35 0.15 22)" }}
+                      >
+                        {cat.name}
+                      </h3>
                     </div>
                     <ul className="space-y-2 text-sm">
                       {cat.items.slice(0, 4).map((s) => (
-                        <li key={s.id} className="flex justify-between border-b border-dashed py-1.5" style={{ borderColor: "oklch(0.84 0.042 80)" }}>
+                        <li
+                          key={s.id}
+                          className="flex justify-between border-b border-dashed py-1.5"
+                          style={{ borderColor: "oklch(0.84 0.042 80)" }}
+                        >
                           <span className="text-foreground/80 min-w-0 pr-2 truncate">{s.name}</span>
-                          <span className="font-semibold shrink-0" style={{ color: "oklch(0.68 0.13 68)" }}>
+                          <span
+                            className="font-semibold shrink-0"
+                            style={{ color: "oklch(0.68 0.13 68)" }}
+                          >
                             {s.price === "On request" ? "On request" : `₹${s.price}`}
                           </span>
                         </li>
                       ))}
                     </ul>
-                    <Button asChild variant="outline" size="sm" className="mt-4 w-full rounded-full min-h-[44px]" style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="mt-4 w-full rounded-full min-h-[44px]"
+                      style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}
+                    >
                       <Link to="/book">Book this →</Link>
                     </Button>
                   </div>
@@ -232,8 +301,6 @@ function Index() {
           </div>
         </div>
       </section>
-
-
     </div>
   );
 }
@@ -241,7 +308,10 @@ function Index() {
 function Feature({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-2 text-muted-foreground text-sm">
-      <span className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-sm" style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))" }}>
+      <span
+        className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-sm"
+        style={{ background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))" }}
+      >
         {icon}
       </span>
       <span>{text}</span>

@@ -19,12 +19,12 @@ mysql -u root < schema.sql
 
 This creates `salon_db` with tables:
 
-| Table | Purpose |
-|-------|---------|
-| `users` | name, email, hashed password, phone |
-| `services` | salon menu (pre-seeded) |
-| `appointments` | bookings with double-booking protection |
-| `skin_analyses` | saved skin-tone results |
+| Table           | Purpose                                 |
+| --------------- | --------------------------------------- |
+| `users`         | name, email, hashed password, phone     |
+| `services`      | salon menu (pre-seeded)                 |
+| `appointments`  | bookings with double-booking protection |
+| `skin_analyses` | saved skin-tone results                 |
 
 ## 2. Configure environment
 
@@ -89,17 +89,17 @@ VITE_API_BASE_URL=http://localhost:5000
 
 ## API endpoints
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/health` | No | DB connectivity check |
-| POST | `/api/register` | No | Create account → JWT |
-| POST | `/api/login` | No | Login → JWT |
-| GET | `/api/slots?date=YYYY-MM-DD` | No | Taken time slots |
-| POST | `/api/book` | JWT | Book appointment |
-| GET | `/api/my-bookings` | JWT | User's bookings |
-| PUT | `/api/bookings/:id` | JWT | Reschedule |
-| DELETE | `/api/bookings/:id` | JWT | Cancel booking |
-| POST | `/api/chatbot` | No | AI assistant replies |
+| Method | Path                         | Auth | Description           |
+| ------ | ---------------------------- | ---- | --------------------- |
+| GET    | `/api/health`                | No   | DB connectivity check |
+| POST   | `/api/register`              | No   | Create account → JWT  |
+| POST   | `/api/login`                 | No   | Login → JWT           |
+| GET    | `/api/slots?date=YYYY-MM-DD` | No   | Taken time slots      |
+| POST   | `/api/book`                  | JWT  | Book appointment      |
+| GET    | `/api/my-bookings`           | JWT  | User's bookings       |
+| PUT    | `/api/bookings/:id`          | JWT  | Reschedule            |
+| DELETE | `/api/bookings/:id`          | JWT  | Cancel booking        |
+| POST   | `/api/chatbot`               | No   | AI assistant replies  |
 
 ### Register example
 
@@ -119,12 +119,12 @@ curl -X POST http://localhost:5000/api/login \
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `Database error` on startup | Start MySQL in XAMPP; run `schema.sql` |
-| `Access denied for user 'root'` | Set `MYSQL_PASSWORD` in `.env` |
-| Frontend still uses mock data | Ensure Flask is running on port 5000; check browser console for CORS errors |
-| Port 5000 in use | Change `PORT=5001` in `.env` and set `VITE_API_BASE_URL=http://localhost:5001` |
+| Problem                         | Fix                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| `Database error` on startup     | Start MySQL in XAMPP; run `schema.sql`                                         |
+| `Access denied for user 'root'` | Set `MYSQL_PASSWORD` in `.env`                                                 |
+| Frontend still uses mock data   | Ensure Flask is running on port 5000; check browser console for CORS errors    |
+| Port 5000 in use                | Change `PORT=5001` in `.env` and set `VITE_API_BASE_URL=http://localhost:5001` |
 
 ## Security notes (for production)
 

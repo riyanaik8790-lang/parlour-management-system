@@ -36,7 +36,7 @@ function clearCreds() {
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
-const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 function validateEmail(value: string): string | undefined {
   if (!value.trim()) return "Email address is required";
@@ -107,8 +107,6 @@ function LoginPage() {
     }
   }
 
-
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -161,7 +159,6 @@ function LoginPage() {
           </p>
         </div>
 
-
         {/* Card */}
         <div
           className="overflow-hidden rounded-3xl shadow-xl"
@@ -212,12 +209,17 @@ function LoginPage() {
                   onFocus={() => {
                     setReadOnly(false);
                     if (savedCreds && email.length > 0) {
-                      setShowSuggestion(savedCreds.email.toLowerCase().startsWith(email.toLowerCase()));
+                      setShowSuggestion(
+                        savedCreds.email.toLowerCase().startsWith(email.toLowerCase()),
+                      );
                     }
                   }}
                   onClick={() => setReadOnly(false)}
                   onChange={(e) => handleEmailChange(e.target.value)}
-                  onBlur={() => { setEmailTouched(true); setTimeout(() => setShowSuggestion(false), 150); }}
+                  onBlur={() => {
+                    setEmailTouched(true);
+                    setTimeout(() => setShowSuggestion(false), 150);
+                  }}
                   disabled={busy}
                   className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none"
                   style={{ color: "oklch(0.25 0.05 50)" }}
@@ -241,7 +243,9 @@ function LoginPage() {
                   <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: SUCCESS_COLOR }} />
                   <div className="flex flex-col items-start text-left">
                     <span className="font-medium">{savedCreds.email}</span>
-                    <span className="text-xs" style={{ color: "oklch(0.58 0.04 55)" }}>Saved account</span>
+                    <span className="text-xs" style={{ color: "oklch(0.58 0.04 55)" }}>
+                      Saved account
+                    </span>
                   </div>
                 </button>
               )}
@@ -276,7 +280,10 @@ function LoginPage() {
                 value={password}
                 onFocus={() => setReadOnly(false)}
                 onClick={() => setReadOnly(false)}
-                onChange={(e) => { setPassword(e.target.value); setServerError(null); }}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setServerError(null);
+                }}
                 onBlur={() => setPasswordTouched(true)}
                 disabled={busy}
                 className="w-full bg-transparent py-0 pl-10 pr-2 text-sm outline-none"
@@ -296,9 +303,7 @@ function LoginPage() {
                     background: rememberMe
                       ? `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`
                       : "oklch(0.998 0.004 85)",
-                    border: rememberMe
-                      ? "none"
-                      : "1.5px solid oklch(0.78 0.030 82)",
+                    border: rememberMe ? "none" : "1.5px solid oklch(0.78 0.030 82)",
                     boxShadow: rememberMe ? `0 2px 8px ${BURGUNDY}30` : "none",
                   }}
                 >
@@ -348,7 +353,8 @@ function LoginPage() {
                   color: "oklch(0.45 0.05 50)",
                 }}
               >
-                Please contact the salon at <span className="font-semibold">+91 8208576165</span> to reset your password.
+                Please contact the salon at <span className="font-semibold">+91 8208576165</span> to
+                reset your password.
               </div>
             )}
 
@@ -364,7 +370,9 @@ function LoginPage() {
                 boxShadow: `0 6px 24px ${BURGUNDY}35`,
               }}
               onMouseEnter={(e) => {
-                if (!busy) (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 32px ${BURGUNDY}50`;
+                if (!busy)
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    `0 8px 32px ${BURGUNDY}50`;
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 24px ${BURGUNDY}35`;
@@ -470,9 +478,7 @@ function FieldWrapper({
         {/* Validation indicator - only when no suffix */}
         {!suffix && (
           <span className="flex-shrink-0">
-            {hasError ? (
-              <XCircle className="h-4 w-4" style={{ color: ERROR_COLOR }} />
-            ) : null}
+            {hasError ? <XCircle className="h-4 w-4" style={{ color: ERROR_COLOR }} /> : null}
           </span>
         )}
       </div>

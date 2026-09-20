@@ -9,7 +9,13 @@ import { toast } from "sonner";
 import { CalendarIcon, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIME_SLOTS, ALL_SERVICES } from "@/lib/services-data";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/my-bookings")({
   head: () => ({
@@ -57,9 +63,18 @@ function BookingSkeleton() {
               />
             </div>
             <div className="flex gap-2">
-              <div className="h-7 w-20 rounded-full animate-pulse" style={{ background: "oklch(0.91 0.020 82)" }} />
-              <div className="h-9 w-14 rounded-lg animate-pulse" style={{ background: "oklch(0.89 0.025 82)" }} />
-              <div className="h-9 w-16 rounded-lg animate-pulse" style={{ background: "oklch(0.89 0.025 82)" }} />
+              <div
+                className="h-7 w-20 rounded-full animate-pulse"
+                style={{ background: "oklch(0.91 0.020 82)" }}
+              />
+              <div
+                className="h-9 w-14 rounded-lg animate-pulse"
+                style={{ background: "oklch(0.89 0.025 82)" }}
+              />
+              <div
+                className="h-9 w-16 rounded-lg animate-pulse"
+                style={{ background: "oklch(0.89 0.025 82)" }}
+              />
             </div>
           </div>
         </li>
@@ -86,14 +101,12 @@ function MyBookingsPage() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const editIsoDate = useMemo(
-    () => (editDate ? format(editDate, "yyyy-MM-dd") : ""),
-    [editDate],
-  );
+  const editIsoDate = useMemo(() => (editDate ? format(editDate, "yyyy-MM-dd") : ""), [editDate]);
 
   // Load bookings
   const load = () => {
-    api.myBookings()
+    api
+      .myBookings()
       .then((r) => setBookings(r.bookings))
       .catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : "Failed to load";
@@ -113,7 +126,10 @@ function MyBookingsPage() {
   useEffect(() => {
     const u = getUser();
     setUser(u);
-    if (!u) { navigate({ to: "/" }); return; }
+    if (!u) {
+      navigate({ to: "/" });
+      return;
+    }
     setReady(true);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,11 +137,16 @@ function MyBookingsPage() {
 
   // Fetch taken slots whenever edit date changes
   useEffect(() => {
-    if (!editIsoDate) { setTakenSlots([]); setEditPreBridalFullyBooked(false); return; }
+    if (!editIsoDate) {
+      setTakenSlots([]);
+      setEditPreBridalFullyBooked(false);
+      return;
+    }
     let alive = true;
     setLoadingSlots(true);
     setEditTime("");
-    api.slots(editIsoDate)
+    api
+      .slots(editIsoDate)
       .then((res) => {
         if (alive) {
           setTakenSlots(res.taken);
@@ -136,9 +157,16 @@ function MyBookingsPage() {
           setEditPreBridalFullyBooked(isPreBridal ? (res.pre_bridal_booked ?? false) : false);
         }
       })
-      .catch(() => { if (alive) { setTakenSlots([]); setEditPreBridalFullyBooked(false); } })
+      .catch(() => {
+        if (alive) {
+          setTakenSlots([]);
+          setEditPreBridalFullyBooked(false);
+        }
+      })
       .finally(() => alive && setLoadingSlots(false));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [editIsoDate, editServiceName]);
 
   const startEdit = (b: B) => {
@@ -186,7 +214,9 @@ function MyBookingsPage() {
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed");
-    } finally { setBusyId(null); }
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const cancelBooking = async (id: number) => {
@@ -198,7 +228,9 @@ function MyBookingsPage() {
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Cancel failed");
-    } finally { setBusyId(null); }
+    } finally {
+      setBusyId(null);
+    }
   };
 
   if (!ready) return null;
@@ -208,7 +240,9 @@ function MyBookingsPage() {
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="font-serif text-3xl text-primary">Please login</h1>
         <p className="mt-2 text-muted-foreground">Login to view your bookings.</p>
-        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>Login</Button>
+        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
+          Login
+        </Button>
       </div>
     );
   }
@@ -232,7 +266,11 @@ function MyBookingsPage() {
       {error && (
         <div
           className="mt-4 rounded-xl px-4 py-3 text-sm"
-          style={{ background: "oklch(0.577 0.245 27 / 8%)", color: "oklch(0.45 0.18 27)", border: "1px solid oklch(0.577 0.245 27 / 20%)" }}
+          style={{
+            background: "oklch(0.577 0.245 27 / 8%)",
+            color: "oklch(0.45 0.18 27)",
+            border: "1px solid oklch(0.577 0.245 27 / 20%)",
+          }}
         >
           {error}
         </div>
@@ -261,7 +299,6 @@ function MyBookingsPage() {
             {editingId === b.id ? (
               /* ---- COMPACT EDIT PANEL ---- */
               <div className="p-4 space-y-4">
-
                 {/* Header row: service name + close button */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -294,7 +331,6 @@ function MyBookingsPage() {
 
                 {/* Date + Time on same row on all screen sizes */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
                   {/* Date picker */}
                   <div className="space-y-1">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -309,7 +345,10 @@ function MyBookingsPage() {
                             !editDate && "text-muted-foreground",
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0" style={{ color: GOLD }} />
+                          <CalendarIcon
+                            className="mr-2 h-3.5 w-3.5 shrink-0"
+                            style={{ color: GOLD }}
+                          />
                           {editDate ? format(editDate, "d MMM yyyy") : "Pick a date"}
                         </Button>
                       </PopoverTrigger>
@@ -339,16 +378,18 @@ function MyBookingsPage() {
                     {!editDate ? (
                       <div
                         className="h-10 rounded-md flex items-center justify-center text-xs text-muted-foreground"
-                        style={{ background: "oklch(0.96 0.010 82)", border: "1px dashed oklch(0.84 0.042 80)" }}
+                        style={{
+                          background: "oklch(0.96 0.010 82)",
+                          border: "1px dashed oklch(0.84 0.042 80)",
+                        }}
                       >
                         Select a date first
                       </div>
                     ) : editPreBridalFullyBooked ? (
                       /* Pre-Bridal fully-booked warning replaces the dropdown */
-                      <div
-                        className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300"
-                      >
-                        ⚠️ The Pre-Bridal Package is fully booked for this date. Please select another day.
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300">
+                        ⚠️ The Pre-Bridal Package is fully booked for this date. Please select
+                        another day.
                       </div>
                     ) : (
                       <Select value={editTime} onValueChange={setEditTime}>
@@ -357,7 +398,9 @@ function MyBookingsPage() {
                         </SelectTrigger>
                         <SelectContent className="max-h-60">
                           {TIME_SLOTS.map((t, index) => {
-                            const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                            const istNow = new Date(
+                              new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+                            );
                             const isToday =
                               editDate?.getDate() === istNow.getDate() &&
                               editDate?.getMonth() === istNow.getMonth() &&
@@ -366,12 +409,12 @@ function MyBookingsPage() {
                             const [slotH, slotM] = t.split(":").map(Number);
                             const slotMinutes = slotH * 60 + slotM;
                             const currentMinutes = istNow.getHours() * 60 + istNow.getMinutes();
-                            
+
                             const isPast = isToday && slotMinutes <= currentMinutes;
-                            
+
                             const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
                             const isBuffer = prevSlot ? takenSlots.includes(prevSlot) : false;
-                            
+
                             const isTaken = takenSlots.includes(t);
                             const isDisabled = isTaken || isPast || isBuffer;
 
@@ -398,9 +441,13 @@ function MyBookingsPage() {
                     className="flex-1 min-h-[44px] gap-2"
                   >
                     {busyId === b.id ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Saving</>
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Saving
+                      </>
                     ) : (
-                      <><Check className="h-4 w-4" /> Save changes</>
+                      <>
+                        <Check className="h-4 w-4" /> Save changes
+                      </>
                     )}
                   </Button>
                   <Button
@@ -434,14 +481,14 @@ function MyBookingsPage() {
                         b.status === "confirmed"
                           ? "oklch(0.35 0.15 22 / 10%)"
                           : b.status === "cancelled"
-                          ? "oklch(0.577 0.245 27 / 10%)"
-                          : "oklch(0.68 0.13 68 / 12%)",
+                            ? "oklch(0.577 0.245 27 / 10%)"
+                            : "oklch(0.68 0.13 68 / 12%)",
                       color:
                         b.status === "confirmed"
                           ? BURGUNDY
                           : b.status === "cancelled"
-                          ? "oklch(0.50 0.22 27)"
-                          : GOLD,
+                            ? "oklch(0.50 0.22 27)"
+                            : GOLD,
                     }}
                   >
                     {b.status}
@@ -469,7 +516,10 @@ function MyBookingsPage() {
                     {busyId === b.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <><Trash2 className="h-3 w-3" /><span className="hidden sm:inline">Delete</span></>
+                      <>
+                        <Trash2 className="h-3 w-3" />
+                        <span className="hidden sm:inline">Delete</span>
+                      </>
                     )}
                   </Button>
                 </div>

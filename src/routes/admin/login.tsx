@@ -85,7 +85,10 @@ function AdminLoginPage() {
 
             {/* Email */}
             <div className="space-y-1.5">
-              <label htmlFor="admin-email" className="text-xs font-semibold uppercase tracking-widest text-white/50">
+              <label
+                htmlFor="admin-email"
+                className="text-xs font-semibold uppercase tracking-widest text-white/50"
+              >
                 Email Address
               </label>
               <input
@@ -102,7 +105,10 @@ function AdminLoginPage() {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label htmlFor="admin-password" className="text-xs font-semibold uppercase tracking-widest text-white/50">
+              <label
+                htmlFor="admin-password"
+                className="text-xs font-semibold uppercase tracking-widest text-white/50"
+              >
                 Password
               </label>
               <div className="relative">
@@ -147,7 +153,10 @@ function AdminLoginPage() {
             {/* Back link */}
             <p className="text-center text-xs text-white/25">
               Not an admin?{" "}
-              <Link to="/" className="text-white/40 underline underline-offset-2 hover:text-white/70">
+              <Link
+                to="/"
+                className="text-white/40 underline underline-offset-2 hover:text-white/70"
+              >
                 Go to main site
               </Link>
             </p>

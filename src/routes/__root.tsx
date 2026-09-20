@@ -83,10 +83,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Hemangi Glam Salon - Smart Booking" },
-      { name: "description", content: "Book salon services online with our smart, error-free scheduling and AI assistant." },
+      {
+        name: "description",
+        content:
+          "Book salon services online with our smart, error-free scheduling and AI assistant.",
+      },
       { name: "author", content: "Hemangi Glam Salon" },
       { property: "og:title", content: "Hemangi Glam Salon - Smart Booking" },
-      { property: "og:description", content: "Book salon services online with our smart, error-free scheduling and AI assistant." },
+      {
+        property: "og:description",
+        content:
+          "Book salon services online with our smart, error-free scheduling and AI assistant.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -129,7 +137,9 @@ function RootComponent() {
 
   // Register the push service worker once on startup (non-blocking, graceful fallback)
   useEffect(() => {
-    registerSW().catch(() => { /* silently ignore if SW fails to register */ });
+    registerSW().catch(() => {
+      /* silently ignore if SW fails to register */
+    });
   }, []);
 
   return (

@@ -82,7 +82,7 @@ export async function subscribeToPush(): Promise<"granted" | "denied" | "already
   if (permission !== "granted") return "denied";
 
   try {
-    const reg = await getSWReg() ?? await registerSW();
+    const reg = (await getSWReg()) ?? (await registerSW());
     if (!reg) return "error";
 
     const sub = await reg.pushManager.subscribe({

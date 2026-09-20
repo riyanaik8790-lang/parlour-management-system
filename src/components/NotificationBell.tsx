@@ -13,21 +13,34 @@ const PUSH_PROMPT_DISMISSED_KEY = "push_prompt_dismissed_v1";
 function fmtTime(raw: string) {
   const d = new Date(raw.replace(" ", "T") + (raw.includes("Z") || raw.includes("+") ? "" : "Z"));
   return d.toLocaleString("en-IN", {
-    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-    hour12: true, timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
   });
 }
 
 function NotifIcon({ type }: { type: string }) {
-  if (type === "new_booking") return <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: BURGUNDY }} />;
-  if (type === "appointment_reminder") return <Clock className="h-4 w-4 flex-shrink-0" style={{ color: GOLD }} />;
-  if (type === "booking_status_update") return <Info className="h-4 w-4 flex-shrink-0" style={{ color: BURGUNDY }} />;
+  if (type === "new_booking")
+    return <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: BURGUNDY }} />;
+  if (type === "appointment_reminder")
+    return <Clock className="h-4 w-4 flex-shrink-0" style={{ color: GOLD }} />;
+  if (type === "booking_status_update")
+    return <Info className="h-4 w-4 flex-shrink-0" style={{ color: BURGUNDY }} />;
   return <Sparkles className="h-4 w-4 flex-shrink-0" style={{ color: GOLD }} />;
 }
 
 // ── Push Permission Banner ────────────────────────────────────────────────────
 
-function PushPromptBanner({ onEnable, onDismiss }: { onEnable: () => void; onDismiss: () => void }) {
+function PushPromptBanner({
+  onEnable,
+  onDismiss,
+}: {
+  onEnable: () => void;
+  onDismiss: () => void;
+}) {
   return (
     <div
       className="mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs shadow-md"
@@ -95,11 +108,15 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
       const res = await api.getNotifications();
       setItems(res.notifications);
       setUnread(res.unread);
-    } catch { /* backend not ready yet */ }
+    } catch {
+      /* backend not ready yet */
+    }
   }, []);
 
   // Fetch on mount
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Auto-refresh (for admin panel live updates)
   useEffect(() => {
@@ -128,8 +145,11 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
       await api.markAllRead();
       setUnread(0);
       setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    } catch { /* silent */ }
-    finally { setMarking(false); }
+    } catch {
+      /* silent */
+    } finally {
+      setMarking(false);
+    }
   }
 
   async function handleEnablePush() {
@@ -169,8 +189,12 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
         style={{
           background: open ? "oklch(0.35 0.15 22 / 8%)" : "transparent",
         }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.35 0.15 22 / 8%)"; }}
-        onMouseLeave={(e) => { if (!open) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "oklch(0.35 0.15 22 / 8%)";
+        }}
+        onMouseLeave={(e) => {
+          if (!open) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+        }}
       >
         <Bell className="h-5 w-5" style={{ color: BURGUNDY }} />
         {unread > 0 && (
@@ -186,10 +210,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
       {/* Push permission prompt — shown below bell, outside the notifications dropdown */}
       {showPushPrompt && !open && (
         <div className="absolute right-0 top-full z-50">
-          <PushPromptBanner
-            onEnable={handleEnablePush}
-            onDismiss={handleDismissPush}
-          />
+          <PushPromptBanner onEnable={handleEnablePush} onDismiss={handleDismissPush} />
           {pushEnabling && (
             <p className="mt-1 text-center text-[10px]" style={{ color: "oklch(0.65 0.03 55)" }}>
               Requesting permission…
@@ -213,8 +234,16 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
             className="flex items-center justify-between border-b px-4 py-3"
             style={{ borderColor: "oklch(0.91 0.025 82)", background: "oklch(0.995 0.006 84)" }}
           >
-            <span className="text-sm font-semibold" style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}>
-              Notifications {unread > 0 && <span className="ml-1 text-xs font-normal" style={{ color: GOLD }}>({unread} new)</span>}
+            <span
+              className="text-sm font-semibold"
+              style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+            >
+              Notifications{" "}
+              {unread > 0 && (
+                <span className="ml-1 text-xs font-normal" style={{ color: GOLD }}>
+                  ({unread} new)
+                </span>
+              )}
             </span>
             {unread > 0 && (
               <button
@@ -233,7 +262,10 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
           {showPushPrompt && (
             <div
               className="flex items-center gap-2 border-b px-4 py-2.5"
-              style={{ borderColor: "oklch(0.91 0.025 82)", background: "oklch(0.35 0.15 22 / 3%)" }}
+              style={{
+                borderColor: "oklch(0.91 0.025 82)",
+                background: "oklch(0.35 0.15 22 / 3%)",
+              }}
             >
               <BellRing className="h-3.5 w-3.5 shrink-0" style={{ color: BURGUNDY }} />
               <span className="flex-1 text-xs" style={{ color: "oklch(0.40 0.05 50)" }}>
@@ -262,7 +294,10 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
           {/* List */}
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10" style={{ color: "oklch(0.68 0.04 55)" }}>
+              <div
+                className="flex flex-col items-center justify-center gap-2 py-10"
+                style={{ color: "oklch(0.68 0.04 55)" }}
+              >
                 <Bell className="h-8 w-8 opacity-30" />
                 <p className="text-sm">No notifications yet</p>
               </div>
@@ -277,12 +312,22 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
                   }}
                 >
                   {/* Icon dot */}
-                  <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
-                    style={{ background: n.type === "new_booking" ? "oklch(0.35 0.15 22 / 10%)" : "oklch(0.68 0.13 68 / 10%)" }}>
+                  <div
+                    className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      background:
+                        n.type === "new_booking"
+                          ? "oklch(0.35 0.15 22 / 10%)"
+                          : "oklch(0.68 0.13 68 / 10%)",
+                    }}
+                  >
                     <NotifIcon type={n.type} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs leading-snug" style={{ color: n.is_read ? "oklch(0.50 0.04 50)" : "oklch(0.25 0.05 50)" }}>
+                    <p
+                      className="text-xs leading-snug"
+                      style={{ color: n.is_read ? "oklch(0.50 0.04 50)" : "oklch(0.25 0.05 50)" }}
+                    >
                       {n.message}
                     </p>
                     <p className="mt-0.5 text-[10px]" style={{ color: "oklch(0.70 0.04 50)" }}>
@@ -290,7 +335,10 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
                     </p>
                   </div>
                   {!n.is_read && (
-                    <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full" style={{ background: BURGUNDY }} />
+                    <div
+                      className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full"
+                      style={{ background: BURGUNDY }}
+                    />
                   )}
                 </div>
               ))

@@ -39,7 +39,12 @@ export const SERVICE_CATEGORIES: { name: string; items: Service[] }[] = [
     items: [
       { id: "hs-loreal", name: "L'Oreal Hair Spa", price: "600", category: "Hair Care" },
       { id: "hs-protein", name: "Protein Spa", price: "1500", category: "Hair Care" },
-      { id: "hc-all", name: "Haircut (Step, Layer, Butterfly, Feather)", price: "400", category: "Hair Care" },
+      {
+        id: "hc-all",
+        name: "Haircut (Step, Layer, Butterfly, Feather)",
+        price: "400",
+        category: "Hair Care",
+      },
     ],
   },
   {

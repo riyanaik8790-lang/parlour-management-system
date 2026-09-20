@@ -4,7 +4,15 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { CalendarIcon, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,7 +27,10 @@ export const Route = createFileRoute("/book")({
   head: () => ({
     meta: [
       { title: "Book an Appointment - Hemangi Glam Salon" },
-      { name: "description", content: "Pick your service, date and time. No double bookings, ever." },
+      {
+        name: "description",
+        content: "Pick your service, date and time. No double bookings, ever.",
+      },
       { property: "og:title", content: "Book an Appointment - Hemangi Glam Salon" },
       { property: "og:description", content: "Pick your service, date and time." },
     ],
@@ -65,24 +76,39 @@ function BookPage() {
 
   // Load already-booked slots so the UI can grey them out and prevent double-booking.
   useEffect(() => {
-    if (!isoDate) { setTaken([]); setPreBridalFullyBooked(false); return; }
+    if (!isoDate) {
+      setTaken([]);
+      setPreBridalFullyBooked(false);
+      return;
+    }
     let alive = true;
     setLoadingSlots(true);
-    api.slots(isoDate)
+    api
+      .slots(isoDate)
       .then((res) => {
         if (alive) {
           setTaken(res.taken);
           setPreBridalFullyBooked(res.pre_bridal_booked ?? false);
         }
       })
-      .catch(() => { if (alive) { setTaken([]); setPreBridalFullyBooked(false); } })
+      .catch(() => {
+        if (alive) {
+          setTaken([]);
+          setPreBridalFullyBooked(false);
+        }
+      })
       .finally(() => alive && setLoadingSlots(false));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [isoDate]);
 
   async function submit() {
-    if (!serviceId || !isoDate || !time) { toast.error("Please select a service, date and time."); return; }
-    
+    if (!serviceId || !isoDate || !time) {
+      toast.error("Please select a service, date and time.");
+      return;
+    }
+
     // Strict IST Time check
     const istNow = getISTNow();
     const istTodayStr = format(istNow, "yyyy-MM-dd");
@@ -101,7 +127,11 @@ function BookPage() {
     }
 
     const user = getUser();
-    if (!user) { toast.error("Please login first."); navigate({ to: "/login" }); return; }
+    if (!user) {
+      toast.error("Please login first.");
+      navigate({ to: "/login" });
+      return;
+    }
     setSubmitting(true);
     try {
       await api.book({ service_id: serviceId, date: isoDate, time });
@@ -136,7 +166,9 @@ function BookPage() {
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="font-serif text-3xl text-primary">Login required</h1>
         <p className="mt-2 text-muted-foreground">Please log in to book an appointment.</p>
-        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>Login</Button>
+        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
+          Login
+        </Button>
         <p className="mt-3 text-sm text-muted-foreground">
           New here?{" "}
           <span
@@ -161,14 +193,17 @@ function BookPage() {
           <div>
             <label className="mb-2 block text-sm font-medium">Service</label>
             <Select value={serviceId} onValueChange={setServiceId}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Choose a service" /></SelectTrigger>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose a service" />
+              </SelectTrigger>
               <SelectContent>
                 {SERVICE_CATEGORIES.map((cat) => (
                   <SelectGroup key={cat.name}>
                     <SelectLabel>{cat.name}</SelectLabel>
                     {cat.items.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name}{s.price !== "On request" ? ` - ₹${s.price}` : ""}
+                        {s.name}
+                        {s.price !== "On request" ? ` - ₹${s.price}` : ""}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -180,7 +215,13 @@ function BookPage() {
             <label className="mb-2 block text-sm font-medium">Date</label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground",
+                  )}
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, "PPP") : "Pick a date"}
                 </Button>
@@ -189,7 +230,10 @@ function BookPage() {
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={(d) => { setDate(d); setTime(""); }}
+                  onSelect={(d) => {
+                    setDate(d);
+                    setTime("");
+                  }}
                   disabled={(d) => {
                     const istToday = getISTNow();
                     istToday.setHours(0, 0, 0, 0);
@@ -203,7 +247,8 @@ function BookPage() {
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium">
-              Time {loadingSlots && <span className="text-xs text-muted-foreground">(loading…)</span>}
+              Time{" "}
+              {loadingSlots && <span className="text-xs text-muted-foreground">(loading…)</span>}
             </label>
 
             {/* Pre-Bridal Package fully-booked banner */}
@@ -221,12 +266,12 @@ function BookPage() {
                 const isTaken = taken.includes(t);
                 const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
                 const isBuffer = prevSlot ? taken.includes(prevSlot) : false;
-                
+
                 const isSelected = time === t;
 
                 // Disable ALL slots when Pre-Bridal Package is fully booked for this date
                 const isPreBridalBlocked = serviceId === "pk-prebridal" && preBridalFullyBooked;
-                
+
                 // Past time validation for today (in IST)
                 let isPastTime = false;
                 if (isoDate) {
@@ -239,7 +284,7 @@ function BookPage() {
                     isPastTime = slotMinutes <= currentMinutes;
                   }
                 }
-                
+
                 const isDisabled = isTaken || isBuffer || !date || isPastTime || isPreBridalBlocked;
 
                 return (
@@ -250,14 +295,24 @@ function BookPage() {
                     onClick={() => setTime(t)}
                     className={cn(
                       "rounded-md border px-1 sm:px-2 py-2.5 text-xs sm:text-sm transition min-h-[44px]",
-                      (isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
-                      isPreBridalBlocked && !(isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
-                      isPastTime && !(isTaken || isBuffer) && !isPreBridalBlocked && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
-                      !isDisabled && !isSelected && "border-border bg-background hover:border-accent hover:text-primary",
+                      (isTaken || isBuffer) &&
+                        "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
+                      isPreBridalBlocked &&
+                        !(isTaken || isBuffer) &&
+                        "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      isPastTime &&
+                        !(isTaken || isBuffer) &&
+                        !isPreBridalBlocked &&
+                        "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      !isDisabled &&
+                        !isSelected &&
+                        "border-border bg-background hover:border-accent hover:text-primary",
                       isSelected && "border-primary bg-primary text-primary-foreground",
                       !date && "opacity-60",
                     )}
-                  >{t}</button>
+                  >
+                    {t}
+                  </button>
                 );
               })}
             </div>
@@ -268,7 +323,14 @@ function BookPage() {
             <div className="text-sm text-muted-foreground">Booking summary</div>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="Service" value={service ? service.name : "-"} />
-              <Row label="Price" value={service && service.price !== "On request" ? `₹${service.price}` : service?.price ?? "-"} />
+              <Row
+                label="Price"
+                value={
+                  service && service.price !== "On request"
+                    ? `₹${service.price}`
+                    : (service?.price ?? "-")
+                }
+              />
               <Row label="Date" value={date ? format(date, "PPP") : "-"} />
               <Row label="Time" value={time || "-"} />
             </dl>
@@ -277,7 +339,12 @@ function BookPage() {
               Payment is handled at the salon after service. No online payment required.
             </div>
           </div>
-          <Button size="lg" className="mt-6 w-full min-h-[44px]" disabled={submitting} onClick={submit}>
+          <Button
+            size="lg"
+            className="mt-6 w-full min-h-[44px]"
+            disabled={submitting}
+            onClick={submit}
+          >
             {submitting ? "Booking…" : "Confirm booking"}
           </Button>
         </div>

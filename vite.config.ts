@@ -20,7 +20,7 @@ export default defineConfig({
     // cert automatically — accept it once in your phone's browser.
     plugins: [basicSsl()],
     server: {
-      host: true,       // expose on local network (0.0.0.0) so phones can connect
+      host: true, // expose on local network (0.0.0.0) so phones can connect
       proxy: {
         // Forward all /api/* requests to the Flask backend (port 5000)
         "/api": {

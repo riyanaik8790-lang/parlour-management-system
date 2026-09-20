@@ -124,7 +124,7 @@ function SkinAdvisorPage() {
       const data = (await analyzeSkinImage(file)) as unknown as AnalysisResult;
       setResult(data);
       setView("results");
-      
+
       // Save result and image preview to sessionStorage
       sessionStorage.setItem("skin-advisor-result", JSON.stringify(data));
       const reader = new FileReader();
@@ -271,9 +271,7 @@ function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
             <Sun className="h-6 w-6 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <h2 className="font-serif text-2xl text-foreground">
-              For the most accurate results…
-            </h2>
+            <h2 className="font-serif text-2xl text-foreground">For the most accurate results…</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Lighting is the single biggest factor in colour accuracy. Please spend 10 seconds
               following these tips before you proceed.
@@ -298,8 +296,6 @@ function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
             </div>
           ))}
         </div>
-
-
 
         <div className="mt-8 flex justify-center">
           <Button
@@ -363,10 +359,7 @@ function CaptureSection({
       </button>
 
       {webcamMode ? (
-        <WebcamCapture
-          onCapture={handleFile}
-          onCancel={() => setWebcamMode(false)}
-        />
+        <WebcamCapture onCapture={handleFile} onCancel={() => setWebcamMode(false)} />
       ) : (
         <>
           {/* ── Drop zone ── */}
@@ -639,10 +632,7 @@ const ANALYSIS_STEPS = [
 function LoadingScreen() {
   const [step, setStep] = useState(0);
   useEffect(() => {
-    const id = setInterval(
-      () => setStep((s) => Math.min(s + 1, ANALYSIS_STEPS.length - 1)),
-      750,
-    );
+    const id = setInterval(() => setStep((s) => Math.min(s + 1, ANALYSIS_STEPS.length - 1)), 750);
     return () => clearInterval(id);
   }, []);
 
@@ -801,25 +791,47 @@ function ResultsSection({
 
       {/* ── Swatch rows ── */}
       <div className="space-y-4">
-        <SwatchSection title="Hair Colours That Flatter You" icon={<Scissors className="h-5 w-5" />} items={result.hair} />
+        <SwatchSection
+          title="Hair Colours That Flatter You"
+          icon={<Scissors className="h-5 w-5" />}
+          items={result.hair}
+        />
         <div className="px-1">
-          <Button onClick={() => navigate({ to: "/book", search: { service: "Global Hair Colour" } })} className="w-full sm:w-auto bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 min-h-[44px]">
+          <Button
+            onClick={() => navigate({ to: "/book", search: { service: "Global Hair Colour" } })}
+            className="w-full sm:w-auto bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 min-h-[44px]"
+          >
             Book a Hair Color Consultation
           </Button>
         </div>
       </div>
 
       <div className="space-y-4">
-        <SwatchSection title="Flattering Lip Shades" icon={<Brush className="h-5 w-5" />} items={result.lips ?? []} />
-        <SwatchSection title="Perfect Blush Shades" icon={<Brush className="h-5 w-5" />} items={result.blush ?? []} />
+        <SwatchSection
+          title="Flattering Lip Shades"
+          icon={<Brush className="h-5 w-5" />}
+          items={result.lips ?? []}
+        />
+        <SwatchSection
+          title="Perfect Blush Shades"
+          icon={<Brush className="h-5 w-5" />}
+          items={result.blush ?? []}
+        />
         <div className="px-1">
-          <Button onClick={() => navigate({ to: "/book", search: { service: "Engagement Look" } })} className="w-full sm:w-auto bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 min-h-[44px]">
+          <Button
+            onClick={() => navigate({ to: "/book", search: { service: "Engagement Look" } })}
+            className="w-full sm:w-auto bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 min-h-[44px]"
+          >
             Book a Makeup Session
           </Button>
         </div>
       </div>
 
-      <SwatchSection title="Outfit Colours" icon={<Shirt className="h-5 w-5" />} items={result.outfits} />
+      <SwatchSection
+        title="Outfit Colours"
+        icon={<Shirt className="h-5 w-5" />}
+        items={result.outfits}
+      />
 
       {/* ── Recommended services ── */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -835,9 +847,7 @@ function ResultsSection({
               <span className="text-sm font-medium text-foreground">{svc}</span>
               <button
                 id={`book-service-${svc.replace(/\s+/g, "-").toLowerCase()}`}
-                onClick={() =>
-                  navigate({ to: "/book", search: { service: svc } })
-                }
+                onClick={() => navigate({ to: "/book", search: { service: svc } })}
                 className="mt-auto inline-flex w-fit items-center gap-1 rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-all duration-150 hover:bg-primary hover:text-primary-foreground"
               >
                 Book this service →
@@ -869,12 +879,7 @@ function ResultsSection({
               Retake Photo
             </Button>
             {!overrideOpen && (
-              <Button
-                id="manual-override-btn"
-                variant="outline"
-                size="sm"
-                onClick={onOpenOverride}
-              >
+              <Button id="manual-override-btn" variant="outline" size="sm" onClick={onOpenOverride}>
                 Select Undertone Manually
               </Button>
             )}
