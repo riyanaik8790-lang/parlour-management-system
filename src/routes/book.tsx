@@ -39,6 +39,7 @@ function BookPage() {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState<string>("");
   const [taken, setTaken] = useState<string[]>([]);
+  const [preBridalFullyBooked, setPreBridalFullyBooked] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // ready prevents a flash of the form before auth check completes
@@ -64,12 +65,17 @@ function BookPage() {
 
   // Load already-booked slots so the UI can grey them out and prevent double-booking.
   useEffect(() => {
-    if (!isoDate) { setTaken([]); return; }
+    if (!isoDate) { setTaken([]); setPreBridalFullyBooked(false); return; }
     let alive = true;
     setLoadingSlots(true);
     api.slots(isoDate)
-      .then((res) => { if (alive) setTaken(res.taken); })
-      .catch(() => { if (alive) setTaken([]); })
+      .then((res) => {
+        if (alive) {
+          setTaken(res.taken);
+          setPreBridalFullyBooked(res.pre_bridal_booked ?? false);
+        }
+      })
+      .catch(() => { if (alive) { setTaken([]); setPreBridalFullyBooked(false); } })
       .finally(() => alive && setLoadingSlots(false));
     return () => { alive = false; };
   }, [isoDate]);
@@ -199,6 +205,17 @@ function BookPage() {
             <label className="mb-2 block text-sm font-medium">
               Time {loadingSlots && <span className="text-xs text-muted-foreground">(loading…)</span>}
             </label>
+
+            {/* Pre-Bridal Package fully-booked banner */}
+            {serviceId === "pk-prebridal" && preBridalFullyBooked && date && (
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300">
+                <span className="mt-0.5 shrink-0 text-base">⚠️</span>
+                <span>
+                  The Pre-Bridal Package is fully booked for this date. Please select another day.
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {TIME_SLOTS.map((t, index) => {
                 const isTaken = taken.includes(t);
@@ -206,6 +223,9 @@ function BookPage() {
                 const isBuffer = prevSlot ? taken.includes(prevSlot) : false;
                 
                 const isSelected = time === t;
+
+                // Disable ALL slots when Pre-Bridal Package is fully booked for this date
+                const isPreBridalBlocked = serviceId === "pk-prebridal" && preBridalFullyBooked;
                 
                 // Past time validation for today (in IST)
                 let isPastTime = false;
@@ -220,7 +240,7 @@ function BookPage() {
                   }
                 }
                 
-                const isDisabled = isTaken || isBuffer || !date || isPastTime;
+                const isDisabled = isTaken || isBuffer || !date || isPastTime || isPreBridalBlocked;
 
                 return (
                   <button
@@ -231,7 +251,8 @@ function BookPage() {
                     className={cn(
                       "rounded-md border px-1 sm:px-2 py-2.5 text-xs sm:text-sm transition min-h-[44px]",
                       (isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
-                      isPastTime && !(isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      isPreBridalBlocked && !(isTaken || isBuffer) && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      isPastTime && !(isTaken || isBuffer) && !isPreBridalBlocked && "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
                       !isDisabled && !isSelected && "border-border bg-background hover:border-accent hover:text-primary",
                       isSelected && "border-primary bg-primary text-primary-foreground",
                       !date && "opacity-60",

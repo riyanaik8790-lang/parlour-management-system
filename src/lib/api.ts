@@ -495,7 +495,7 @@ export const api = {
 
   slots: (date: string) =>
     withMock(
-      () => request<{ taken: string[] }>(`/api/slots?date=${encodeURIComponent(date)}`),
+      () => request<{ taken: string[]; pre_bridal_booked: boolean }>(`/api/slots?date=${encodeURIComponent(date)}`),
       () => {
         // Deterministic "taken" slots for the given date so the UI feels real.
         const seed = date.split("-").reduce((a, b) => a + Number(b), 0);
@@ -505,8 +505,12 @@ export const api = {
         const local = readJSON<
           { id: number; service_name: string; date: string; time: string; status: string }[]
         >(MOCK_BOOKINGS_KEY, []);
-        for (const b of local) if (b.date === date) taken.push(b.time);
-        return { taken: Array.from(new Set(taken)) };
+        let pre_bridal_booked = false;
+        for (const b of local) {
+          if (b.date === date) taken.push(b.time);
+          if (b.date === date && b.service_name === "Pre-Bridal Package") pre_bridal_booked = true;
+        }
+        return { taken: Array.from(new Set(taken)), pre_bridal_booked };
       },
     ),
 

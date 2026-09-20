@@ -8,7 +8,7 @@ import { api, getUser, clearSession } from "@/lib/api";
 import { toast } from "sonner";
 import { CalendarIcon, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TIME_SLOTS } from "@/lib/services-data";
+import { TIME_SLOTS, ALL_SERVICES } from "@/lib/services-data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/my-bookings")({
@@ -80,7 +80,9 @@ function MyBookingsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState<Date | undefined>(undefined);
   const [editTime, setEditTime] = useState("");
+  const [editServiceName, setEditServiceName] = useState("");
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
+  const [editPreBridalFullyBooked, setEditPreBridalFullyBooked] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -119,23 +121,34 @@ function MyBookingsPage() {
 
   // Fetch taken slots whenever edit date changes
   useEffect(() => {
-    if (!editIsoDate) { setTakenSlots([]); return; }
+    if (!editIsoDate) { setTakenSlots([]); setEditPreBridalFullyBooked(false); return; }
     let alive = true;
     setLoadingSlots(true);
     setEditTime("");
     api.slots(editIsoDate)
-      .then((res) => { if (alive) setTakenSlots(res.taken); })
-      .catch(() => { if (alive) setTakenSlots([]); })
+      .then((res) => {
+        if (alive) {
+          setTakenSlots(res.taken);
+          // Only show the Pre-Bridal blockout if the booking being edited IS a Pre-Bridal Package
+          const isPreBridal =
+            editServiceName === "Pre-Bridal Package" ||
+            ALL_SERVICES.find((s) => s.name === editServiceName)?.id === "pk-prebridal";
+          setEditPreBridalFullyBooked(isPreBridal ? (res.pre_bridal_booked ?? false) : false);
+        }
+      })
+      .catch(() => { if (alive) { setTakenSlots([]); setEditPreBridalFullyBooked(false); } })
       .finally(() => alive && setLoadingSlots(false));
     return () => { alive = false; };
-  }, [editIsoDate]);
+  }, [editIsoDate, editServiceName]);
 
   const startEdit = (b: B) => {
     setEditingId(b.id);
+    setEditServiceName(b.service_name);
     const parsed = new Date(b.date + "T00:00:00");
     setEditDate(isNaN(parsed.getTime()) ? undefined : parsed);
     setEditTime(b.time);
     setTakenSlots([]);
+    setEditPreBridalFullyBooked(false);
   };
 
   const saveEdit = async (id: number) => {
@@ -329,6 +342,13 @@ function MyBookingsPage() {
                         style={{ background: "oklch(0.96 0.010 82)", border: "1px dashed oklch(0.84 0.042 80)" }}
                       >
                         Select a date first
+                      </div>
+                    ) : editPreBridalFullyBooked ? (
+                      /* Pre-Bridal fully-booked warning replaces the dropdown */
+                      <div
+                        className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300"
+                      >
+                        ⚠️ The Pre-Bridal Package is fully booked for this date. Please select another day.
                       </div>
                     ) : (
                       <Select value={editTime} onValueChange={setEditTime}>

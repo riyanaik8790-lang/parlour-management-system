@@ -506,12 +506,29 @@ def slots():
     try:
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT time FROM appointments WHERE date = %s AND status != 'cancelled'",
+            "SELECT a.time FROM appointments a WHERE a.date = %s AND a.status != 'cancelled'",
             (slot_date,),
         )
         taken = [row["time"] for row in cur.fetchall()]
+
+        # Check if the Pre-Bridal Package (service id: pk-prebridal) is already
+        # booked on this date so the frontend can block the full day for that service.
+        cur.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM appointments a
+            JOIN services s ON s.id = a.service_id
+            WHERE a.date = %s
+              AND a.status != 'cancelled'
+              AND (a.service_id = 'pk-prebridal' OR s.name = 'Pre-Bridal Package')
+            """,
+            (slot_date,),
+        )
+        pre_bridal_row = cur.fetchone()
+        pre_bridal_booked = bool(pre_bridal_row and pre_bridal_row["cnt"] > 0)
+
         cur.close()
-        return jsonify({"taken": taken})
+        return jsonify({"taken": taken, "pre_bridal_booked": pre_bridal_booked})
     except PGError as err:
         return db_error(err)
 
@@ -565,6 +582,31 @@ def book():
         if cur.fetchone():
             cur.close()
             return jsonify({"error": "That time slot is already booked. Pick another."}), 409
+
+        # ── Pre-Bridal Package: only one booking allowed per day ────────────────
+        # Check by service_id (canonical) OR by service name as a safety net.
+        cur.execute("SELECT name FROM services WHERE id = %s", (service_id,))
+        svc_check_row = cur.fetchone()
+        svc_check_name = svc_check_row["name"] if svc_check_row else ""
+        if service_id == "pk-prebridal" or svc_check_name == "Pre-Bridal Package":
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM appointments a
+                JOIN services s ON s.id = a.service_id
+                WHERE a.date = %s
+                  AND a.status != 'cancelled'
+                  AND (a.service_id = 'pk-prebridal' OR s.name = 'Pre-Bridal Package')
+                """,
+                (slot_date,),
+            )
+            prebridal_row = cur.fetchone()
+            if prebridal_row and prebridal_row["cnt"] > 0:
+                cur.close()
+                return jsonify({
+                    "error": "The Pre-Bridal Package is already booked for this date. Please select another day."
+                }), 400
+        # ───────────────────────────────────────────────────────────────────────
 
         cur.execute(
             "INSERT INTO appointments (user_id, service_id, date, time, status) VALUES (%s, %s, %s, %s, 'confirmed') RETURNING id",
@@ -984,10 +1026,16 @@ def update_booking(booking_id: int):
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute(
-            "SELECT id FROM appointments WHERE id = %s AND user_id = %s AND status != 'cancelled'",
+            """
+            SELECT a.id, s.name AS service_name, s.id AS service_id
+            FROM appointments a
+            JOIN services s ON s.id = a.service_id
+            WHERE a.id = %s AND a.user_id = %s AND a.status != 'cancelled'
+            """,
             (booking_id, g.current_user["id"]),
         )
-        if not cur.fetchone():
+        existing = cur.fetchone()
+        if not existing:
             cur.close()
             return jsonify({"error": "Booking not found"}), 404
 
@@ -998,6 +1046,30 @@ def update_booking(booking_id: int):
         if cur.fetchone():
             cur.close()
             return jsonify({"error": "That time slot is already booked"}), 409
+
+        # ── Pre-Bridal Package: only one booking allowed per day ────────────────
+        # If the appointment being edited is a Pre-Bridal Package, check that the
+        # target date does not already have another Pre-Bridal booking.
+        if existing["service_id"] == "pk-prebridal" or existing["service_name"] == "Pre-Bridal Package":
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM appointments a
+                JOIN services s ON s.id = a.service_id
+                WHERE a.date = %s
+                  AND a.status != 'cancelled'
+                  AND a.id != %s
+                  AND (a.service_id = 'pk-prebridal' OR s.name = 'Pre-Bridal Package')
+                """,
+                (slot_date, booking_id),
+            )
+            prebridal_row = cur.fetchone()
+            if prebridal_row and prebridal_row["cnt"] > 0:
+                cur.close()
+                return jsonify({
+                    "error": "The Pre-Bridal Package is already booked for this date. Please select another day."
+                }), 400
+        # ───────────────────────────────────────────────────────────────────────
 
         cur.execute(
             "UPDATE appointments SET date = %s, time = %s WHERE id = %s",
