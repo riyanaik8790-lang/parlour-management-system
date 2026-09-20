@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api, clearSession, getUser, setSession, getToken, getAdminToken } from "@/lib/api";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import {
@@ -36,6 +38,7 @@ type Section = "profile" | "notifications" | "password" | "danger";
 
 function SettingsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const sessionUser = getUser();
 
   useEffect(() => {
@@ -85,7 +88,7 @@ function SettingsPage() {
       .then((p) => { setName(p.name); setPhone(p.phone); setEmail(p.email); setRole(p.role); setPushEnabled(p.push_enabled ?? false); })
       .catch(() => {
         const u = getUser();
-        if (u) { setName(u.name); setEmail(u.email); setRole(u.role); }
+        if (u) { setName(u.name); setEmail(u.email); setRole(u.role ?? ""); }
       })
       .finally(() => setLoadingProfile(false));
   }, []);

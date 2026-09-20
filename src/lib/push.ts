@@ -87,7 +87,7 @@ export async function subscribeToPush(): Promise<"granted" | "denied" | "already
 
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VITE_VAPID_KEY),
+      applicationServerKey: urlBase64ToUint8Array(VITE_VAPID_KEY) as unknown as BufferSource,
     });
 
     const json = sub.toJSON();

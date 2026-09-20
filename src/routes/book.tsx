@@ -12,9 +12,9 @@ import { api, getUser, clearSession } from "@/lib/api";
 import { ALL_SERVICES, SERVICE_CATEGORIES, TIME_SLOTS } from "@/lib/services-data";
 
 export const Route = createFileRoute("/book")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { service?: string } => ({
     // ?service=Gold+Bleach   (passed by the Skin Advisor page)
-    service: typeof search.service === "string" ? search.service : "",
+    service: typeof search.service === "string" ? search.service : undefined,
   }),
   head: () => ({
     meta: [

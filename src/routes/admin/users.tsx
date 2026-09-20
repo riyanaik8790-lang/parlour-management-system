@@ -288,7 +288,7 @@ function AdminUsersPage() {
 
   // Which user is pending confirmation, and what action
   const [pendingUser, setPendingUser] = useState<AdminUser | null>(null);
-  const [pendingAction, setPendingAction] = useState<"promote" | "demote">("promote");
+  const [pendingAction, setPendingAction] = useState<"promote" | "demote" | "delete">("promote");
   const [actionBusy, setActionBusy] = useState(false);
 
   const [resettingUser, setResettingUser] = useState<AdminUser | null>(null);
@@ -314,7 +314,7 @@ function AdminUsersPage() {
     loadUsers();
   }, []);
 
-  function openConfirm(user: AdminUser, action: "promote" | "demote") {
+  function openConfirm(user: AdminUser, action: "promote" | "demote" | "delete") {
     setPendingUser(user);
     setPendingAction(action);
   }

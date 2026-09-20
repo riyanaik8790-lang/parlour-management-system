@@ -441,15 +441,16 @@ export const api = {
   },
 
   getProfile: () =>
-    request<{ id: number; name: string; email: string; phone: string; role: string }>("/api/profile"),
+    request<{ id: number; name: string; email: string; phone: string; role: string; push_enabled?: boolean }>("/api/profile"),
 
   updateProfile: (body: {
     name?: string;
     phone?: string;
     current_password?: string;
     new_password?: string;
+    push_enabled?: boolean;
   }) =>
-    request<{ ok: boolean; user: StoredUser; profile: { id: number; name: string; email: string; phone: string; role: string } }>(
+    request<{ ok: boolean; user: StoredUser; profile: { id: number; name: string; email: string; phone: string; role: string; push_enabled?: boolean } }>(
       "/api/profile",
       { method: "PUT", body: JSON.stringify(body) }
     ),
