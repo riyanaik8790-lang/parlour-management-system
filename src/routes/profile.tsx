@@ -34,6 +34,7 @@ const BG = "oklch(0.968 0.018 85)";
 
 const STRONG_PW_RE =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]).{8,72}$/;
+const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -87,12 +88,22 @@ function ProfilePage() {
   // ── Save info (name + phone) ──────────────────────────────────────────────
   async function saveInfo(e: React.FormEvent) {
     e.preventDefault();
-    setSavingInfo(true);
     setInfoError(null);
     setInfoSuccess(false);
+    const fe: Record<string, string> = {};
+    const trimName = name.trim();
+    const trimPhone = phone.trim().replace(/\D/g, "");
+    if (trimName.split(" ").length < 2) fe.name = "Please enter your first and last name";
+    if (!trimPhone) fe.phone = "Phone number is required";
+    else if (!INDIAN_PHONE_RE.test(trimPhone)) fe.phone = "Enter a valid 10-digit Indian mobile number (starts with 6–9)";
+    if (Object.keys(fe).length) {
+      setFieldErrors(fe);
+      return;
+    }
+    setSavingInfo(true);
     setFieldErrors({});
     try {
-      const res = await api.updateProfile({ name: name.trim(), phone: phone.trim() });
+      const res = await api.updateProfile({ name: trimName, phone: trimPhone });
       // Update the stored session name so navbar refreshes
       const stored = getUser();
       if (stored)
