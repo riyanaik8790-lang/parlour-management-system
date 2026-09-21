@@ -860,6 +860,25 @@ export const api = {
     });
   },
 
+  adminGetArchives: () => {
+    const token = getAdminToken() ?? getToken();
+    return fetch(`${API_BASE}/api/admin/archives`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch archives");
+      return data.archives as {
+        name: string;
+        size: number;
+        created_at: string;
+        url: string;
+      }[];
+    });
+  },
+
   adminSendReminders: () => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();

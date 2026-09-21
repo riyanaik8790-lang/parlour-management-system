@@ -10,6 +10,8 @@ import os
 import re
 import secrets
 import string
+import csv
+import io
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
@@ -50,6 +52,12 @@ try:
 except ImportError:
     SCHEDULER_AVAILABLE = False
 
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -73,6 +81,13 @@ JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "168"))  # 7 days
 VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 VAPID_PUBLIC_KEY  = os.getenv("VAPID_PUBLIC_KEY", "")
 VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+supabase_client: Client | None = None
+if SUPABASE_AVAILABLE and SUPABASE_URL and SUPABASE_KEY:
+    supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Build DATABASE_URL — strip quotes, ensure sslmode=require for Supabase
 _raw_dsn = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/salon_db")
@@ -1741,6 +1756,31 @@ def admin_get_storage():
     except Exception as err:
         return db_error(err)
 
+@app.get("/api/admin/archives")
+@require_admin
+def admin_get_archives():
+    if not supabase_client:
+        return jsonify({"error": "Supabase client not configured"}), 500
+    try:
+        bucket_name = "salon-archives"
+        response = supabase_client.storage.from_(bucket_name).list()
+        
+        files = []
+        if isinstance(response, list):
+            for file_obj in response:
+                if file_obj.get('name') != '.emptyFolderPlaceholder':
+                    signed_url = supabase_client.storage.from_(bucket_name).create_signed_url(file_obj['name'], 3600)
+                    files.append({
+                        "name": file_obj['name'],
+                        "size": file_obj.get('metadata', {}).get('size', 0),
+                        "created_at": file_obj.get('created_at'),
+                        "url": signed_url['signedURL'] if isinstance(signed_url, dict) and 'signedURL' in signed_url else (signed_url.get('signedUrl') if isinstance(signed_url, dict) else signed_url)
+                    })
+        return jsonify({"archives": files})
+    except Exception as e:
+        print(f"[admin_get_archives] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 # ---------------------------------------------------------------------------
 # Admin - reset user password
@@ -2453,6 +2493,8 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     try:
         scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
         scheduler.add_job(func=check_30min_reminders, trigger="interval", minutes=1)
+        # Run on the 1st of every month at 02:00 AM
+        scheduler.add_job(func=archive_old_appointments, trigger="cron", day=1, hour=2, minute=0)
         scheduler.start()
         print("[startup] APScheduler started: 30-minute reminder job is active.")
         

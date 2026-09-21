@@ -19,6 +19,8 @@ import {
   Trash2,
   Settings as SettingsIcon,
   Bell,
+  Download,
+  FileText,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -98,6 +100,7 @@ function SettingsPage() {
   // Storage state
   const [storageData, setStorageData] = useState<{used_mb: number, total_mb: number} | null>(null);
   const [loadingStorage, setLoadingStorage] = useState(false);
+  const [archivesData, setArchivesData] = useState<{name: string, size: number, created_at: string, url: string}[]>([]);
 
   // Load profile
   useEffect(() => {
@@ -248,10 +251,13 @@ function SettingsPage() {
   useEffect(() => {
     if (activeSection === "storage" && role === "ADMIN") {
       setLoadingStorage(true);
-      api.adminGetStorage()
-        .then(setStorageData)
-        .catch(console.error)
-        .finally(() => setLoadingStorage(false));
+      Promise.all([
+        api.adminGetStorage().catch(console.error),
+        api.adminGetArchives().catch(console.error)
+      ]).then(([storageRes, archivesRes]) => {
+        if (storageRes) setStorageData(storageRes);
+        if (archivesRes) setArchivesData(archivesRes);
+      }).finally(() => setLoadingStorage(false));
     }
   }, [activeSection, role]);
 
@@ -626,6 +632,43 @@ function SettingsPage() {
                 ) : (
                   <Banner type="error" msg="Failed to load storage data" />
                 )}
+
+                {/* Historical Data Archives */}
+                <div className="mt-8">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-4 border-b pb-2">Historical Data Archives</h3>
+                  {archivesData.length > 0 ? (
+                    <div className="space-y-3">
+                      {archivesData.map((file) => (
+                        <div key={file.name} className="flex items-center justify-between p-3 bg-white/50 border border-gray-100 rounded-xl hover:bg-white transition-colors duration-200">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gray-50 rounded-lg">
+                              <FileText className="w-5 h-5 text-gray-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">{file.name}</p>
+                              <p className="text-xs text-gray-400">
+                                {file.created_at ? new Date(file.created_at).toLocaleDateString() : ""} • {(file.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 bg-white/40 p-4 rounded-xl text-center border border-dashed border-gray-200">
+                      No historical archives available yet. Archives are automatically generated for records older than 2 years.
+                    </p>
+                  )}
+                </div>
               </Card>
             )}
 
