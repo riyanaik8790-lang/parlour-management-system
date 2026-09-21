@@ -19,7 +19,6 @@ import {
   Trash2,
   Settings as SettingsIcon,
   Bell,
-  Database,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -242,7 +241,7 @@ function SettingsPage() {
     { id: "profile", label: "Edit Profile", icon: <User className="h-4 w-4" /> },
     { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
     { id: "password", label: "Change Password", icon: <Lock className="h-4 w-4" /> },
-    ...(role === "ADMIN" ? [{ id: "storage", label: "Database Storage", icon: <Database className="h-4 w-4" /> } as { id: Section; label: string; icon: React.ReactNode }] : []),
+    ...(role === "ADMIN" ? [{ id: "storage", label: "Storage", icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg> } as { id: Section; label: string; icon: React.ReactNode }] : []),
     { id: "danger", label: "Danger Zone", icon: <AlertTriangle className="h-4 w-4" /> },
   ];
 
@@ -593,14 +592,14 @@ function SettingsPage() {
               </Card>
             )}
 
-            {/* ── Database Storage ── */}
+            {/* ── Storage ── */}
             {activeSection === "storage" && role === "ADMIN" && (
               <Card gradient={`linear-gradient(90deg, ${BURGUNDY}, ${GOLD})`}>
                 <h2
                   className="mb-5 text-base font-semibold"
                   style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
                 >
-                  Database Storage
+                  Storage
                 </h2>
                 
                 {loadingStorage ? (
@@ -623,9 +622,6 @@ function SettingsPage() {
                         style={{ width: `${Math.min(100, (storageData.used_mb / storageData.total_mb) * 100)}%` }}
                       ></div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Database capacity usage for your Hemangi Glam free-tier PostgreSQL instance.
-                    </p>
                   </div>
                 ) : (
                   <Banner type="error" msg="Failed to load storage data" />
