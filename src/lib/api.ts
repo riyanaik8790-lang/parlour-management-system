@@ -843,6 +843,23 @@ export const api = {
     });
   },
 
+  adminGetStorage: () => {
+    const token = getAdminToken() ?? getToken();
+    return fetch(`${API_BASE}/api/admin/storage`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch storage info");
+      return data as {
+        used_mb: number;
+        total_mb: number;
+      };
+    });
+  },
+
   adminSendReminders: () => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();

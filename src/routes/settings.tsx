@@ -19,6 +19,7 @@ import {
   Trash2,
   Settings as SettingsIcon,
   Bell,
+  Database,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -47,7 +48,7 @@ const STRONG_PW_RE =
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
 
 // ── Section enum ──────────────────────────────────────────────────────────────
-type Section = "profile" | "notifications" | "password" | "danger";
+type Section = "profile" | "notifications" | "password" | "danger" | "storage";
 
 function SettingsPage() {
   const navigate = useNavigate();
@@ -94,6 +95,10 @@ function SettingsPage() {
   const [showDeletePw, setShowDeletePw] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Storage state
+  const [storageData, setStorageData] = useState<{used_mb: number, total_mb: number} | null>(null);
+  const [loadingStorage, setLoadingStorage] = useState(false);
 
   // Load profile
   useEffect(() => {
@@ -237,8 +242,19 @@ function SettingsPage() {
     { id: "profile", label: "Edit Profile", icon: <User className="h-4 w-4" /> },
     { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
     { id: "password", label: "Change Password", icon: <Lock className="h-4 w-4" /> },
+    ...(role === "ADMIN" ? [{ id: "storage", label: "Database Storage", icon: <Database className="h-4 w-4" /> } as { id: Section; label: string; icon: React.ReactNode }] : []),
     { id: "danger", label: "Danger Zone", icon: <AlertTriangle className="h-4 w-4" /> },
   ];
+
+  useEffect(() => {
+    if (activeSection === "storage" && role === "ADMIN") {
+      setLoadingStorage(true);
+      api.adminGetStorage()
+        .then(setStorageData)
+        .catch(console.error)
+        .finally(() => setLoadingStorage(false));
+    }
+  }, [activeSection, role]);
 
   return (
     <div className="min-h-screen px-4 py-12" style={{ background: BG }}>
@@ -574,6 +590,46 @@ function SettingsPage() {
                     )}
                   </button>
                 </form>
+              </Card>
+            )}
+
+            {/* ── Database Storage ── */}
+            {activeSection === "storage" && role === "ADMIN" && (
+              <Card gradient={`linear-gradient(90deg, ${BURGUNDY}, ${GOLD})`}>
+                <h2
+                  className="mb-5 text-base font-semibold"
+                  style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+                >
+                  Database Storage
+                </h2>
+                
+                {loadingStorage ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" style={{ color: BURGUNDY }} />
+                  </div>
+                ) : storageData ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-semibold text-gray-700">Storage Used</span>
+                      <span className="font-medium text-gray-900">{storageData.used_mb} MB / {storageData.total_mb} MB Used</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ease-out ${
+                          storageData.used_mb / storageData.total_mb > 0.9 ? 'bg-red-500' :
+                          storageData.used_mb / storageData.total_mb > 0.7 ? 'bg-yellow-400' :
+                          'bg-green-500'
+                        }`} 
+                        style={{ width: `${Math.min(100, (storageData.used_mb / storageData.total_mb) * 100)}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Database capacity usage for your Hemangi Glam free-tier PostgreSQL instance.
+                    </p>
+                  </div>
+                ) : (
+                  <Banner type="error" msg="Failed to load storage data" />
+                )}
               </Card>
             )}
 

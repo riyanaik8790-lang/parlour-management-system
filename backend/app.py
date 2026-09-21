@@ -1718,6 +1718,31 @@ def admin_stats():
 
 
 # ---------------------------------------------------------------------------
+# Admin - get storage size
+# ---------------------------------------------------------------------------
+
+@app.get("/api/admin/storage")
+@require_admin
+def admin_get_storage():
+    try:
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT pg_database_size(current_database()) AS size_bytes;")
+        row = cur.fetchone()
+        cur.close()
+
+        size_bytes = row["size_bytes"] if row else 0
+        used_mb = round(size_bytes / (1024 * 1024), 2)
+        total_mb = 500.0
+        
+        return jsonify({
+            "used_mb": used_mb,
+            "total_mb": total_mb
+        })
+    except Exception as err:
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
 # Admin - reset user password
 # ---------------------------------------------------------------------------
 
