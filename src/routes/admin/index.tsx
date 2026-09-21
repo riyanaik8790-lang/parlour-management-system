@@ -79,8 +79,6 @@ function WalkinModal({
 }) {
   const [offlineName, setOfflineName] = useState("");
   const [offlinePhone, setOfflinePhone] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-  const [nameError, setNameError] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("");
@@ -96,8 +94,6 @@ function WalkinModal({
     if (!open) {
       setOfflineName("");
       setOfflinePhone("");
-      setPhoneError("");
-      setNameError("");
       setServiceId("");
       setDate(undefined);
       setTime("");
@@ -140,33 +136,32 @@ function WalkinModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    let hasError = false;
 
     if (!offlineName.trim()) {
-      setNameError("Customer name is required.");
-      hasError = true;
+      toast.error("Customer name is required.");
+      return;
     }
     const trimPhone = offlinePhone.trim().replace(/\D/g, "");
     if (!trimPhone) {
-      setPhoneError("Phone number is required.");
-      hasError = true;
-    } else if (!INDIAN_PHONE_RE.test(trimPhone)) {
-      setPhoneError("Enter a valid 10-digit Indian mobile number (starting with 6–9).");
-      hasError = true;
+      toast.error("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (!INDIAN_PHONE_RE.test(trimPhone)) {
+      toast.error("Please enter a valid 10-digit mobile number.");
+      return;
     }
     if (!serviceId) {
       toast.error("Please select a service.");
-      hasError = true;
+      return;
     }
     if (!isoDate) {
       toast.error("Please select a date.");
-      hasError = true;
+      return;
     }
     if (!time) {
       toast.error("Please select a time slot.");
-      hasError = true;
+      return;
     }
-    if (hasError) return;
 
     setSubmitting(true);
     try {
@@ -242,7 +237,7 @@ function WalkinModal({
           <div className="space-y-1.5">
             <label
               className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
-              style={{ color: nameError ? "oklch(0.577 0.245 27.325)" : TEXT_MUTED }}
+              style={{ color: TEXT_MUTED }}
             >
               <User className="h-3 w-3" /> Customer Name <span style={{ color: BURGUNDY }}>*</span>
             </label>
@@ -250,26 +245,17 @@ function WalkinModal({
               id="offline-customer-name"
               placeholder="e.g. Priya Sharma"
               value={offlineName}
-              onChange={(e) => {
-                setOfflineName(e.target.value);
-                if (e.target.value.trim()) setNameError("");
-              }}
+              onChange={(e) => setOfflineName(e.target.value)}
               required
               className="h-10"
-              style={nameError ? { borderColor: "oklch(0.577 0.245 27.325)", boxShadow: "0 0 0 3px oklch(0.577 0.245 27.325 / 12%)" } : {}}
             />
-            {nameError && (
-              <p className="flex items-center gap-1 text-xs" style={{ color: "oklch(0.577 0.245 27.325)" }}>
-                <span>✕</span> {nameError}
-              </p>
-            )}
           </div>
 
           {/* Customer Phone */}
           <div className="space-y-1.5">
             <label
               className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"
-              style={{ color: phoneError ? "oklch(0.577 0.245 27.325)" : TEXT_MUTED }}
+              style={{ color: TEXT_MUTED }}
             >
               <Phone className="h-3 w-3" /> Customer Phone <span style={{ color: BURGUNDY }}>*</span>
             </label>
@@ -277,28 +263,11 @@ function WalkinModal({
               id="offline-customer-phone"
               placeholder="e.g. 9876543210"
               value={offlinePhone}
-              onChange={(e) => {
-                const val = e.target.value;
-                setOfflinePhone(val);
-                // Live validation: clear error once valid
-                const digits = val.trim().replace(/\D/g, "");
-                if (INDIAN_PHONE_RE.test(digits)) setPhoneError("");
-                else if (!val.trim()) setPhoneError("Phone number is required.");
-              }}
+              onChange={(e) => setOfflinePhone(e.target.value)}
               type="tel"
               maxLength={13}
               className="h-10"
-              style={phoneError ? { borderColor: "oklch(0.577 0.245 27.325)", boxShadow: "0 0 0 3px oklch(0.577 0.245 27.325 / 12%)" } : {}}
             />
-            {phoneError ? (
-              <p className="flex items-center gap-1 text-xs" style={{ color: "oklch(0.577 0.245 27.325)" }}>
-                <span>✕</span> {phoneError}
-              </p>
-            ) : (
-              <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-                10-digit Indian mobile number (starts with 6, 7, 8, or 9)
-              </p>
-            )}
           </div>
 
           {/* Service */}
