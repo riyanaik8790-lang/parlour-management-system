@@ -2436,48 +2436,48 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             # We must create a fresh DB connection because this runs in a background thread, outside Flask's app context.
             db_url = os.getenv("DATABASE_URL")
             if not db_url: return
-            
+
             db = psycopg2.connect(db_url)
             IST = timezone(timedelta(hours=5, minutes=30))
             now_ist = datetime.now(IST)
-            
+
             # Look ahead exactly 30 minutes
             target_ist = now_ist + timedelta(minutes=30)
             target_date = target_ist.strftime("%Y-%m-%d")
-            
-            # Since appointments are at strict 30-min intervals (e.g. 09:00, 09:30), 
+
+            # Since appointments are at strict 30-min intervals (e.g. 09:00, 09:30),
             # we just format the target time to HH:MM.
             target_time = target_ist.strftime("%H:%M")
 
             cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            
+
             cur.execute(
-                """SELECT a.id, a.user_id 
+                """SELECT a.id, a.user_id
                    FROM appointments a
                    JOIN users u ON a.user_id = u.id
-                   WHERE a.status = 'confirmed' 
-                     AND a.reminder_sent = false 
-                     AND a.date = %s 
-                     AND a.time = %s 
+                   WHERE a.status = 'confirmed'
+                     AND a.reminder_sent = false
+                     AND a.date = %s
+                     AND a.time = %s
                      AND u.push_enabled = true""",
                 (target_date, target_time)
             )
             matches = cur.fetchall()
-            
+
             if matches:
                 print(f"[scheduler] Found {len(matches)} appointments starting at {target_time}. Sending pushes...")
-            
+
             for appt in matches:
                 # 1. Update the flag first so we don't spam if something fails halfway
                 cur.execute("UPDATE appointments SET reminder_sent = true WHERE id = %s", (appt["id"],))
-                
+
                 # 2. Add to in-app notifications
-                msg = f"Your appointment starts in exactly 30 minutes!"
+                msg = "Your appointment starts in exactly 30 minutes!"
                 cur.execute(
                     "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
                     (appt["user_id"], msg, appt["id"]),
                 )
-                
+
                 # 3. Send Web Push
                 try:
                     _send_push(db, appt["user_id"], "Appointment Starting Soon ⏰", msg, "/my-bookings")
@@ -2490,14 +2490,149 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         except Exception as e:
             print(f"[scheduler] 30min reminder error: {e}")
 
+    # ---------------------------------------------------------------------------
+    # Capacity-Based Self-Healing Archive Job
+    # ---------------------------------------------------------------------------
+    def archive_old_appointments():
+        """
+        Capacity-based Data Lifecycle Management job.
+
+        Logic:
+          1. Measure current database size in MB.
+          2. If size < 400 MB (80% of the 500 MB free-tier limit), do nothing.
+          3. If size >= 400 MB:
+             a. Fetch the oldest 10,000 appointment rows.
+             b. Serialise them to a timestamped CSV.
+             c. Upload the CSV to the Supabase 'salon-archives' storage bucket.
+             d. DELETE those exact rows from the live database.
+             e. Log a structured success message.
+
+        Runs once per day at midnight (IST) via APScheduler.
+        A fresh psycopg2 connection is opened because this function executes
+        in a background thread, outside Flask's application context.
+        """
+        ARCHIVE_THRESHOLD_MB = 400   # trigger archiving above this size
+        ARCHIVE_BATCH_SIZE   = 10_000  # rows to archive per run
+
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            print("[archive] DATABASE_URL not set — skipping.")
+            return
+
+        db = None
+        try:
+            db = psycopg2.connect(db_url)
+            cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            # ── Step 1: Measure database size ──────────────────────────────────
+            cur.execute("SELECT ROUND(pg_database_size(current_database()) / 1048576.0, 2) AS size_mb")
+            row = cur.fetchone()
+            size_mb = float(row["size_mb"]) if row else 0.0
+            print(f"[archive] Current DB size: {size_mb} MB")
+
+            # ── Step 2: Threshold check ────────────────────────────────────────
+            if size_mb < ARCHIVE_THRESHOLD_MB:
+                print(f"[archive] DB size ({size_mb} MB) is below {ARCHIVE_THRESHOLD_MB} MB threshold. No action needed.")
+                cur.close()
+                db.close()
+                return
+
+            print(f"[archive] DB size ({size_mb} MB) >= {ARCHIVE_THRESHOLD_MB} MB threshold. Starting archival...")
+
+            # ── Step 3a: Fetch oldest ARCHIVE_BATCH_SIZE appointment rows ──────
+            cur.execute(
+                """
+                SELECT id, user_id, service_id, date, time, status,
+                       reminder_sent, created_at
+                FROM   appointments
+                ORDER  BY created_at ASC
+                LIMIT  %s
+                """,
+                (ARCHIVE_BATCH_SIZE,)
+            )
+            rows = cur.fetchall()
+
+            if not rows:
+                print("[archive] No appointment rows found to archive.")
+                cur.close()
+                db.close()
+                return
+
+            archived_ids = [r["id"] for r in rows]
+            print(f"[archive] Archiving {len(archived_ids)} rows (IDs {archived_ids[0]} → {archived_ids[-1]}).")
+
+            # ── Step 3b: Convert to CSV in memory ─────────────────────────────
+            fieldnames = ["id", "user_id", "service_id", "date", "time",
+                          "status", "reminder_sent", "created_at"]
+            csv_buffer = io.StringIO()
+            writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in rows:
+                writer.writerow({
+                    "id":           r["id"],
+                    "user_id":      r["user_id"],
+                    "service_id":   r["service_id"],
+                    "date":         str(r["date"]),
+                    "time":         r["time"],
+                    "status":       r["status"],
+                    "reminder_sent": r["reminder_sent"],
+                    "created_at":   str(r["created_at"]),
+                })
+            csv_bytes = csv_buffer.getvalue().encode("utf-8")
+
+            # ── Step 3c: Upload CSV to Supabase storage ────────────────────────
+            timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            object_name = f"appointments_archive_{timestamp_str}.csv"
+
+            if not SUPABASE_AVAILABLE or not supabase_client:
+                print("[archive] WARNING: Supabase client unavailable — archive CSV not uploaded.")
+            else:
+                try:
+                    supabase_client.storage.from_("salon-archives").upload(
+                        path=object_name,
+                        file=csv_bytes,
+                        file_options={"content-type": "text/csv"},
+                    )
+                    print(f"[archive] Uploaded '{object_name}' to salon-archives bucket.")
+                except Exception as upload_err:
+                    # If upload fails, abort — do NOT delete rows without a backup.
+                    print(f"[archive] Upload failed: {upload_err}. Aborting deletion to protect data.")
+                    cur.close()
+                    db.close()
+                    return
+
+            # ── Step 3d: DELETE the archived rows ─────────────────────────────
+            cur.execute(
+                "DELETE FROM appointments WHERE id = ANY(%s)",
+                (archived_ids,)
+            )
+            deleted_count = cur.rowcount
+            db.commit()
+
+            # ── Step 3e: Log success ───────────────────────────────────────────
+            print(
+                f"[archive] Capacity reached {ARCHIVE_THRESHOLD_MB}MB threshold. "
+                f"Auto-archived oldest {deleted_count} records to free up space. "
+                f"Archive file: salon-archives/{object_name}"
+            )
+
+            cur.close()
+        except Exception as e:
+            print(f"[archive] Unexpected error during archival: {e}")
+            import traceback; traceback.print_exc()
+        finally:
+            if db and not db.closed:
+                db.close()
+
     try:
         scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+        # 30-minute appointment reminder: runs every minute
         scheduler.add_job(func=check_30min_reminders, trigger="interval", minutes=1)
-        # Run on the 1st of every month at 02:00 AM
-        scheduler.add_job(func=archive_old_appointments, trigger="cron", day=1, hour=2, minute=0)
+        # Capacity-based archive: runs daily at midnight IST
+        scheduler.add_job(func=archive_old_appointments, trigger="cron", hour=0, minute=0)
         scheduler.start()
-        print("[startup] APScheduler started: 30-minute reminder job is active.")
-        
+        print("[startup] APScheduler started: 30-min reminder + daily capacity-archive jobs active.")
+
         # Ensure it shuts down gracefully when the process exits
         import atexit
         atexit.register(lambda: scheduler.shutdown())
