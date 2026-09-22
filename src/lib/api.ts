@@ -879,6 +879,22 @@ export const api = {
     });
   },
 
+  adminDeleteArchive: (filename: string) => {
+    if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
+    const token = getAdminToken() ?? getToken();
+    return fetch(`${API_BASE}/api/admin/archives/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete archive");
+      return data as { ok: boolean; message: string };
+    });
+  },
+
   adminSendReminders: () => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();

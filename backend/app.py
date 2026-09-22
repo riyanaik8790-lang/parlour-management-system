@@ -1783,6 +1783,39 @@ def admin_get_archives():
 
 
 # ---------------------------------------------------------------------------
+# Admin - delete a single CSV archive from Supabase storage
+# ---------------------------------------------------------------------------
+
+@app.delete("/api/admin/archives/<path:filename>")
+@require_admin
+def admin_delete_archive(filename: str):
+    """
+    Remove a named file from the salon-archives Supabase storage bucket.
+    Protected — admin JWT required.
+
+    DELETE /api/admin/archives/appointments_archive_20260922T000000Z.csv
+    """
+    if not supabase_client:
+        return jsonify({"error": "Supabase client not configured"}), 500
+
+    # Basic safety: disallow path traversal
+    if "/" in filename or ".." in filename:
+        return jsonify({"error": "Invalid filename"}), 400
+
+    try:
+        bucket_name = "salon-archives"
+        result = supabase_client.storage.from_(bucket_name).remove([filename])
+        print(f"[admin_delete_archive] Deleted '{filename}' from {bucket_name}. Result: {result}")
+        return jsonify({
+            "ok": True,
+            "message": f"Archive '{filename}' deleted successfully."
+        })
+    except Exception as e:
+        print(f"[admin_delete_archive] Error deleting '{filename}': {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
 # Admin - reset user password
 # ---------------------------------------------------------------------------
 

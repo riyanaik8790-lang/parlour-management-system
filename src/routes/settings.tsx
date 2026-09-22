@@ -101,6 +101,8 @@ function SettingsPage() {
   const [storageData, setStorageData] = useState<{used_mb: number, total_mb: number} | null>(null);
   const [loadingStorage, setLoadingStorage] = useState(false);
   const [archivesData, setArchivesData] = useState<{name: string, size: number, created_at: string, url: string}[]>([]);
+  const [deletingArchive, setDeletingArchive] = useState<string | null>(null); // filename being deleted
+  const [archiveToDelete, setArchiveToDelete] = useState<string | null>(null);  // filename pending confirm
 
   // Load profile
   useEffect(() => {
@@ -235,6 +237,21 @@ function SettingsPage() {
       setDeleteError(err instanceof Error ? err.message : "Deletion failed");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  // ── Delete archive ──────────────────────────────────────────────────────────
+  async function deleteArchive(filename: string) {
+    setArchiveToDelete(null);
+    setDeletingArchive(filename);
+    try {
+      await api.adminDeleteArchive(filename);
+      setArchivesData((prev) => prev.filter((f) => f.name !== filename));
+      toast.success(`Archive "${filename}" deleted successfully.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete archive.");
+    } finally {
+      setDeletingArchive(null);
     }
   }
 
@@ -607,7 +624,7 @@ function SettingsPage() {
                 >
                   Storage
                 </h2>
-                
+
                 {loadingStorage ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin" style={{ color: BURGUNDY }} />
@@ -619,12 +636,12 @@ function SettingsPage() {
                       <span className="font-medium text-gray-900">{storageData.used_mb} MB / {storageData.total_mb} MB Used</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
-                      <div 
+                      <div
                         className={`h-full rounded-full transition-all duration-500 ease-out ${
                           storageData.used_mb / storageData.total_mb > 0.9 ? 'bg-red-500' :
                           storageData.used_mb / storageData.total_mb > 0.7 ? 'bg-yellow-400' :
                           'bg-green-500'
-                        }`} 
+                        }`}
                         style={{ width: `${Math.min(100, (storageData.used_mb / storageData.total_mb) * 100)}%` }}
                       ></div>
                     </div>
@@ -640,36 +657,114 @@ function SettingsPage() {
                     <div className="space-y-3">
                       {archivesData.map((file) => (
                         <div key={file.name} className="flex items-center justify-between p-3 bg-white/50 border border-gray-100 rounded-xl hover:bg-white transition-colors duration-200">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 bg-gray-50 rounded-lg flex-shrink-0">
                               <FileText className="w-5 h-5 text-gray-400" />
                             </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-700">{file.name}</p>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
                               <p className="text-xs text-gray-400">
                                 {file.created_at ? new Date(file.created_at).toLocaleDateString() : ""} • {(file.size / 1024).toFixed(1)} KB
                               </p>
                             </div>
                           </div>
-                          <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Download
-                          </a>
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                            <a
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Download
+                            </a>
+                            <button
+                              id={`delete-archive-${file.name}`}
+                              onClick={() => setArchiveToDelete(file.name)}
+                              disabled={deletingArchive === file.name}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 active:scale-95 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {deletingArchive === file.name ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                              {deletingArchive === file.name ? "Deleting…" : "Delete"}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="text-xs text-gray-500 bg-white/40 p-4 rounded-xl text-center border border-dashed border-gray-200">
-                      No historical archives available yet. Archives are automatically generated for records older than 2 years.
+                      No historical archives available yet. Archives are automatically generated when the database reaches 400 MB.
                     </p>
                   )}
                 </div>
               </Card>
+            )}
+
+            {/* ── Delete Archive Confirmation Modal ── */}
+            {archiveToDelete && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style={{ background: "oklch(0.10 0.03 50 / 60%)" }}
+                onClick={() => setArchiveToDelete(null)}
+              >
+                <div
+                  className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-fade-up"
+                  style={{ background: CARD_BG, border: `1px solid oklch(0.577 0.245 27.325 / 30%)` }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Red top bar */}
+                  <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, oklch(0.577 0.245 27.325), oklch(0.65 0.20 28))" }} />
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "oklch(0.577 0.245 27.325 / 10%)" }}>
+                        <AlertTriangle className="h-5 w-5" style={{ color: ERROR_COLOR }} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold" style={{ color: ERROR_COLOR }}>Delete Archive?</h3>
+                        <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>This action cannot be undone.</p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm leading-relaxed" style={{ color: "oklch(0.40 0.04 50)" }}>
+                      Are you sure you want to delete{" "}
+                      <span className="font-semibold" style={{ color: BURGUNDY }}>«{archiveToDelete}»</span>?
+                    </p>
+                    <div
+                      className="flex items-start gap-2 rounded-xl p-3 text-xs"
+                      style={{ background: "oklch(0.577 0.245 27.325 / 6%)", border: "1px solid oklch(0.577 0.245 27.325 / 20%)" }}
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: ERROR_COLOR }} />
+                      <span style={{ color: ERROR_COLOR }}>
+                        Please ensure you have <strong>downloaded this file</strong> first. Once deleted from Supabase storage it cannot be recovered.
+                      </span>
+                    </div>
+
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        onClick={() => setArchiveToDelete(null)}
+                        className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                        style={{ background: "oklch(0.93 0.020 83 / 60%)", border: `1px solid ${BORDER}`, color: "oklch(0.40 0.04 50)" }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        id="confirm-delete-archive"
+                        onClick={() => deleteArchive(archiveToDelete)}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98] shadow-lg"
+                        style={{ background: "linear-gradient(135deg, oklch(0.577 0.245 27.325), oklch(0.65 0.20 28))" }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Yes, Delete It
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* ── Danger Zone ── */}
