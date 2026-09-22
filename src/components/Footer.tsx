@@ -232,13 +232,7 @@ export function Footer() {
       {/* Bottom bar */}
       <hr className="gold-divider" />
       <div className="py-4 text-center text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2">
-        <span>© {new Date().getFullYear()} Hemangi Glam Salon</span>
-        <span className="hidden sm:inline">·</span>
-        <span className="flex items-center justify-center gap-1">
-          Made with{" "}
-          <Heart className="h-3 w-3 fill-current" style={{ color: "oklch(0.68 0.13 68)" }} /> for
-          beauty lovers
-        </span>
+        <span>© {new Date().getFullYear()} Hemangi Makeover. All rights reserved.</span>
       </div>
     </footer>
   );
