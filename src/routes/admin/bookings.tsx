@@ -187,7 +187,7 @@ function AdminBookingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.adminGetAllBookings(statusFilter !== "all" ? statusFilter : undefined);
+      const data = await api.adminGetAllBookings();
       setBookings(data.bookings);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load bookings");
@@ -198,8 +198,7 @@ function AdminBookingsPage() {
 
   useEffect(() => {
     loadBookings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, []);
 
   async function handleStatusUpdate(id: number, status: string) {
     try {
@@ -212,7 +211,9 @@ function AdminBookingsPage() {
   }
 
   const filtered = bookings.filter((b) => {
+    if (statusFilter !== "all" && b.status !== statusFilter) return false;
     const q = query.toLowerCase();
+    if (!q) return true;
     return (
       (b.offline_name ?? b.user_name).toLowerCase().includes(q) ||
       b.user_email.toLowerCase().includes(q) ||
