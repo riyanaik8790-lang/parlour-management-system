@@ -37,15 +37,15 @@ export const Route = createFileRoute("/services")({
 
 const SERVICE_IMAGES: Record<string, { src: string; position: string }> = {
   Facial: { src: facialGoldImg, position: "center 30%" },
-  "Hair Spa": { src: hairSpaImg, position: "center 25%" },
-  "Bridal Makeup Package": { src: bridalImg, position: "center 20%" },
+  "Hair Care": { src: hairSpaImg, position: "center 25%" },
+  Packages: { src: bridalImg, position: "center 20%" },
   "Pre-Bridal Package": { src: preBridalImg, position: "center 20%" },
   "Manicure & Pedicure": { src: pedicureImg, position: "center" },
   Nails: { src: nailsJpegImg, position: "center" },
   Bleach: { src: bleachImg, position: "center 35%" },
   Cleanup: { src: cleanupImg, position: "center" },
   "D-Tan": { src: facialImg, position: "center 25%" },
-  Threading: { src: threadingImg, position: "center 15%" },
+  "Threading & Face": { src: threadingImg, position: "center 15%" },
   Waxing: { src: waxingImg, position: "center" },
   "Hair Cuts": { src: hairCutImg, position: "center 60%" },
   "Hair Treatments": { src: hairColor1Img, position: "center 30%" },
