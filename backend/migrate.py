@@ -15,5 +15,6 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     CONSTRAINT uq_push_endpoint UNIQUE (endpoint)
 );
 ''')
+cur.execute('CREATE INDEX IF NOT EXISTS idx_appointments_user_id ON appointments(user_id);')
 conn.commit()
 print('Success!')
