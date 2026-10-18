@@ -1019,8 +1019,9 @@ function PwField({
       >
         {label}
       </label>
+      {/* Outer focus-ring wrapper */}
       <div
-        className="flex items-center gap-2 rounded-xl px-3 py-3 transition-all duration-150"
+        className="rounded-xl transition-all duration-150"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
@@ -1031,32 +1032,35 @@ function PwField({
             : "none",
         }}
       >
-        <Lock
-          className="h-4 w-4 flex-shrink-0"
-          style={{ color: hasError ? ERROR_COLOR : focused ? accentColor : "oklch(0.62 0.04 55)" }}
-        />
-        <input
-          id={id}
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            onClear();
-          }}
-          placeholder="••••••••"
-          className="flex-1 bg-transparent pl-2 text-sm outline-none"
-          style={{ color: "oklch(0.25 0.05 50)" }}
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          tabIndex={-1}
-          aria-label={show ? "Hide" : "Show"}
-          className="flex-shrink-0 p-1 transition-opacity hover:opacity-70"
-          style={{ color: "oklch(0.60 0.04 50)" }}
-        >
-          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
+        {/* Inner row: lock icon + input + eye button all inside the border */}
+        <div className="relative flex w-full items-center px-3 py-3">
+          <Lock
+            className="h-4 w-4 flex-shrink-0"
+            style={{ color: hasError ? ERROR_COLOR : focused ? accentColor : "oklch(0.62 0.04 55)" }}
+          />
+          <input
+            id={id}
+            type={show ? "text" : "password"}
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              onClear();
+            }}
+            placeholder="••••••••"
+            className="w-full bg-transparent pl-2 pr-10 text-sm outline-none"
+            style={{ color: "oklch(0.25 0.05 50)" }}
+          />
+          <button
+            type="button"
+            onClick={onToggle}
+            tabIndex={-1}
+            aria-label={show ? "Hide" : "Show"}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-opacity hover:opacity-70"
+            style={{ color: "oklch(0.60 0.04 50)" }}
+          >
+            {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
       {hasError && (
         <p className="flex items-center gap-1 text-xs" style={{ color: ERROR_COLOR }}>
