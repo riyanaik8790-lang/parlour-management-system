@@ -118,10 +118,27 @@ function SkinAdvisorPage() {
   const runAnalysis = useCallback(async (file: File) => {
     setView("loading");
     setCaptureError(null);
+
+    // Fail fast if the device is offline
+    if (!navigator.onLine) {
+      const msg = "Network error. Please check your internet connection and try again.";
+      setCaptureError(msg);
+      toast.error(msg);
+      setView("capture");
+      return;
+    }
+
+    // 30-second hard timeout so the browser never hangs indefinitely
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Analysis timed out. Please try again.")), 30_000)
+    );
+
     try {
-      // Cast via unknown because the API type hasn't been updated yet in api.ts;
-      // the actual runtime payload matches AnalysisResult exactly.
-      const data = (await analyzeSkinImage(file)) as unknown as AnalysisResult;
+      const data = (await Promise.race([
+        analyzeSkinImage(file),
+        timeoutPromise,
+      ])) as unknown as AnalysisResult;
+
       setResult(data);
       setView("results");
 
@@ -511,6 +528,24 @@ function WebcamCapture({
 
   useEffect(() => {
     let active = true;
+
+    // Detect HTTPS requirement (getUserMedia only works on secure origins)
+    const isSecure =
+      location.protocol === "https:" || location.hostname === "localhost";
+    if (!isSecure) {
+      setCamError(
+        "Camera access requires a secure (HTTPS) connection. Please use the upload option instead."
+      );
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCamError(
+        "Your browser does not support camera access. Please upload a photo instead."
+      );
+      return;
+    }
+
     navigator.mediaDevices
       .getUserMedia({ video: { width: 640, height: 480, facingMode: "user" }, audio: false })
       .then((stream) => {
@@ -524,7 +559,29 @@ function WebcamCapture({
           videoRef.current.play().then(() => setReady(true));
         }
       })
-      .catch(() => setCamError("Camera permission denied or device not available."));
+      .catch((err: unknown) => {
+        if (!active) return;
+        // Map browser DOMException names to friendly messages
+        const name = err instanceof DOMException ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setCamError(
+            "Camera permission denied. Please allow camera access in your browser settings and try again."
+          );
+        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          setCamError(
+            "No camera detected on this device. Please upload a photo instead."
+          );
+        } else if (name === "NotReadableError" || name === "TrackStartError") {
+          setCamError(
+            "Camera is in use by another app. Please close other apps using the camera and try again."
+          );
+        } else {
+          setCamError(
+            "Unable to access camera. Please ensure permissions are granted and try again."
+          );
+        }
+      });
+
     return () => {
       active = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -574,7 +631,15 @@ function WebcamCapture({
     <div className="space-y-4">
       <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl border border-border bg-black">
         {camError ? (
-          <p className="px-6 text-center text-sm text-destructive">{camError}</p>
+          <div className="flex flex-col items-center gap-4 px-6 py-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+              <Camera className="h-7 w-7 text-destructive" />
+            </div>
+            <p className="text-sm font-medium text-destructive">{camError}</p>
+            <p className="text-xs text-muted-foreground">
+              You can still upload a photo using the option above.
+            </p>
+          </div>
         ) : (
           <>
             <video ref={videoRef} playsInline muted className="-scale-x-100 block w-full" />

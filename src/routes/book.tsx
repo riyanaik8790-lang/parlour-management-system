@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CalendarIcon, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
 import { ALL_SERVICES, SERVICE_CATEGORIES, TIME_SLOTS } from "@/lib/services-data";
@@ -133,26 +133,42 @@ function BookPage() {
       return;
     }
     setSubmitting(true);
+    // 15-second timeout so the button never stays frozen on a slow network
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
       await api.book({ service_id: serviceId, date: isoDate, time });
       toast.success("Appointment booked!");
       navigate({ to: "/my-bookings" });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Booking failed";
-      // If the backend rejected the token (expired / invalid), clear the stale
-      // session so the Navbar updates and send the user back to login.
-      const isAuthError =
-        msg.includes("Invalid or expired session") ||
-        msg.includes("Login required") ||
-        msg.includes("User not found");
-      if (isAuthError) {
-        clearSession();
-        toast.error("Your session has expired. Please log in again.");
-        navigate({ to: "/login" });
+      const isAborted =
+        e instanceof DOMException && e.name === "AbortError";
+      const isOffline =
+        !navigator.onLine ||
+        (e instanceof TypeError && e.message.toLowerCase().includes("fetch"));
+
+      if (isAborted) {
+        toast.error("Request timed out. The server took too long — please try again.");
+      } else if (isOffline) {
+        toast.error("Network error. Please check your internet connection and try again.");
       } else {
-        toast.error(msg);
+        const msg = e instanceof Error ? e.message : "Booking failed";
+        // If the backend rejected the token (expired / invalid), clear the stale
+        // session so the Navbar updates and send the user back to login.
+        const isAuthError =
+          msg.includes("Invalid or expired session") ||
+          msg.includes("Login required") ||
+          msg.includes("User not found");
+        if (isAuthError) {
+          clearSession();
+          toast.error("Your session has expired. Please log in again.");
+          navigate({ to: "/login" });
+        } else {
+          toast.error(msg);
+        }
       }
     } finally {
+      clearTimeout(timeoutId);
       setSubmitting(false);
     }
   }
@@ -341,11 +357,18 @@ function BookPage() {
           </div>
           <Button
             size="lg"
-            className="mt-6 w-full min-h-[44px]"
+            className="mt-6 w-full min-h-[44px] gap-2"
             disabled={submitting}
             onClick={submit}
           >
-            {submitting ? "Booking…" : "Confirm booking"}
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing…
+              </>
+            ) : (
+              "Confirm booking"
+            )}
           </Button>
         </div>
       </div>
