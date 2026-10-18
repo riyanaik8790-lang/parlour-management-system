@@ -106,7 +106,7 @@ export function Navbar() {
         </nav>
 
         {/* Auth buttons */}
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           {/* Notification bell - any logged-in user */}
           {user && <NotificationBell />}
 

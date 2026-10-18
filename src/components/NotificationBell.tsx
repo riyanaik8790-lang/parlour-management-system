@@ -180,7 +180,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref}>
       {/* Bell button */}
       <button
         onClick={toggle}
@@ -222,7 +222,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
       {/* Notifications dropdown */}
       {open && (
         <div
-          className="absolute right-0 mt-2 z-[9999] origin-top-right overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5 w-[300px] max-w-[85vw] sm:w-80 md:w-96"
+          className="absolute right-0 top-full mt-2 z-[9999] origin-top-right overflow-hidden rounded-xl shadow-2xl ring-1 ring-black/5 w-[300px] max-w-[85vw] sm:w-80 md:w-96"
           style={{
             border: "1px solid oklch(0.88 0.030 82)",
             background: "oklch(0.998 0.004 85)",
