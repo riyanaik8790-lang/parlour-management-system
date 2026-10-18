@@ -262,9 +262,34 @@ function BookPage() {
             </Popover>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">
-              Time{" "}
-              {loadingSlots && <span className="text-xs text-muted-foreground">(loading…)</span>}
+            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <span>Time</span>
+              {loadingSlots && (
+                <svg
+                  className="animate-spin text-muted-foreground"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-label="Loading available time slots"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeOpacity="0.25"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M12 2a10 10 0 0 1 10 10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
             </label>
 
             {/* Pre-Bridal Package fully-booked banner */}
