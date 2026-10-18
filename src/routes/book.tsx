@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CalendarIcon, CheckCircle2, Loader2 } from "lucide-react";
+import { CalendarIcon, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
 import { ALL_SERVICES, SERVICE_CATEGORIES, TIME_SLOTS } from "@/lib/services-data";
@@ -362,10 +362,31 @@ function BookPage() {
             onClick={submit}
           >
             {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Processing…
-              </>
+              /* Animated SVG circle spinner — no text, pure visual feedback */
+              <svg
+                className="animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-label="Loading"
+              >
+                {/* Track circle */}
+                <circle
+                  cx="12" cy="12" r="10"
+                  stroke="currentColor"
+                  strokeOpacity="0.25"
+                  strokeWidth="3"
+                />
+                {/* Spinning arc — covers ~75% of the circumference */}
+                <path
+                  d="M12 2a10 10 0 0 1 10 10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+              </svg>
             ) : (
               "Confirm booking"
             )}
