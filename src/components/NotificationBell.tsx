@@ -222,7 +222,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
       {/* Notifications dropdown */}
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl shadow-2xl"
+          className="absolute right-0 mt-2 w-[90vw] sm:w-96 max-w-[calc(100vw-2rem)] z-50 origin-top-right overflow-hidden rounded-2xl shadow-2xl"
           style={{
             background: "oklch(0.998 0.004 85)",
             border: "1px solid oklch(0.88 0.030 82)",
