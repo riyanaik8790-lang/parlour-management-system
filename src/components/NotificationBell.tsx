@@ -84,9 +84,6 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   const [unread, setUnread] = useState(0);
   const [marking, setMarking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  // Fixed-position coordinates for the dropdown (avoids stacking-context clipping)
-  const [dropPos, setDropPos] = useState<{ top: number; right: number } | null>(null);
 
   // Push prompt state
   // Show if: push supported + permission not yet decided + user hasn't permanently dismissed
@@ -131,42 +128,14 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (
-        btnRef.current &&
-        !btnRef.current.contains(e.target as Node) &&
-        !(e.target as Element).closest("[data-notif-dropdown]")
-      ) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Close on scroll / resize so stale coordinates don't show a misplaced panel
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("scroll", close, { passive: true, capture: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [open]);
-
   function toggle() {
-    if (!open) {
-      load(); // re-fetch when opening
-      // Compute position from the bell button's bounding rect
-      if (btnRef.current) {
-        const r = btnRef.current.getBoundingClientRect();
-        setDropPos({
-          top: r.bottom + 8, // 8 px gap below button
-          right: window.innerWidth - r.right, // distance from right viewport edge
-        });
-      }
-    }
+    if (!open) load(); // re-fetch when opening
     setOpen((v) => !v);
   }
 
@@ -210,18 +179,10 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     // localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
   }
 
-  // Dropdown width: min(384px, 90vw, viewport - 16px padding)
-  const dropdownWidth = Math.min(384, window.innerWidth * 0.9, window.innerWidth - 16);
-  // Clamp right so the panel never goes off the left edge
-  const clampedRight = dropPos
-    ? Math.min(dropPos.right, window.innerWidth - dropdownWidth - 8)
-    : 0;
-
   return (
     <div ref={ref} className="relative">
       {/* Bell button */}
       <button
-        ref={btnRef}
         onClick={toggle}
         aria-label="Notifications"
         className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-150"
@@ -246,12 +207,9 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
         )}
       </button>
 
-      {/* Push permission prompt — fixed below bell */}
-      {showPushPrompt && !open && dropPos && (
-        <div
-          className="fixed z-[9999]"
-          style={{ top: dropPos.top, right: clampedRight }}
-        >
+      {/* Push permission prompt — shown below bell */}
+      {showPushPrompt && !open && (
+        <div className="absolute right-0 top-full z-50">
           <PushPromptBanner onEnable={handleEnablePush} onDismiss={handleDismissPush} />
           {pushEnabling && (
             <p className="mt-1 text-center text-[10px]" style={{ color: "oklch(0.65 0.03 55)" }}>
@@ -261,15 +219,13 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
         </div>
       )}
 
-      {/* Notifications dropdown — fixed so it escapes navbar stacking context */}
-      {open && dropPos && (
+      {/* Notifications dropdown:
+           mobile  → fixed, centered card (top-20 left-1/2 -translate-x-1/2)
+           desktop → standard absolute anchored dropdown (sm:absolute sm:top-full sm:right-0) */}
+      {open && (
         <div
-          data-notif-dropdown
-          className="fixed z-[9999] overflow-hidden rounded-2xl shadow-2xl"
+          className="fixed top-20 left-1/2 -translate-x-1/2 w-[95vw] max-w-sm z-50 sm:absolute sm:top-full sm:right-0 sm:left-auto sm:translate-x-0 sm:w-96 sm:mt-2 overflow-hidden rounded-2xl shadow-2xl"
           style={{
-            top: dropPos.top,
-            right: clampedRight,
-            width: dropdownWidth,
             background: "oklch(0.998 0.004 85)",
             border: "1px solid oklch(0.88 0.030 82)",
             boxShadow: "0 16px 48px oklch(0.35 0.15 22 / 18%)",
