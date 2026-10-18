@@ -219,15 +219,13 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
         </div>
       )}
 
-      {/* Notifications dropdown:
-           mobile  → fixed, centered card (top-20 left-1/2 -translate-x-1/2)
-           desktop → standard absolute anchored dropdown (sm:absolute sm:top-full sm:right-0) */}
+      {/* Notifications dropdown */}
       {open && (
         <div
-          className="fixed top-20 left-1/2 -translate-x-1/2 w-[95vw] max-w-sm z-50 sm:absolute sm:top-full sm:right-0 sm:left-auto sm:translate-x-0 sm:w-96 sm:mt-2 overflow-hidden rounded-2xl shadow-2xl"
+          className="absolute right-0 mt-2 z-[9999] origin-top-right overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5 w-[300px] max-w-[85vw] sm:w-80 md:w-96"
           style={{
-            background: "oklch(0.998 0.004 85)",
             border: "1px solid oklch(0.88 0.030 82)",
+            background: "oklch(0.998 0.004 85)",
             boxShadow: "0 16px 48px oklch(0.35 0.15 22 / 18%)",
           }}
         >
