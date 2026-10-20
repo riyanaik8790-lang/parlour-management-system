@@ -89,7 +89,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevUnreadRef = useRef<number | null>(null);
 
-  // Audio unlock state: user interaction unlocks browser AudioContext via muted/zero-volume playback
+  // Audio unlock state: user interaction unlocks browser AudioContext
   const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("salon_audio_unlocked") === "true";
@@ -102,30 +102,82 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     audioRef.current = new Audio("/notification-ding.mp3");
   }, []);
 
+  // Play crisp notification chime (Web Audio API primary, HTML5 Audio fallback)
+  const playChime = useCallback(() => {
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        if (ctx.state === "suspended") {
+          ctx.resume();
+        }
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(1046.5, now); // C6
+        osc1.frequency.exponentialRampToValueAtTime(1318.51, now + 0.08); // E6
+
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(2093.0, now); // C7 overtone
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.35, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.55);
+        osc2.stop(now + 0.55);
+        console.log("[NotifBell] Chime played successfully ✔");
+        return true;
+      }
+    } catch (e) {
+      console.warn("[NotifBell] Web Audio chime note failed, trying HTML5 Audio fallback:", e);
+    }
+
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.volume = 1;
+      audioRef.current
+        .play()
+        .then(() => console.log("[NotifBell] HTML5 Sound played successfully ✔"))
+        .catch((err) => console.warn("[NotifBell] HTML5 Audio play error:", err));
+      return true;
+    }
+    return false;
+  }, []);
+
   const handleUnlockAudio = async () => {
     try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio("/notification-ding.mp3");
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        if (ctx.state === "suspended") {
+          await ctx.resume();
+        }
       }
-      // Play and pause at volume 0 to officially unlock the browser's AudioContext via trusted user gesture
-      const sound = audioRef.current;
-      sound.volume = 0;
-      sound.currentTime = 0;
-      await sound.play();
-      sound.pause();
-      sound.currentTime = 0;
-      sound.volume = 1;
+    } catch (_) {}
 
-      setIsAudioUnlocked(true);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("salon_audio_unlocked", "true");
-      }
-      toast.success("Alert sounds enabled! 🔔");
-      console.log("[NotifBell] AudioContext unlocked successfully via user gesture ✔");
-    } catch (err) {
-      console.error("[NotifBell] Failed to unlock AudioContext:", err);
-      toast.error("Could not enable audio. Please check browser permissions.");
+    // Play confirmation chime
+    playChime();
+
+    setIsAudioUnlocked(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("salon_audio_unlocked", "true");
     }
+    toast.success("Alert sounds enabled! 🔔");
+    console.log("[NotifBell] Audio unlocked successfully via user gesture ✔");
   };
 
   const toggleAudioUnlock = async () => {
@@ -145,22 +197,13 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     if (prevUnreadRef.current !== null && unread > prevUnreadRef.current) {
       console.log(`[NotifBell] Unread count rose ${prevUnreadRef.current} → ${unread}.`);
       if (!isAudioUnlocked) {
-        console.warn("[NotifBell] Audio playback skipped: alert sounds are locked or disabled (isAudioUnlocked=false).");
+        console.warn("[NotifBell] Audio playback skipped: alert sounds are locked or muted (isAudioUnlocked=false).");
         return;
       }
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.volume = 1;
-        audioRef.current
-          .play()
-          .then(() => console.log("[NotifBell] Sound played successfully ✔"))
-          .catch((err) => console.error("[NotifBell] Audio blocked/error:", err));
-      } else {
-        console.warn("[NotifBell] audioRef.current is null — Audio element not initialised.");
-      }
+      playChime();
     }
     prevUnreadRef.current = unread;
-  }, [unread, isAudioUnlocked]);
+  }, [unread, isAudioUnlocked, playChime]);
 
   // Push prompt state
   // Show if: push supported + permission not yet decided + user hasn't permanently dismissed
