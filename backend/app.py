@@ -388,7 +388,10 @@ def get_profile():
     user = g.current_user
     try:
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id, name, email, phone, role, push_enabled FROM users WHERE id = %s", (user["id"],))
+        cur.execute(
+            "SELECT id, name, email, phone, role, push_enabled, avatar_url FROM users WHERE id = %s",
+            (user["id"],),
+        )
         row = cur.fetchone()
         cur.close()
     except PGError as err:
@@ -410,6 +413,7 @@ def update_profile():
     current_password = data.get("current_password") or ""
     new_password = data.get("new_password") or ""
     push_enabled = data.get("push_enabled")
+    avatar_url = data.get("avatar_url")  # optional HTTPS URL from Supabase Storage
 
     # Validate name
     if name_raw:
@@ -470,6 +474,10 @@ def update_profile():
         if push_enabled is not None:
             updates.append("push_enabled = %s")
             values.append(bool(push_enabled))
+        if avatar_url is not None:
+            # Accepts a full HTTPS URL string or null to remove the avatar
+            updates.append("avatar_url = %s")
+            values.append(str(avatar_url).strip() if avatar_url else None)
 
         if not updates:
             cur.close()
@@ -480,7 +488,10 @@ def update_profile():
         db.commit()
 
         # Return updated user
-        cur.execute("SELECT id, name, email, phone, role, push_enabled FROM users WHERE id = %s", (user["id"],))
+        cur.execute(
+            "SELECT id, name, email, phone, role, push_enabled, avatar_url FROM users WHERE id = %s",
+            (user["id"],),
+        )
         updated = cur.fetchone()
         cur.close()
     except PGError as err:
@@ -551,13 +562,30 @@ def slots():
 @app.post("/api/book")
 @require_auth
 def book():
+    import json as _json
     data = request.get_json(silent=True) or {}
-    service_id = (data.get("service_id") or "").strip()
+
+    # ── New cart payload: services[] + total_duration ────────────────────────
+    # Also accept legacy single-service payloads for backward-compatibility.
+    services_list = data.get("services")  # list of service IDs
+    total_duration = data.get("total_duration", 0)  # minutes
+
+    # Legacy single-service support
+    legacy_service_id = (data.get("service_id") or "").strip()
+    if not services_list and legacy_service_id:
+        services_list = [legacy_service_id]
+
     date_str = (data.get("date") or "").strip()
     time_str = (data.get("time") or "").strip()
 
-    if not service_id or not date_str or not time_str:
-        return jsonify({"error": "service_id, date, and time are required"}), 400
+    if not services_list or not date_str or not time_str:
+        return jsonify({"error": "services (array), date, and time are required"}), 400
+
+    if not isinstance(services_list, list) or len(services_list) == 0:
+        return jsonify({"error": "services must be a non-empty array of service IDs"}), 400
+
+    # Sanitise service IDs
+    services_list = [str(s).strip() for s in services_list if str(s).strip()]
 
     try:
         slot_date = date.fromisoformat(date_str)
@@ -571,7 +599,7 @@ def book():
     if slot_date.weekday() == 4:
         return jsonify({"error": "We are closed on Fridays. Please choose another day."}), 400
 
-    # Validate time is within working hours: 09:00 – 16:30
+    # Validate start time is within working hours: 09:00 – 16:30
     VALID_TIMES = [
         f"{str(h).zfill(2)}:{m}"
         for h in range(9, 17)
@@ -581,29 +609,66 @@ def book():
     if time_str not in VALID_TIMES:
         return jsonify({"error": "Booking time must be between 09:00 and 16:30 (salon closes at 5 PM)."}), 400
 
+    # Compute required block end time (total_duration + 30-min buffer)
+    BUFFER_MINS = 30
+    SALON_CLOSE_MINS = 17 * 60  # 17:00
+    start_h, start_m = map(int, time_str.split(":"))
+    start_mins = start_h * 60 + start_m
+    block_end_mins = start_mins + int(total_duration) + BUFFER_MINS
+
+    if block_end_mins > SALON_CLOSE_MINS:
+        return jsonify({
+            "error": "The selected services don't fit within salon hours at this time. Please choose an earlier slot."
+        }), 400
+
     try:
         db = get_db()
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        cur.execute("SELECT id FROM services WHERE id = %s", (service_id,))
-        if not cur.fetchone():
-            cur.close()
-            return jsonify({"error": "Unknown service"}), 400
-
+        # ── Validate all service IDs exist ───────────────────────────────────
+        placeholders = ",".join(["%s"] * len(services_list))
         cur.execute(
-            "SELECT id FROM appointments WHERE date = %s AND time = %s AND status != 'cancelled'",
-            (slot_date, time_str),
+            f"SELECT id, name FROM services WHERE id IN ({placeholders})",
+            tuple(services_list),
         )
-        if cur.fetchone():
+        found_rows = cur.fetchall()
+        found_ids = {row["id"] for row in found_rows}
+        unknown = [sid for sid in services_list if sid not in found_ids]
+        if unknown:
             cur.close()
-            return jsonify({"error": "That time slot is already booked. Pick another."}), 409
+            return jsonify({"error": f"Unknown service(s): {', '.join(unknown)}"}), 400
 
-        # ── Pre-Bridal Package: only one booking allowed per day ────────────────
-        # Check by service_id (canonical) OR by service name as a safety net.
-        cur.execute("SELECT name FROM services WHERE id = %s", (service_id,))
-        svc_check_row = cur.fetchone()
-        svc_check_name = svc_check_row["name"] if svc_check_row else ""
-        if service_id == "pk-prebridal" or svc_check_name == "Pre-Bridal Package":
+        service_names = [row["name"] for row in found_rows]
+        # Use first service ID as the canonical service_id for backward compat
+        primary_service_id = services_list[0]
+
+        # ── Continuous-block availability check ──────────────────────────────
+        # Fetch all booked times for this date and build a set of occupied minutes.
+        cur.execute(
+            "SELECT time FROM appointments WHERE date = %s AND status != 'cancelled'",
+            (slot_date,),
+        )
+        booked_times = [row["time"] for row in cur.fetchall()]
+
+        # Build a set of occupied minute-values from existing bookings.
+        # Each slot occupies 30 minutes.
+        occupied = set()
+        for bt in booked_times:
+            bh, bm = map(int, str(bt)[:5].split(":"))
+            slot_start = bh * 60 + bm
+            for m in range(slot_start, slot_start + 30):
+                occupied.add(m)
+
+        # Check that [start_mins, block_end_mins) is completely free.
+        for m in range(start_mins, block_end_mins):
+            if m in occupied:
+                cur.close()
+                return jsonify({
+                    "error": "There is not a long enough free block at this time for all your selected services (including the 30-minute buffer). Please choose another slot."
+                }), 409
+
+        # ── Pre-Bridal Package: only one booking allowed per day ─────────────
+        if "pk-prebridal" in services_list:
             cur.execute(
                 """
                 SELECT COUNT(*) AS cnt
@@ -621,25 +686,31 @@ def book():
                 return jsonify({
                     "error": "The Pre-Bridal Package is already booked for this date. Please select another day."
                 }), 400
-        # ───────────────────────────────────────────────────────────────────────
+        # ────────────────────────────────────────────────────────────────────
 
+        # ── Insert the booking ───────────────────────────────────────────────
+        # service_id: primary service for FK; services_json: full cart stored as JSON.
+        services_json_str = _json.dumps(services_list)
         cur.execute(
-            "INSERT INTO appointments (user_id, service_id, date, time, status) VALUES (%s, %s, %s, %s, 'confirmed') RETURNING id",
-            (g.current_user["id"], service_id, slot_date, time_str),
+            """
+            INSERT INTO appointments (user_id, service_id, date, time, status, services_json, total_duration)
+            VALUES (%s, %s, %s, %s, 'confirmed', %s, %s)
+            RETURNING id
+            """,
+            (g.current_user["id"], primary_service_id, slot_date, time_str,
+             services_json_str, int(total_duration)),
         )
         booking_id = cur.fetchone()["id"]
         db.commit()
 
-        # Notify all admins about the new booking
+        # ── Notify all admins about the new booking ──────────────────────────
         try:
+            svc_display = ", ".join(service_names) if service_names else primary_service_id
+            customer_name = g.current_user["name"]
+            msg = f"New booking: {customer_name} booked {svc_display} on {date_str} at {time_str}"
             cur2 = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur2.execute("SELECT id FROM users WHERE role = 'ADMIN'")
             admins = cur2.fetchall()
-            cur2.execute("SELECT name FROM services WHERE id = %s", (service_id,))
-            svc_row = cur2.fetchone()
-            svc_name = svc_row["name"] if svc_row else service_id
-            customer_name = g.current_user["name"]
-            msg = f"New booking: {customer_name} booked {svc_name} on {date_str} at {time_str}"
             for admin in admins:
                 cur2.execute(
                     "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'new_booking', %s, %s)",
@@ -653,9 +724,7 @@ def book():
         except Exception:
             pass  # never fail the booking because of a notification error
 
-        # -------------------------------------------------------------
-        # TWILIO SMS INTEGRATION
-        # -------------------------------------------------------------
+        # ── Twilio SMS ───────────────────────────────────────────────────────
         try:
             twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
             twilio_auth = os.getenv("TWILIO_AUTH_TOKEN")
@@ -665,14 +734,13 @@ def book():
             if twilio_sid and twilio_auth and twilio_number and user_phone:
                 from twilio.rest import Client
                 client = Client(twilio_sid, twilio_auth)
-                
-                # SMS Body
-                sms_body = f"Confirmed! Your appointment at Hemangi Makeover is set for {date_str} at {time_str}."
-                
-                # Basic E.164 formatting fallback if missing '+' (e.g. India)
+                svc_display = ", ".join(service_names) if service_names else primary_service_id
+                sms_body = (
+                    f"Confirmed! Your appointment at Hemangi Makeover is set for "
+                    f"{date_str} at {time_str}. Services: {svc_display}."
+                )
                 if not user_phone.startswith('+'):
                     user_phone = '+91' + user_phone.lstrip('0')
-
                 client.messages.create(
                     body=sms_body,
                     from_=twilio_number,
@@ -680,7 +748,6 @@ def book():
                 )
                 print(f"[Twilio] SMS sent to {user_phone}")
         except Exception as e:
-            # Failsafe: Do NOT crash the booking if Twilio fails
             print(f"[Twilio Error] Failed to send SMS: {e}")
 
         cur.close()

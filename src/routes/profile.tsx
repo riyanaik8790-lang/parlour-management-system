@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, getUser, setSession } from "@/lib/api";
+import { supabase, AVATAR_BUCKET, AVATAR_MAX_BYTES } from "@/lib/supabase";
 import {
   User,
   Phone,
@@ -12,7 +13,9 @@ import {
   Loader2,
   ShieldCheck,
   Save,
+  Camera,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -33,8 +36,32 @@ const SUCCESS_COLOR = "oklch(0.42 0.18 150)";
 const BG = "oklch(0.968 0.018 85)";
 
 const STRONG_PW_RE =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]).{8,72}$/;
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]).{8,72}$/;
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
+
+// ─── Avatar helpers ───────────────────────────────────────────────────────────
+
+/** Generate initials (up to 2 chars) from a display name. */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** Deterministic soft background color from initials. */
+function initialsColor(initials: string): string {
+  const palettes = [
+    "oklch(0.82 0.08 22)",   // soft rose
+    "oklch(0.80 0.07 68)",   // warm gold
+    "oklch(0.78 0.09 160)",  // sage green
+    "oklch(0.80 0.08 250)",  // sky blue
+    "oklch(0.78 0.08 300)",  // soft lavender
+    "oklch(0.80 0.08 30)",   // peach
+  ];
+  const code = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+  return palettes[code % palettes.length];
+}
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -50,6 +77,7 @@ function ProfilePage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Password change state
   const [currentPw, setCurrentPw] = useState("");
@@ -69,6 +97,10 @@ function ProfilePage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // Avatar upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Load profile on mount
   useEffect(() => {
     api
@@ -78,14 +110,87 @@ function ProfilePage() {
         setPhone(p.phone);
         setEmail(p.email);
         setRole(p.role);
+        setAvatarUrl(p.avatar_url ?? null);
       })
       .catch(() => {
-        /* silent - use session data */
+        /* silent — use session data */
       })
       .finally(() => setLoadingProfile(false));
   }, []);
 
-  // ── Save info (name + phone) ──────────────────────────────────────────────
+  // ── Avatar upload ─────────────────────────────────────────────────────────
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    // Reset input so re-selecting same file still triggers onChange
+    fileInputRef.current.value = "";
+
+    if (!file) return;
+
+    // ── 1. Client-side size guard (max 2 MB) ──────────────────────────────
+    if (file.size > AVATAR_MAX_BYTES) {
+      toast.error(`Image is too large. Maximum size is 2 MB (your file: ${(file.size / 1_048_576).toFixed(1)} MB).`);
+      return;
+    }
+
+    // ── 2. Type guard ────────────────────────────────────────────────────
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (JPEG, PNG, WebP, etc.).");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const user = getUser();
+      if (!user) {
+        toast.error("Please login first.");
+        navigate({ to: "/login" });
+        return;
+      }
+
+      // ── 3. Build a unique, deterministic file path for this user ────────
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const filePath = `${user.id}/avatar.${ext}`;
+
+      // ── 4. Upload to Supabase Storage (upsert = overwrite existing) ──────
+      const { error: uploadError } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,          // silently replace existing avatar
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        console.error("[avatar] Supabase upload error:", uploadError);
+        toast.error(`Upload failed: ${uploadError.message}`);
+        return;
+      }
+
+      // ── 5. Get the permanent public URL ─────────────────────────────────
+      const { data: urlData } = supabase.storage
+        .from(AVATAR_BUCKET)
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData.publicUrl;
+
+      // ── 6. Persist the URL in the users table via Flask backend ─────────
+      await api.updateAvatarUrl(publicUrl);
+
+      // ── 7. Update local UI state immediately ─────────────────────────────
+      // Append a cache-busting timestamp so the browser fetches the new image
+      setAvatarUrl(`${publicUrl}?t=${Date.now()}`);
+      toast.success("Profile photo updated!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast.error(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  // ── Save info (name + phone) ───────────────────────────────────────────────
   async function saveInfo(e: React.FormEvent) {
     e.preventDefault();
     setInfoError(null);
@@ -133,7 +238,7 @@ function ProfilePage() {
     }
   }
 
-  // ── Change password ───────────────────────────────────────────────────────
+  // ── Change password ────────────────────────────────────────────────────────
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwError(null);
@@ -186,17 +291,76 @@ function ProfilePage() {
 
   if (!sessionUser) return null;
 
+  const initials = getInitials(name || sessionUser.name || "?");
+
   return (
     <div className="min-h-screen px-4 py-12" style={{ background: BG }}>
       <div className="mx-auto max-w-lg space-y-6">
-        {/* Header */}
-        <div className="animate-fade-up">
-          <div
-            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-          >
-            <User className="h-7 w-7 text-white" />
+        {/* ── Header + Avatar ───────────────────────────────────────────────── */}
+        <div className="animate-fade-up flex flex-col items-center">
+
+          {/* Avatar ring */}
+          <div className="relative mb-4">
+            {/* Circle avatar */}
+            <div
+              className="h-24 w-24 rounded-full overflow-hidden shadow-lg ring-4"
+              style={{ ringColor: "oklch(0.88 0.030 82)" }}
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={`${name || "User"} avatar`}
+                  className="h-full w-full object-cover"
+                  onError={() => setAvatarUrl(null)} // fallback to initials on broken URL
+                />
+              ) : (
+                /* Stylish initials fallback */
+                <div
+                  className="flex h-full w-full items-center justify-center text-2xl font-bold select-none"
+                  style={{
+                    background: initialsColor(initials),
+                    color: BURGUNDY,
+                  }}
+                >
+                  {initials}
+                </div>
+              )}
+
+              {/* Uploading overlay */}
+              {isUploading && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full"
+                  style={{ background: "oklch(0 0 0 / 45%)" }}>
+                  <Loader2 className="h-7 w-7 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+
+            {/* Camera button */}
+            <button
+              type="button"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Upload profile photo"
+              className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+              style={{
+                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                border: "2px solid oklch(0.968 0.018 85)",
+              }}
+            >
+              <Camera className="h-3.5 w-3.5 text-white" />
+            </button>
+
+            {/* Hidden file input — accepts images only, max 2 MB enforced in JS */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+              aria-label="Choose avatar image"
+            />
           </div>
+
           <h1
             className="text-center text-3xl font-bold"
             style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
@@ -206,6 +370,7 @@ function ProfilePage() {
           <p className="mt-1 text-center text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
             Update your personal information
           </p>
+
           {/* Role badge */}
           <div className="mt-3 flex justify-center">
             <span
@@ -223,6 +388,11 @@ function ProfilePage() {
               {role || "USER"}
             </span>
           </div>
+
+          {/* Upload hint */}
+          <p className="mt-2 text-xs" style={{ color: "oklch(0.68 0.04 55)" }}>
+            Click the <Camera className="inline h-3 w-3" /> icon to change your photo · Max 2 MB
+          </p>
         </div>
 
         {loadingProfile ? (
@@ -231,7 +401,7 @@ function ProfilePage() {
           </div>
         ) : (
           <>
-            {/* ── Card 1: Info ─────────────────────────────────────────────── */}
+            {/* ── Card 1: Info ───────────────────────────────────────────────── */}
             <div
               className="overflow-hidden rounded-3xl shadow-xl animate-fade-up"
               style={{
@@ -362,7 +532,7 @@ function ProfilePage() {
               </form>
             </div>
 
-            {/* ── Card 2: Password ─────────────────────────────────────────── */}
+            {/* ── Card 2: Password ──────────────────────────────────────────── */}
             <div
               className="overflow-hidden rounded-3xl shadow-xl animate-fade-up"
               style={{

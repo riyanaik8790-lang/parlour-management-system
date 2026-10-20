@@ -454,6 +454,7 @@ export const api = {
       phone: string;
       role: string;
       push_enabled?: boolean;
+      avatar_url?: string | null;
     }>("/api/profile"),
 
   updateProfile: (body: {
@@ -462,6 +463,7 @@ export const api = {
     current_password?: string;
     new_password?: string;
     push_enabled?: boolean;
+    avatar_url?: string | null;
   }) =>
     request<{
       ok: boolean;
@@ -473,8 +475,16 @@ export const api = {
         phone: string;
         role: string;
         push_enabled?: boolean;
+        avatar_url?: string | null;
       };
     }>("/api/profile", { method: "PUT", body: JSON.stringify(body) }),
+
+  /** Convenience wrapper: update only the avatar_url field */
+  updateAvatarUrl: (avatarUrl: string) =>
+    request<{ ok: boolean; user: StoredUser; profile: { avatar_url: string } }>("/api/profile", {
+      method: "PUT",
+      body: JSON.stringify({ avatar_url: avatarUrl }),
+    }),
 
   getNotifications: () =>
     request<{ notifications: AppNotification[]; unread: number }>("/api/notifications"),
@@ -536,7 +546,7 @@ export const api = {
       },
     ),
 
-  book: (body: { service_id: string; date: string; time: string }) =>
+  book: (body: { services: string[]; total_duration: number; date: string; time: string }) =>
     withMock(
       () =>
         request<{ id: number }>("/api/book", {
@@ -548,9 +558,11 @@ export const api = {
           { id: number; service_name: string; date: string; time: string; status: string }[]
         >(MOCK_BOOKINGS_KEY, []);
         const id = Date.now();
+        // Join all selected service names for the mock display
+        const names = body.services.map((sid) => serviceNameFor(sid)).join(", ");
         list.unshift({
           id,
-          service_name: serviceNameFor(body.service_id),
+          service_name: names || "Salon Service",
           date: body.date,
           time: body.time,
           status: "confirmed",

@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, clearSession, getUser, setSession, getToken, getAdminToken } from "@/lib/api";
+import { supabase, AVATAR_BUCKET, AVATAR_MAX_BYTES } from "@/lib/supabase";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import {
   User,
@@ -21,6 +22,7 @@ import {
   Bell,
   Download,
   FileText,
+  Camera,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -45,8 +47,29 @@ const CARD_BG = "oklch(0.998 0.004 85)";
 const BORDER = "oklch(0.88 0.030 82)";
 
 const STRONG_PW_RE =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]).{8,72}$/;
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]).{8,72}$/;
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
+
+// ── Avatar helpers ───────────────────────────────────────────────────────────
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function initialsColor(initials: string): string {
+  const palettes = [
+    "oklch(0.82 0.08 22)",   // soft rose
+    "oklch(0.80 0.07 68)",   // warm gold
+    "oklch(0.78 0.09 160)",  // sage green
+    "oklch(0.80 0.08 250)",  // sky blue
+    "oklch(0.78 0.08 300)",  // soft lavender
+    "oklch(0.80 0.08 30)",   // peach
+  ];
+  const code = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+  return palettes[code % palettes.length];
+}
 
 // ── Section enum ──────────────────────────────────────────────────────────────
 type Section = "profile" | "notifications" | "password" | "danger" | "storage";
@@ -67,6 +90,9 @@ function SettingsPage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [savingPush, setSavingPush] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -113,6 +139,7 @@ function SettingsPage() {
         setPhone(p.phone);
         setEmail(p.email);
         setRole(p.role);
+        setAvatarUrl(p.avatar_url ?? null);
         setPushEnabled(p.push_enabled ?? false);
       })
       .catch(() => {
@@ -125,6 +152,69 @@ function SettingsPage() {
       })
       .finally(() => setLoadingProfile(false));
   }, []);
+
+  // ── Avatar upload ──────────────────────────────────────────────────────────
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = "";
+
+    if (!file) return;
+
+    if (file.size > AVATAR_MAX_BYTES) {
+      toast.error(`Image is too large. Maximum size is 2 MB (your file: ${(file.size / 1_048_576).toFixed(1)} MB).`);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (JPEG, PNG, WebP, etc.).");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const user = getUser();
+      if (!user) {
+        toast.error("Please login first.");
+        navigate({ to: "/login" });
+        return;
+      }
+
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const filePath = `${user.id}/avatar.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        console.error("[avatar] Supabase upload error:", uploadError);
+        toast.error(`Upload failed: ${uploadError.message}`);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from(AVATAR_BUCKET)
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData.publicUrl;
+
+      await api.updateAvatarUrl(publicUrl);
+
+      setAvatarUrl(`${publicUrl}?t=${Date.now()}`);
+      toast.success("Profile photo updated!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast.error(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  }
 
   // ── Save profile ────────────────────────────────────────────────────────────
   async function saveInfo(e: React.FormEvent) {
@@ -370,9 +460,85 @@ function SettingsPage() {
                     <Loader2 className="h-6 w-6 animate-spin" style={{ color: BURGUNDY }} />
                   </div>
                 ) : (
-                  <form onSubmit={saveInfo} className="space-y-4">
-                    {infoSuccess && <Banner type="success" msg="Profile updated successfully!" />}
-                    {infoError && <Banner type="error" msg={infoError} />}
+                  <div className="space-y-6">
+                    {/* Avatar Upload Section */}
+                    <div className="flex flex-col items-center justify-center pb-2">
+                      <div className="relative">
+                        <div
+                          className="h-24 w-24 rounded-full overflow-hidden shadow-md ring-4"
+                          style={{ ringColor: "oklch(0.88 0.030 82)" }}
+                        >
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt={`${name || "User"} avatar`}
+                              className="h-full w-full object-cover"
+                              onError={() => setAvatarUrl(null)}
+                            />
+                          ) : (
+                            <div
+                              className="flex h-full w-full items-center justify-center text-2xl font-bold select-none"
+                              style={{
+                                background: initialsColor(getInitials(name || sessionUser?.name || "?")),
+                                color: BURGUNDY,
+                              }}
+                            >
+                              {getInitials(name || sessionUser?.name || "?")}
+                            </div>
+                          )}
+
+                          {isUploading && (
+                            <div
+                              className="absolute inset-0 flex items-center justify-center rounded-full"
+                              style={{ background: "oklch(0 0 0 / 45%)" }}
+                            >
+                              <Loader2 className="h-6 w-6 animate-spin text-white" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Camera upload button */}
+                        <button
+                          type="button"
+                          disabled={isUploading}
+                          onClick={() => fileInputRef.current?.click()}
+                          aria-label="Upload profile photo"
+                          className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+                          style={{
+                            background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                            border: "2px solid oklch(0.968 0.018 85)",
+                          }}
+                        >
+                          <Camera className="h-3.5 w-3.5 text-white" />
+                        </button>
+
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarChange}
+                          aria-label="Choose avatar image"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="mt-2.5 text-xs font-semibold hover:underline"
+                        style={{ color: BURGUNDY }}
+                      >
+                        {isUploading ? "Uploading photo..." : "Change photo"}
+                      </button>
+                      <p className="text-[11px]" style={{ color: "oklch(0.60 0.04 55)" }}>
+                        Max size: 2 MB (JPG, PNG, WebP)
+                      </p>
+                    </div>
+
+                    <form onSubmit={saveInfo} className="space-y-4">
+                      {infoSuccess && <Banner type="success" msg="Profile updated successfully!" />}
+                      {infoError && <Banner type="error" msg={infoError} />}
 
                     {/* Email (read-only) */}
                     <div className="space-y-1.5">
@@ -443,7 +609,8 @@ function SettingsPage() {
                         </>
                       )}
                     </button>
-                  </form>
+                    </form>
+                  </div>
                 )}
               </Card>
             )}

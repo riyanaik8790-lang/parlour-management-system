@@ -4,20 +4,11 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import { CalendarIcon, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, CheckCircle2, ShoppingCart, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
-import { ALL_SERVICES, SERVICE_CATEGORIES, TIME_SLOTS } from "@/lib/services-data";
+import { ALL_SERVICES, SERVICE_CATEGORIES, TIME_SLOTS, BUFFER_MINS } from "@/lib/services-data";
 
 export const Route = createFileRoute("/book")({
   validateSearch: (search: Record<string, unknown>): { service?: string } => ({
@@ -43,12 +34,22 @@ function getISTNow(): Date {
   return new Date(str);
 }
 
+/** Convert "HH:MM" to total minutes since midnight */
+function toMins(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
 function BookPage() {
   const navigate = useNavigate();
   const { service: preselectedService } = Route.useSearch();
-  const [serviceId, setServiceId] = useState<string>("");
+
+  // ── Service Cart state ─────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState<string>("");
+  // taken: array of "HH:MM" strings that are already booked for the chosen date
   const [taken, setTaken] = useState<string[]>([]);
   const [preBridalFullyBooked, setPreBridalFullyBooked] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -57,6 +58,37 @@ function BookPage() {
   const [ready, setReady] = useState(false);
 
   const isoDate = useMemo(() => (date ? format(date, "yyyy-MM-dd") : ""), [date]);
+
+  // ── Derived cart values ────────────────────────────────────────────────────
+  const selectedServices = useMemo(
+    () => ALL_SERVICES.filter((s) => selectedIds.includes(s.id)),
+    [selectedIds],
+  );
+
+  /** Sum of all selected service durations in minutes */
+  const totalDuration = useMemo(
+    () => selectedServices.reduce((acc, s) => acc + s.durationMins, 0),
+    [selectedServices],
+  );
+
+  /**
+   * Numeric total price (only counting services with a plain numeric price).
+   * Returns null if no services are selected or all prices are "On request".
+   */
+  const totalPrice = useMemo(() => {
+    if (selectedServices.length === 0) return null;
+    let sum = 0;
+    let hasNumeric = false;
+    for (const s of selectedServices) {
+      // price may be "500", "200 - 300" (take lower), or "On request"
+      const match = s.price.match(/\d+/);
+      if (match) {
+        sum += Number(match[0]);
+        hasNumeric = true;
+      }
+    }
+    return hasNumeric ? sum : null;
+  }, [selectedServices]);
 
   // Auth guard: show inline login prompt if not logged in (no silent redirect)
   useEffect(() => {
@@ -69,7 +101,7 @@ function BookPage() {
     const match = ALL_SERVICES.find(
       (s) => s.name.toLowerCase() === preselectedService.toLowerCase(),
     );
-    if (match) setServiceId(match.id);
+    if (match) setSelectedIds([match.id]);
   }, [preselectedService]);
 
   const user = ready ? getUser() : null;
@@ -103,9 +135,49 @@ function BookPage() {
     };
   }, [isoDate]);
 
+  // ── Continuous-block availability check ───────────────────────────────────
+  /**
+   * Returns true when slot `t` does NOT have a free continuous block of
+   * (totalDuration + BUFFER_MINS) minutes starting at that time.
+   *
+   * Algorithm: build a Set of taken minute-values, then walk every minute
+   * in [slotStart, slotStart + totalDuration + BUFFER) and check if it's
+   * occupied by any taken slot's half-hour window.
+   */
+  function isBlockUnavailable(t: string): boolean {
+    if (totalDuration === 0) return false; // no services selected → no constraint
+
+    const takenMinutes = new Set<number>();
+    for (const tk of taken) {
+      const start = toMins(tk);
+      // Each taken slot occupies 30 minutes
+      for (let m = start; m < start + 30; m++) takenMinutes.add(m);
+    }
+
+    const requiredEnd = toMins(t) + totalDuration + BUFFER_MINS;
+    // Also block slots that would push past salon close (17:00 = 1020 min)
+    if (requiredEnd > 17 * 60) return true;
+
+    // Check every minute in the required block
+    for (let m = toMins(t); m < requiredEnd; m++) {
+      if (takenMinutes.has(m)) return true;
+    }
+    return false;
+  }
+
+  // ── Service cart toggle ────────────────────────────────────────────────────
+  function toggleService(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    // Clear the selected time whenever the cart changes (duration may differ)
+    setTime("");
+  }
+
+  // ── Form submission ────────────────────────────────────────────────────────
   async function submit() {
-    if (!serviceId || !isoDate || !time) {
-      toast.error("Please select a service, date and time.");
+    if (selectedIds.length === 0 || !isoDate || !time) {
+      toast.error("Please select at least one service, a date, and a time.");
       return;
     }
 
@@ -137,7 +209,12 @@ function BookPage() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      await api.book({ service_id: serviceId, date: isoDate, time });
+      await api.book({
+        services: selectedIds,
+        total_duration: totalDuration,
+        date: isoDate,
+        time,
+      });
       toast.success("Appointment booked!");
       navigate({ to: "/my-bookings" });
     } catch (e) {
@@ -198,35 +275,73 @@ function BookPage() {
     );
   }
 
-  const service = ALL_SERVICES.find((s) => s.id === serviceId);
+  const hasPreBridal = selectedIds.includes("pk-prebridal");
+  const isPreBridalBlocked = hasPreBridal && preBridalFullyBooked;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
       <h1 className="font-serif text-3xl sm:text-4xl text-primary">Book your appointment</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Grey slots are already booked.</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Select one or more services, then pick a date &amp; time.
+      </p>
       <div className="mt-6 sm:mt-8 grid gap-6 md:grid-cols-2">
+        {/* ── Left column: service picker + date + time ── */}
         <div className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+
+          {/* ── Service multi-select (checkboxes) ── */}
           <div>
-            <label className="mb-2 block text-sm font-medium">Service</label>
-            <Select value={serviceId} onValueChange={setServiceId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a service" />
-              </SelectTrigger>
-              <SelectContent>
-                {SERVICE_CATEGORIES.map((cat) => (
-                  <SelectGroup key={cat.name}>
-                    <SelectLabel>{cat.name}</SelectLabel>
-                    {cat.items.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                        {s.price !== "On request" ? ` - ₹${s.price}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="mb-3 flex items-center gap-2 text-sm font-medium">
+              <ShoppingCart className="h-4 w-4 text-primary" />
+              Services
+              {selectedIds.length > 0 && (
+                <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+                  {selectedIds.length} selected
+                </span>
+              )}
+            </label>
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {SERVICE_CATEGORIES.map((cat) => (
+                <div key={cat.name}>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {cat.name}
+                  </p>
+                  <div className="space-y-1">
+                    {cat.items.map((svc) => {
+                      const checked = selectedIds.includes(svc.id);
+                      return (
+                        <label
+                          key={svc.id}
+                          htmlFor={`svc-${svc.id}`}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors",
+                            checked
+                              ? "border-primary bg-primary/10 text-foreground"
+                              : "border-border bg-background hover:border-accent hover:bg-accent/5",
+                          )}
+                        >
+                          <input
+                            id={`svc-${svc.id}`}
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary"
+                            checked={checked}
+                            onChange={() => toggleService(svc.id)}
+                          />
+                          <span className="flex-1">{svc.name}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {svc.price !== "On request" ? `₹${svc.price}` : "On request"}
+                            {" · "}
+                            {svc.durationMins} min
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* ── Date picker ── */}
           <div>
             <label className="mb-2 block text-sm font-medium">Date</label>
             <Popover>
@@ -261,6 +376,8 @@ function BookPage() {
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* ── Time slots ── */}
           <div>
             <label className="mb-2 flex items-center gap-2 text-sm font-medium">
               <span>Time</span>
@@ -290,10 +407,15 @@ function BookPage() {
                   />
                 </svg>
               )}
+              {totalDuration > 0 && (
+                <span className="ml-auto text-xs text-muted-foreground">
+                  Need {totalDuration + BUFFER_MINS} min block (incl. 30 min buffer)
+                </span>
+              )}
             </label>
 
             {/* Pre-Bridal Package fully-booked banner */}
-            {serviceId === "pk-prebridal" && preBridalFullyBooked && date && (
+            {isPreBridalBlocked && date && (
               <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300">
                 <span className="mt-0.5 shrink-0 text-base">⚠️</span>
                 <span>
@@ -302,16 +424,23 @@ function BookPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {TIME_SLOTS.map((t, index) => {
-                const isTaken = taken.includes(t);
-                const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
-                const isBuffer = prevSlot ? taken.includes(prevSlot) : false;
+            {selectedIds.length === 0 && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Select at least one service above to see available slots.
+              </p>
+            )}
 
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {TIME_SLOTS.map((t) => {
+                const isTaken = taken.includes(t);
+                const isBlockBusy = isBlockUnavailable(t);
                 const isSelected = time === t;
 
                 // Disable ALL slots when Pre-Bridal Package is fully booked for this date
-                const isPreBridalBlocked = serviceId === "pk-prebridal" && preBridalFullyBooked;
+                const isPreBridalDisabled = hasPreBridal && preBridalFullyBooked;
+
+                // No services selected → keep slots visible but unclickable
+                const noServices = selectedIds.length === 0;
 
                 // Past time validation for today (in IST)
                 let isPastTime = false;
@@ -326,7 +455,13 @@ function BookPage() {
                   }
                 }
 
-                const isDisabled = isTaken || isBuffer || !date || isPastTime || isPreBridalBlocked;
+                const isDisabled =
+                  isTaken ||
+                  isBlockBusy ||
+                  !date ||
+                  isPastTime ||
+                  isPreBridalDisabled ||
+                  noServices;
 
                 return (
                   <button
@@ -336,15 +471,20 @@ function BookPage() {
                     onClick={() => setTime(t)}
                     className={cn(
                       "rounded-md border px-1 sm:px-2 py-2.5 text-xs sm:text-sm transition min-h-[44px]",
-                      (isTaken || isBuffer) &&
+                      (isTaken || isBlockBusy) &&
                         "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
-                      isPreBridalBlocked &&
-                        !(isTaken || isBuffer) &&
+                      isPreBridalDisabled &&
+                        !(isTaken || isBlockBusy) &&
                         "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
                       isPastTime &&
-                        !(isTaken || isBuffer) &&
-                        !isPreBridalBlocked &&
+                        !(isTaken || isBlockBusy) &&
+                        !isPreBridalDisabled &&
                         "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
+                      noServices &&
+                        !(isTaken || isBlockBusy) &&
+                        !isPreBridalDisabled &&
+                        !isPastTime &&
+                        "cursor-not-allowed opacity-40",
                       !isDisabled &&
                         !isSelected &&
                         "border-border bg-background hover:border-accent hover:text-primary",
@@ -359,22 +499,63 @@ function BookPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Right column: booking summary ── */}
         <div className="flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div>
             <div className="text-sm text-muted-foreground">Booking summary</div>
-            <dl className="mt-3 space-y-2 text-sm">
-              <Row label="Service" value={service ? service.name : "-"} />
-              <Row
-                label="Price"
-                value={
-                  service && service.price !== "On request"
-                    ? `₹${service.price}`
-                    : (service?.price ?? "-")
-                }
-              />
+
+            {/* Selected services list */}
+            {selectedServices.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground italic">No services selected yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5">
+                {selectedServices.map((svc) => (
+                  <li
+                    key={svc.id}
+                    className="flex items-center justify-between rounded-md border border-dashed border-border/60 px-2 py-1 text-sm"
+                  >
+                    <span className="flex items-center gap-1.5 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleService(svc.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label={`Remove ${svc.name}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      {svc.name}
+                    </span>
+                    <span className="ml-2 shrink-0 text-muted-foreground">
+                      {svc.price !== "On request" ? `₹${svc.price}` : "On request"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Totals */}
+            {selectedServices.length > 0 && (
+              <dl className="mt-3 space-y-1 text-sm border-t border-border/60 pt-2">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Total duration</dt>
+                  <dd className="font-medium text-foreground">{totalDuration} min</dd>
+                </div>
+                {totalPrice !== null && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Estimated total</dt>
+                    <dd className="font-semibold text-primary">₹{totalPrice}+</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+
+            {/* Date & Time row */}
+            <dl className="mt-3 space-y-2 text-sm border-t border-border/60 pt-2">
               <Row label="Date" value={date ? format(date, "PPP") : "-"} />
               <Row label="Time" value={time || "-"} />
             </dl>
+
             <div className="mt-4 flex items-start gap-2 rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">
               <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
               Payment is handled at the salon after service. No online payment required.
