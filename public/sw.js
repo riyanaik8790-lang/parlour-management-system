@@ -53,6 +53,7 @@ self.addEventListener("push", function (event) {
     badge: ICON,
     tag: data.tag || "hemangi-notification", // collapses duplicates
     renotify: true,
+    vibrate: [200, 100, 200],
     data: { url: data.url || APP_ORIGIN },
   };
 

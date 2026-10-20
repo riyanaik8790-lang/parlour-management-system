@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X, Info } from "lucide-react";
+import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X, Info, Volume2, VolumeX } from "lucide-react";
 import { api, type AppNotification, getToken } from "@/lib/api";
 import { isPushSupported, getPushPermission, subscribeToPush, isSubscribed } from "@/lib/push";
 import { toast } from "sonner";
@@ -85,21 +85,72 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   const [marking, setMarking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // ── Audio Alert Setup ────────────────────────────────────────────────────────
+  // ── Audio Alert Setup & Autoplay Unlock ─────────────────────────────────────
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevUnreadRef = useRef<number | null>(null);
+
+  // Audio unlock state: user interaction unlocks browser AudioContext via muted/zero-volume playback
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("salon_audio_unlocked") === "true";
+    }
+    return false;
+  });
 
   useEffect(() => {
     // Create HTML5 Audio instance for notification sound
     audioRef.current = new Audio("/notification-ding.mp3");
   }, []);
 
-  // Play audio alert when unread count increases (after initial mount)
+  const handleUnlockAudio = async () => {
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new Audio("/notification-ding.mp3");
+      }
+      // Play and pause at volume 0 to officially unlock the browser's AudioContext via trusted user gesture
+      const sound = audioRef.current;
+      sound.volume = 0;
+      sound.currentTime = 0;
+      await sound.play();
+      sound.pause();
+      sound.currentTime = 0;
+      sound.volume = 1;
+
+      setIsAudioUnlocked(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("salon_audio_unlocked", "true");
+      }
+      toast.success("Alert sounds enabled! 🔔");
+      console.log("[NotifBell] AudioContext unlocked successfully via user gesture ✔");
+    } catch (err) {
+      console.error("[NotifBell] Failed to unlock AudioContext:", err);
+      toast.error("Could not enable audio. Please check browser permissions.");
+    }
+  };
+
+  const toggleAudioUnlock = async () => {
+    if (isAudioUnlocked) {
+      setIsAudioUnlocked(false);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("salon_audio_unlocked", "false");
+      }
+      toast.info("Alert sounds muted.");
+    } else {
+      await handleUnlockAudio();
+    }
+  };
+
+  // Play audio alert when unread count increases (only if user has unlocked audio)
   useEffect(() => {
     if (prevUnreadRef.current !== null && unread > prevUnreadRef.current) {
-      console.log(`[NotifBell] Unread count rose ${prevUnreadRef.current} → ${unread}. Attempting audio play.`);
+      console.log(`[NotifBell] Unread count rose ${prevUnreadRef.current} → ${unread}.`);
+      if (!isAudioUnlocked) {
+        console.warn("[NotifBell] Audio playback skipped: alert sounds are locked or disabled (isAudioUnlocked=false).");
+        return;
+      }
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
+        audioRef.current.volume = 1;
         audioRef.current
           .play()
           .then(() => console.log("[NotifBell] Sound played successfully ✔"))
@@ -109,7 +160,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
       }
     }
     prevUnreadRef.current = unread;
-  }, [unread]);
+  }, [unread, isAudioUnlocked]);
 
   // Push prompt state
   // Show if: push supported + permission not yet decided + user hasn't permanently dismissed
@@ -283,6 +334,49 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
                 Mark all read
               </button>
             )}
+          </div>
+
+          {/* Sound Alert Toggle Bar (Foreground AudioContext Unlock) */}
+          <div
+            className="flex items-center justify-between border-b px-4 py-2"
+            style={{
+              borderColor: "oklch(0.91 0.025 82)",
+              background: isAudioUnlocked ? "oklch(0.985 0.008 85)" : "oklch(0.96 0.018 85)",
+            }}
+          >
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "oklch(0.40 0.05 45)" }}>
+              {isAudioUnlocked ? (
+                <Volume2 className="h-3.5 w-3.5" style={{ color: "oklch(0.42 0.18 150)" }} />
+              ) : (
+                <VolumeX className="h-3.5 w-3.5" style={{ color: "oklch(0.60 0.04 50)" }} />
+              )}
+              <span>Alert Sounds</span>
+            </div>
+            <button
+              id="enable-alert-sounds-btn"
+              onClick={toggleAudioUnlock}
+              className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all active:scale-95"
+              style={{
+                background: isAudioUnlocked
+                  ? "oklch(0.42 0.18 150 / 12%)"
+                  : `linear-gradient(135deg, ${BURGUNDY}, oklch(0.45 0.15 25))`,
+                color: isAudioUnlocked ? "oklch(0.38 0.15 150)" : "white",
+                border: isAudioUnlocked ? "1px solid oklch(0.42 0.18 150 / 30%)" : "none",
+              }}
+              title={isAudioUnlocked ? "Click to mute alert sounds" : "Click to enable and unlock alert sounds"}
+            >
+              {isAudioUnlocked ? (
+                <>
+                  <Volume2 className="h-3 w-3" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="h-3 w-3" />
+                  <span>Enable Alert Sounds</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Push enable row — inside dropdown when open */}
