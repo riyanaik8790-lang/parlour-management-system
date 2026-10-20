@@ -1,76 +1,67 @@
 /**
  * public/sw.js — Web Push Service Worker
  *
- * This file MUST live in /public/ so Vite copies it to the web root at build time.
- * It handles:
- *  - push events  → display a system notification (even when tab is not visible)
- *  - notificationclick → focus or open the app tab
+ * Handles:
+ *  - push events  → display a system notification strictly wrapped in event.waitUntil()
+ *  - notificationclick → open / focus app tab strictly wrapped in event.waitUntil()
  */
 
 const APP_ORIGIN = self.location.origin;
 const ICON = APP_ORIGIN + "/favicon.png";
 
-console.log("[SW] Service worker script loaded. Origin:", APP_ORIGIN);
-
-// ── Install: log so we know the SW file was parsed ───────────────────────────
-
-self.addEventListener("install", (event) => {
-  console.log("[SW] Install event fired — skipWaiting to activate immediately.");
+// ── Install: activate immediately ───────────────────────────────────────────
+self.addEventListener("install", function (event) {
   self.skipWaiting();
 });
 
-// ── Activate: take control immediately ───────────────────────────────────────
-
-self.addEventListener("activate", (event) => {
-  console.log("[SW] Activate event fired — claiming all clients.");
+// ── Activate: claim all clients immediately ─────────────────────────────────
+self.addEventListener("activate", function (event) {
   event.waitUntil(clients.claim());
 });
 
-// ── Push event ───────────────────────────────────────────────────────────────
-
+// ── Push Event: Mobile Keep-Alive with event.waitUntil() ─────────────────────
 self.addEventListener("push", function (event) {
-  // ── DEBUG: log raw push data ─────────────────────────────────────────────
-  const rawText = event.data ? event.data.text() : "(no data)";
-  console.log("[SW] Push received! Raw payload text:", rawText);
-
-  let data = { title: "Hemangi Makeover", body: "You have a new notification." };
+  let title = "New Alert";
+  let body = "Check your dashboard.";
+  let url = APP_ORIGIN;
+  let tag = "hemangi-notification";
 
   if (event.data) {
     try {
-      data = event.data.json();
-      console.log("[SW] Push payload parsed as JSON:", data);
-    } catch (parseErr) {
-      data.body = rawText;
-      console.warn("[SW] Push payload is not JSON, using raw text as body. Parse error:", parseErr);
+      const data = event.data.json();
+      if (data && typeof data === "object") {
+        if (data.title) title = data.title;
+        if (data.body) body = data.body;
+        if (data.url) url = data.url;
+        if (data.tag) tag = data.tag;
+      }
+    } catch (err) {
+      // If payload is plain text instead of JSON
+      try {
+        const rawText = event.data.text();
+        if (rawText) body = rawText;
+      } catch (_) {}
     }
-  } else {
-    console.warn("[SW] Push event had no data attached.");
   }
 
   const options = {
-    body: data.body || "",
+    body: body,
     icon: ICON,
     badge: ICON,
-    tag: data.tag || "hemangi-notification", // collapses duplicates
+    tag: tag,
     renotify: true,
     vibrate: [200, 100, 200],
-    data: { url: data.url || APP_ORIGIN },
+    data: { url: url },
   };
 
-  console.log("[SW] Calling showNotification with title:", data.title, "| options:", options);
-
+  // Strictly wrap showNotification inside event.waitUntil so mobile OS does not terminate the SW early
   event.waitUntil(
-    self.registration
-      .showNotification(data.title, options)
-      .then(() => console.log("[SW] showNotification() resolved ✔"))
-      .catch((err) => console.error("[SW] showNotification() FAILED:", err))
+    self.registration.showNotification(title, options)
   );
 });
 
-// ── Notification click ────────────────────────────────────────────────────────
-
-self.addEventListener("notificationclick", (event) => {
-  console.log("[SW] Notification clicked:", event.notification.title);
+// ── Notification Click: Focus or Open App ───────────────────────────────────
+self.addEventListener("notificationclick", function (event) {
   event.notification.close();
 
   const targetUrl =
@@ -78,22 +69,19 @@ self.addEventListener("notificationclick", (event) => {
       ? event.notification.data.url
       : APP_ORIGIN;
 
-  console.log("[SW] Navigating to:", targetUrl);
-
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // Focus an existing open tab if possible
-      for (const client of windowClients) {
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (windowClients) {
+      // Focus existing tab if open
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
         if (client.url === targetUrl && "focus" in client) {
-          console.log("[SW] Focusing existing tab:", client.url);
           return client.focus();
         }
       }
-      // Otherwise open a new tab
+      // Otherwise open new tab
       if (clients.openWindow) {
-        console.log("[SW] Opening new tab:", targetUrl);
         return clients.openWindow(targetUrl);
       }
-    }),
+    })
   );
 });
