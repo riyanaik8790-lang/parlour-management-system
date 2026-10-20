@@ -34,10 +34,12 @@ let _swReg: ServiceWorkerRegistration | null = null;
 export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) return null;
   try {
+    console.log("[push] Registering service worker at /sw.js …");
     _swReg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    console.log("[push] SW registered ✔ scope:", _swReg.scope, "state:", _swReg.active?.state);
     return _swReg;
   } catch (err) {
-    console.warn("[push] SW registration failed:", err);
+    console.error("[push] SW registration FAILED:", err);
     return null;
   }
 }
@@ -47,8 +49,10 @@ async function getSWReg(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) return null;
   try {
     _swReg = (await navigator.serviceWorker.getRegistration("/")) ?? null;
+    console.log("[push] getSWReg() →", _swReg ? ("found: " + _swReg.scope) : "none registered");
     return _swReg;
-  } catch {
+  } catch (err) {
+    console.error("[push] getSWReg() error:", err);
     return null;
   }
 }
@@ -70,37 +74,83 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
  * Returns 'granted' | 'denied' | 'already' | 'error'.
  */
 export async function subscribeToPush(): Promise<"granted" | "denied" | "already" | "error"> {
-  if (!isPushSupported()) return "error";
-  if (!VITE_VAPID_KEY) {
-    console.warn("[push] VITE_VAPID_PUBLIC_KEY is not set");
+  console.log("[push] subscribeToPush() called.");
+
+  if (!isPushSupported()) {
+    console.error("[push] Push NOT supported in this browser (missing serviceWorker / PushManager / Notification).");
     return "error";
   }
 
-  // Request permission — browsers only show the dialog when this is called from
-  // a user gesture, so we call it inside the "Enable" button click handler.
+  if (!VITE_VAPID_KEY) {
+    console.error("[push] VITE_VAPID_PUBLIC_KEY is not set in .env.local — push will not work.");
+    return "error";
+  }
+  console.log("[push] VAPID public key present ✔ (first 20 chars):", VITE_VAPID_KEY.slice(0, 20));
+
+  // ── Hard permission guard ──────────────────────────────────────────────────
+  if (Notification.permission === "denied") {
+    console.error("[push] Push Notifications are blocked by the browser. User must unblock in browser settings.");
+    return "denied";
+  }
+
+  // Request permission — must be called from inside a user gesture click handler.
+  console.log("[push] Current Notification.permission:", Notification.permission, "— calling requestPermission()…");
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") return "denied";
+  console.log("[push] requestPermission() result:", permission);
+
+  if (permission !== "granted") {
+    console.warn("[push] Permission not granted. Returned:", permission);
+    return "denied";
+  }
 
   try {
-    const reg = (await getSWReg()) ?? (await registerSW());
-    if (!reg) return "error";
+    // Get or register the service worker
+    let reg = await getSWReg();
+    if (!reg) {
+      console.log("[push] No existing SW registration — registering now…");
+      reg = await registerSW();
+    }
+    if (!reg) {
+      console.error("[push] Service worker registration failed — cannot subscribe to push.");
+      return "error";
+    }
+    console.log("[push] SW registration ready:", reg.scope);
 
+    // Check if already subscribed
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      console.log("[push] Already subscribed to push ✔ endpoint:", existing.endpoint.slice(0, 60) + "…");
+      // Re-POST subscription to backend in case it was lost from DB
+      const json = existing.toJSON();
+      await api.subscribePush({
+        endpoint: json.endpoint!,
+        p256dh: json.keys?.p256dh || "",
+        auth: json.keys?.auth || "",
+      });
+      return "already";
+    }
+
+    // Create new subscription
+    console.log("[push] Creating new pushManager.subscribe()…");
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VITE_VAPID_KEY) as unknown as BufferSource,
     });
+    console.log("[push] pushManager.subscribe() success ✔ endpoint:", sub.endpoint.slice(0, 60) + "…");
 
     const json = sub.toJSON();
+    console.log("[push] Sending subscription to backend — p256dh present:", !!json.keys?.p256dh, "auth present:", !!json.keys?.auth);
 
     await api.subscribePush({
       endpoint: json.endpoint!,
       p256dh: json.keys?.p256dh || "",
       auth: json.keys?.auth || "",
     });
+    console.log("[push] Subscription saved to backend ✔");
 
     return "granted";
   } catch (err) {
-    console.warn("[push] subscribe error:", err);
+    console.error("[push] subscribeToPush() caught an error:", err);
     return "error";
   }
 }
@@ -110,15 +160,23 @@ export async function subscribeToPush(): Promise<"granted" | "denied" | "already
 export async function unsubscribeFromPush(): Promise<void> {
   if (!isPushSupported()) return;
   try {
+    console.log("[push] unsubscribeFromPush() called.");
     const reg = await getSWReg();
-    if (!reg) return;
+    if (!reg) {
+      console.warn("[push] No SW registration found — nothing to unsubscribe.");
+      return;
+    }
     const sub = await reg.pushManager.getSubscription();
-    if (!sub) return;
+    if (!sub) {
+      console.warn("[push] No active push subscription found in browser.");
+      return;
+    }
     await sub.unsubscribe();
-
+    console.log("[push] Browser push subscription removed ✔");
     await api.unsubscribePush();
+    console.log("[push] Backend subscription record deleted ✔");
   } catch (err) {
-    console.warn("[push] unsubscribe error:", err);
+    console.error("[push] unsubscribeFromPush() error:", err);
   }
 }
 
@@ -130,6 +188,7 @@ export async function isSubscribed(): Promise<boolean> {
     const reg = await getSWReg();
     if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
+    console.log("[push] isSubscribed():", sub !== null);
     return sub !== null;
   } catch {
     return false;

@@ -97,18 +97,15 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   // Play audio alert when unread count increases (after initial mount)
   useEffect(() => {
     if (prevUnreadRef.current !== null && unread > prevUnreadRef.current) {
+      console.log(`[NotifBell] Unread count rose ${prevUnreadRef.current} → ${unread}. Attempting audio play.`);
       if (audioRef.current) {
-        try {
-          audioRef.current.currentTime = 0;
-          const playPromise = audioRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(() => {
-              // Browser autoplay policy prevented audio without prior user gesture; catch silently
-            });
-          }
-        } catch {
-          // Silently catch synchronous playback errors
-        }
+        audioRef.current.currentTime = 0;
+        audioRef.current
+          .play()
+          .then(() => console.log("[NotifBell] Sound played successfully ✔"))
+          .catch((err) => console.error("[NotifBell] Audio blocked/error:", err));
+      } else {
+        console.warn("[NotifBell] audioRef.current is null — Audio element not initialised.");
       }
     }
     prevUnreadRef.current = unread;

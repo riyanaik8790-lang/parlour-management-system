@@ -781,8 +781,18 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
     Any per-subscription error is caught and logged; stale 410/404 subscriptions
     are removed automatically. Never raises — push is always additive.
     """
-    if not PUSH_AVAILABLE or not VAPID_PRIVATE_KEY:
+    print(f"[push] _send_push() called — user_id={user_id}, title={title!r}")
+
+    if not PUSH_AVAILABLE:
+        print("[push] SKIPPED — pywebpush is not installed (PUSH_AVAILABLE=False).")
         return
+    if not VAPID_PRIVATE_KEY:
+        print("[push] SKIPPED — VAPID_PRIVATE_KEY is empty. Check backend .env file.")
+        return
+
+    print(f"[push] VAPID_CLAIMS_EMAIL={VAPID_CLAIMS_EMAIL!r}")
+    print(f"[push] VAPID_PUBLIC_KEY (first 20 chars): {VAPID_PUBLIC_KEY[:20]!r}")
+
     try:
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
@@ -792,14 +802,21 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
         subs = cur.fetchall()
         cur.close()
     except Exception as e:
-        print(f"[push] DB read error: {e}")
+        print(f"[push] DB read error for user_id={user_id}: {e}")
+        return
+
+    print(f"[push] Found {len(subs)} subscription(s) for user_id={user_id}.")
+    if not subs:
+        print(f"[push] No subscriptions found — user has not subscribed or subscription was deleted.")
         return
 
     import json as _json
     payload = _json.dumps({"title": title, "body": body, "url": url})
+    print(f"[push] Payload JSON: {payload}")
     stale_ids = []
 
     for sub in subs:
+        print(f"[push] Sending to sub id={sub['id']}, endpoint={sub['endpoint'][:60]}…")
         try:
             webpush(
                 subscription_info={
@@ -810,17 +827,27 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
             )
+            print(f"[push] ✔ Push sent successfully to sub id={sub['id']}")
         except WebPushException as e:
             status = getattr(e.response, "status_code", None)
+            resp_text = ""
+            try:
+                resp_text = e.response.text[:200] if e.response else ""
+            except Exception:
+                pass
+            print(f"[push] ✘ WebPushException for sub id={sub['id']}: status={status}, error={e}, response_body={resp_text!r}")
             if status in (404, 410):
-                # Subscription expired / user unsubscribed from browser side
+                print(f"[push] Subscription id={sub['id']} is stale (HTTP {status}) — will delete.")
                 stale_ids.append(sub["id"])
-            else:
-                print(f"[push] send error for sub {sub['id']}: {e}")
+            elif status == 401:
+                print(f"[push] HTTP 401 — VAPID key mismatch or expired. Check VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY in .env.")
+            elif status == 400:
+                print(f"[push] HTTP 400 — Bad push request. Likely malformed payload or subscription keys.")
         except Exception as e:
-            print(f"[push] unexpected error for sub {sub['id']}: {e}")
+            print(f"[push] ✘ Unexpected error for sub id={sub['id']}: {type(e).__name__}: {e}")
 
     if stale_ids:
+        print(f"[push] Removing {len(stale_ids)} stale subscription(s): {stale_ids}")
         try:
             cur2 = db.cursor()
             cur2.executemany(
@@ -829,8 +856,10 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
             )
             db.commit()
             cur2.close()
-        except Exception:
-            pass
+            print(f"[push] Stale subscriptions removed ✔")
+        except Exception as e:
+            print(f"[push] Failed to remove stale subscriptions: {e}")
+
 
 
 # ── VAPID public key endpoint (no auth required — public information) ─────────
