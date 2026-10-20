@@ -718,7 +718,7 @@ def book():
             svc_display = ", ".join(service_names) if service_names else primary_service_id
             customer_name = g.current_user["name"]
             db_msg = f"New booking: {customer_name} booked {svc_display} on {date_str} at {time_str}"
-            push_body = f"{customer_name} booked {svc_display} on {date_str} at {time_str}."
+            push_body = f"{customer_name} booked {svc_display} at {time_str}"
             cur2 = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur2.execute("SELECT id FROM users WHERE role = 'ADMIN'")
             admins = cur2.fetchall()
@@ -729,9 +729,9 @@ def book():
                 )
             db.commit()
             cur2.close()
-            # Instant push to each admin — title/body match the requested format exactly
+            # Instant push to each admin — short, punchy title and body
             for admin in admins:
-                _send_push(db, admin["id"], "New Booking!", push_body, "/admin")
+                _send_push(db, admin["id"], "New Appointment!", push_body, "/admin")
             # Confirmation push to the customer who just booked
             _send_push(
                 db,

@@ -1,13 +1,16 @@
 /**
  * public/sw.js — Web Push Service Worker
  *
- * Handles:
- *  - push events  → display a system notification strictly wrapped in event.waitUntil()
- *  - notificationclick → open / focus app tab strictly wrapped in event.waitUntil()
+ * Professional rich notification configuration:
+ *  - High-res logo icon & Android monochrome status-bar badge
+ *  - Short punchy title and clean body
+ *  - Interactive Action buttons ('View Dashboard')
+ *  - Reliable event.waitUntil keep-alive
  */
 
 const APP_ORIGIN = self.location.origin;
-const ICON = APP_ORIGIN + "/favicon.png";
+const LOGO_ICON = APP_ORIGIN + "/logo.png";
+const STATUS_BADGE = APP_ORIGIN + "/badge.png";
 
 // ── Install: activate immediately ───────────────────────────────────────────
 self.addEventListener("install", function (event) {
@@ -19,12 +22,14 @@ self.addEventListener("activate", function (event) {
   event.waitUntil(clients.claim());
 });
 
-// ── Push Event: Mobile Keep-Alive with event.waitUntil() ─────────────────────
+// ── Push Event: Rich Notification Configuration ─────────────────────────────
 self.addEventListener("push", function (event) {
-  let title = "New Alert";
-  let body = "Check your dashboard.";
-  let url = APP_ORIGIN;
-  let tag = "hemangi-notification";
+  let title = "New Appointment!";
+  let body = "A new appointment has been booked.";
+  let url = APP_ORIGIN + "/admin";
+  let tag = "hemangi-appointment";
+  let icon = LOGO_ICON;
+  let badge = STATUS_BADGE;
 
   if (event.data) {
     try {
@@ -34,9 +39,11 @@ self.addEventListener("push", function (event) {
         if (data.body) body = data.body;
         if (data.url) url = data.url;
         if (data.tag) tag = data.tag;
+        if (data.icon) icon = data.icon;
+        if (data.badge) badge = data.badge;
       }
     } catch (err) {
-      // If payload is plain text instead of JSON
+      // Plain text fallback
       try {
         const rawText = event.data.text();
         if (rawText) body = rawText;
@@ -46,39 +53,54 @@ self.addEventListener("push", function (event) {
 
   const options = {
     body: body,
-    icon: ICON,
-    badge: ICON,
+    icon: icon,
+    badge: badge,
     tag: tag,
     renotify: true,
     vibrate: [200, 100, 200],
-    data: { url: url },
+    data: {
+      url: url,
+    },
+    actions: [
+      {
+        action: "open_dashboard",
+        title: "View Dashboard",
+      },
+    ],
   };
 
-  // Strictly wrap showNotification inside event.waitUntil so mobile OS does not terminate the SW early
   event.waitUntil(
     self.registration.showNotification(title, options)
   );
 });
 
-// ── Notification Click: Focus or Open App ───────────────────────────────────
+// ── Notification Click: Handle Action Buttons & Keep-Alive ──────────────────
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
 
-  const targetUrl =
+  let targetUrl =
     event.notification.data && event.notification.data.url
       ? event.notification.data.url
-      : APP_ORIGIN;
+      : APP_ORIGIN + "/admin";
+
+  // If user clicked the 'View Dashboard' action button explicitly
+  if (event.action === "open_dashboard") {
+    targetUrl = APP_ORIGIN + "/admin";
+  }
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (windowClients) {
       // Focus existing tab if open
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        if (client.url === targetUrl && "focus" in client) {
+        if (client.url.startsWith(APP_ORIGIN) && "focus" in client) {
+          if ("navigate" in client && client.url !== targetUrl) {
+            client.navigate(targetUrl);
+          }
           return client.focus();
         }
       }
-      // Otherwise open new tab
+      // Otherwise open a new window/tab
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
