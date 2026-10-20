@@ -474,10 +474,11 @@ def update_profile():
         if push_enabled is not None:
             updates.append("push_enabled = %s")
             values.append(bool(push_enabled))
-        if avatar_url is not None:
-            # Accepts a full HTTPS URL string or null to remove the avatar
+        if "avatar_url" in data:
+            # Accepts a full HTTPS URL string or None/null to remove the avatar
+            val = data.get("avatar_url")
             updates.append("avatar_url = %s")
-            values.append(str(avatar_url).strip() if avatar_url else None)
+            values.append(str(val).strip() if val else None)
 
         if not updates:
             cur.close()

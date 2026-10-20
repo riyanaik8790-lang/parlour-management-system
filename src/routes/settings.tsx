@@ -253,15 +253,38 @@ function SettingsPage() {
 
     setIsUploading(true);
     try {
-      // 1. Delete file(s) from Supabase Storage avatars bucket if present
-      const extensions = ["jpg", "jpeg", "png", "webp", "gif"];
-      const filesToRemove = extensions.map((ext) => `${user.id}/avatar.${ext}`);
-      await supabase.storage.from(AVATAR_BUCKET).remove(filesToRemove);
+      // 1. Delete from Supabase Storage avatars bucket using extracted filePath or user prefix
+      if (avatarUrl) {
+        try {
+          // Extract file path from publicUrl (e.g. .../avatars/user-id/avatar.jpg -> user-id/avatar.jpg)
+          const urlObj = new URL(avatarUrl.split("?")[0]);
+          const parts = urlObj.pathname.split(`/${AVATAR_BUCKET}/`);
+          if (parts[1]) {
+            const filePath = decodeURIComponent(parts[1]);
+            await supabase.storage.from(AVATAR_BUCKET).remove([filePath]);
+          }
+        } catch {
+          // Fallback to removing standard user avatars
+          const extensions = ["jpg", "jpeg", "png", "webp", "gif"];
+          const filesToRemove = extensions.map((ext) => `${user.id}/avatar.${ext}`);
+          await supabase.storage.from(AVATAR_BUCKET).remove(filesToRemove);
+        }
+      }
 
-      // 2. Set avatar_url to null in backend database
+      // 2. Direct Supabase / Backend database update to set avatar_url: null
+      try {
+        await supabase
+          .from("users")
+          .update({ avatar_url: null })
+          .eq("id", user.id);
+      } catch {
+        /* fallback to backend api if direct table RLS is restricted */
+      }
+
+      // Also sync through backend API endpoint
       await api.updateProfile({ avatar_url: null });
 
-      // 3. Update React state immediately to show initials fallback
+      // 3. Update React state immediately so UI switches back to initials fallback
       setAvatarUrl(null);
       toast.success("Profile photo removed");
     } catch (err) {
