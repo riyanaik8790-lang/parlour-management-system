@@ -21,8 +21,10 @@ import {
   Settings as SettingsIcon,
   Bell,
   Download,
-  FileText,
   Camera,
+  Pencil,
+  ExternalLink,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -92,10 +94,31 @@ function SettingsPage() {
   const [role, setRole] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const avatarContainerRef = useRef<HTMLDivElement>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [savingPush, setSavingPush] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+
+  // Close avatar dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        avatarContainerRef.current &&
+        !avatarContainerRef.current.contains(e.target as Node)
+      ) {
+        setIsAvatarMenuOpen(false);
+      }
+    }
+    if (isAvatarMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isAvatarMenuOpen]);
 
   // Info save state
   const [savingInfo, setSavingInfo] = useState(false);
@@ -207,9 +230,37 @@ function SettingsPage() {
       await api.updateAvatarUrl(publicUrl);
 
       setAvatarUrl(`${publicUrl}?t=${Date.now()}`);
+      setIsAvatarMenuOpen(false);
       toast.success("Profile photo updated!");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed";
+      toast.error(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  // ── Remove photo ───────────────────────────────────────────────────────────
+  async function handleRemoveAvatar() {
+    setIsAvatarMenuOpen(false);
+    const user = getUser();
+    if (!user) return;
+
+    setIsUploading(true);
+    try {
+      // 1. Delete file(s) from Supabase Storage avatars bucket if present
+      const extensions = ["jpg", "jpeg", "png", "webp", "gif"];
+      const filesToRemove = extensions.map((ext) => `${user.id}/avatar.${ext}`);
+      await supabase.storage.from(AVATAR_BUCKET).remove(filesToRemove);
+
+      // 2. Set avatar_url to null in backend database
+      await api.updateProfile({ avatar_url: null });
+
+      // 3. Update React state immediately to show initials fallback
+      setAvatarUrl(null);
+      toast.success("Profile photo removed");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to remove photo";
       toast.error(msg);
     } finally {
       setIsUploading(false);
@@ -461,12 +512,15 @@ function SettingsPage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Avatar Upload Section */}
+                    {/* Avatar with Google-style dropdown menu */}
                     <div className="flex flex-col items-center justify-center pb-2">
-                      <div className="relative">
+                      <div ref={avatarContainerRef} className="relative">
+                        {/* Circle Avatar (clickable to toggle menu) */}
                         <div
-                          className="h-24 w-24 rounded-full overflow-hidden shadow-md ring-4"
+                          onClick={() => !isUploading && setIsAvatarMenuOpen((prev) => !prev)}
+                          className="h-24 w-24 rounded-full overflow-hidden shadow-md ring-4 cursor-pointer transition-transform hover:opacity-95"
                           style={{ ringColor: "oklch(0.88 0.030 82)" }}
+                          title="Click to manage profile photo"
                         >
                           {avatarUrl ? (
                             <img
@@ -497,43 +551,116 @@ function SettingsPage() {
                           )}
                         </div>
 
-                        {/* Camera upload button */}
+                        {/* Circular Pencil Icon button at bottom-right */}
                         <button
                           type="button"
                           disabled={isUploading}
-                          onClick={() => fileInputRef.current?.click()}
-                          aria-label="Upload profile photo"
-                          className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
-                          style={{
-                            background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
-                            border: "2px solid oklch(0.968 0.018 85)",
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsAvatarMenuOpen((prev) => !prev);
                           }}
+                          aria-label="Edit profile photo"
+                          className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md p-1 border transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+                          style={{ borderColor: "oklch(0.88 0.030 82)" }}
                         >
-                          <Camera className="h-3.5 w-3.5 text-white" />
+                          <Pencil className="h-4 w-4" style={{ color: BURGUNDY }} />
                         </button>
 
+                        {/* Hidden standard file picker (Upload photo) */}
                         <input
                           ref={fileInputRef}
                           type="file"
                           accept="image/*"
                           className="hidden"
                           onChange={handleAvatarChange}
-                          aria-label="Choose avatar image"
+                          aria-label="Upload photo"
                         />
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading}
-                        className="mt-2.5 text-xs font-semibold hover:underline"
-                        style={{ color: BURGUNDY }}
-                      >
-                        {isUploading ? "Uploading photo..." : "Change photo"}
-                      </button>
-                      <p className="text-[11px]" style={{ color: "oklch(0.60 0.04 55)" }}>
-                        Max size: 2 MB (JPG, PNG, WebP)
-                      </p>
+                        {/* Hidden camera capture input (Take photo - opens front camera on mobile) */}
+                        <input
+                          ref={cameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          className="hidden"
+                          onChange={handleAvatarChange}
+                          aria-label="Take photo with camera"
+                        />
+
+                        {/* Google-style Dropdown Menu */}
+                        {isAvatarMenuOpen && (
+                          <div
+                            className="absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl border animate-fade-up"
+                            style={{ borderColor: "oklch(0.88 0.030 82)" }}
+                          >
+                            <div className="space-y-1">
+                              {/* 1. View photo */}
+                              {avatarUrl ? (
+                                <a
+                                  href={avatarUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => setIsAvatarMenuOpen(false)}
+                                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                                >
+                                  <ExternalLink className="h-4 w-4 text-gray-500" />
+                                  <span>View photo</span>
+                                </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-400 cursor-not-allowed"
+                                >
+                                  <ExternalLink className="h-4 w-4 text-gray-300" />
+                                  <span>View photo</span>
+                                </button>
+                              )}
+
+                              {/* 2. Take photo */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsAvatarMenuOpen(false);
+                                  cameraInputRef.current?.click();
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                              >
+                                <Camera className="h-4 w-4 text-gray-500" />
+                                <span>Take photo</span>
+                              </button>
+
+                              {/* 3. Upload photo */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsAvatarMenuOpen(false);
+                                  fileInputRef.current?.click();
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                              >
+                                <ImageIcon className="h-4 w-4 text-gray-500" />
+                                <span>Upload photo</span>
+                              </button>
+
+                              {/* 4. Remove photo */}
+                              {avatarUrl && (
+                                <>
+                                  <div className="my-1 border-t" style={{ borderColor: "oklch(0.92 0.02 85)" }} />
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveAvatar}
+                                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-rose-500" />
+                                    <span>Remove photo</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <form onSubmit={saveInfo} className="space-y-4">
