@@ -457,16 +457,21 @@ function ProfilePage() {
                     Email Address
                   </label>
                   <div
-                    className="flex items-center gap-2 rounded-xl px-3 py-3"
+                    className="relative flex items-center rounded-xl"
                     style={{
                       background: "oklch(0.93 0.020 83 / 40%)",
                       border: "1px solid oklch(0.88 0.030 82)",
                     }}
                   >
-                    <span className="text-sm" style={{ color: "oklch(0.65 0.04 50)" }}>
-                      {email}
-                    </span>
-                    <span className="ml-auto text-xs" style={{ color: "oklch(0.70 0.04 50)" }}>
+                    <input
+                      type="email"
+                      value={email}
+                      readOnly
+                      disabled
+                      className="w-full bg-transparent px-3 py-3 pr-28 sm:pr-32 truncate text-sm outline-none cursor-not-allowed"
+                      style={{ color: "oklch(0.65 0.04 50)" }}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-gray-400 whitespace-nowrap pointer-events-none">
                       Cannot change
                     </span>
                   </div>
