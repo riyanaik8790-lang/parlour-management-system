@@ -95,8 +95,8 @@ function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const avatarContainerRef = useRef<HTMLDivElement>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [savingPush, setSavingPush] = useState(false);
@@ -179,8 +179,7 @@ function SettingsPage() {
   // ── Avatar upload ──────────────────────────────────────────────────────────
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!fileInputRef.current) return;
-    fileInputRef.current.value = "";
+    e.target.value = "";
 
     if (!file) return;
 
@@ -566,25 +565,25 @@ function SettingsPage() {
                           <Pencil className="h-4 w-4" style={{ color: BURGUNDY }} />
                         </button>
 
-                        {/* Hidden standard file picker (Upload photo) */}
+                        {/* Hidden camera capture input (Take photo - forces front camera) */}
                         <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarChange}
-                          aria-label="Upload photo"
-                        />
-
-                        {/* Hidden camera capture input (Take photo - opens front camera on mobile) */}
-                        <input
-                          ref={cameraInputRef}
+                          ref={cameraRef}
                           type="file"
                           accept="image/*"
                           capture="user"
-                          className="hidden"
+                          hidden
                           onChange={handleAvatarChange}
                           aria-label="Take photo with camera"
+                        />
+
+                        {/* Hidden standard gallery file input (Upload photo - opens gallery/files) */}
+                        <input
+                          ref={galleryRef}
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={handleAvatarChange}
+                          aria-label="Upload photo from files"
                         />
 
                         {/* Google-style Dropdown Menu */}
@@ -622,7 +621,7 @@ function SettingsPage() {
                                 type="button"
                                 onClick={() => {
                                   setIsAvatarMenuOpen(false);
-                                  cameraInputRef.current?.click();
+                                  cameraRef.current?.click();
                                 }}
                                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                               >
@@ -635,7 +634,7 @@ function SettingsPage() {
                                 type="button"
                                 onClick={() => {
                                   setIsAvatarMenuOpen(false);
-                                  fileInputRef.current?.click();
+                                  galleryRef.current?.click();
                                 }}
                                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                               >
