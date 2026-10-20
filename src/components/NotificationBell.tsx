@@ -102,82 +102,60 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     audioRef.current = new Audio("/notification-ding.mp3");
   }, []);
 
-  // Play crisp notification chime (Web Audio API primary, HTML5 Audio fallback)
-  const playChime = useCallback(() => {
+  // Helper to play /notification-ding.mp3 and trigger device vibration
+  const playAlertSoundAndVibrate = useCallback(() => {
+    // 1. Play custom HTML5 notification sound
     try {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        if (ctx.state === "suspended") {
-          ctx.resume();
-        }
-        const now = ctx.currentTime;
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc1.type = "sine";
-        osc1.frequency.setValueAtTime(1046.5, now); // C6
-        osc1.frequency.exponentialRampToValueAtTime(1318.51, now + 0.08); // E6
-
-        osc2.type = "sine";
-        osc2.frequency.setValueAtTime(2093.0, now); // C7 overtone
-
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.35, now + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-
-        osc1.connect(gain);
-        osc2.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + 0.55);
-        osc2.stop(now + 0.55);
-        console.log("[NotifBell] Chime played successfully ✔");
-        return true;
+      if (!audioRef.current) {
+        audioRef.current = new Audio("/notification-ding.mp3");
       }
-    } catch (e) {
-      console.warn("[NotifBell] Web Audio chime note failed, trying HTML5 Audio fallback:", e);
-    }
-
-    if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.volume = 1;
       audioRef.current
         .play()
-        .then(() => console.log("[NotifBell] HTML5 Sound played successfully ✔"))
-        .catch((err) => console.warn("[NotifBell] HTML5 Audio play error:", err));
-      return true;
+        .then(() => console.log("[NotifBell] /notification-ding.mp3 played successfully ✔"))
+        .catch((err) => console.error("[NotifBell] Audio play error:", err));
+    } catch (err) {
+      console.error("[NotifBell] Failed to play audio:", err);
     }
-    return false;
+
+    // 2. Trigger physical device vibration
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate([200, 100, 200]);
+      console.log("[NotifBell] Device vibration triggered: [200, 100, 200] ✔");
+    }
   }, []);
 
   const handleUnlockAudio = async () => {
     try {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        if (ctx.state === "suspended") {
-          await ctx.resume();
-        }
+      if (!audioRef.current) {
+        audioRef.current = new Audio("/notification-ding.mp3");
       }
-    } catch (_) {}
+      // Play audio file directly via user interaction to bypass browser autoplay policies
+      audioRef.current.currentTime = 0;
+      audioRef.current.volume = 1;
+      await audioRef.current.play();
 
-    // Play confirmation chime
-    playChime();
+      // Trigger test vibration
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+      }
 
-    setIsAudioUnlocked(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("salon_audio_unlocked", "true");
+      setIsAudioUnlocked(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("salon_audio_unlocked", "true");
+      }
+      toast.success("Alert sounds & vibration enabled! 🔔");
+      console.log("[NotifBell] Audio unlocked via trusted user interaction ✔");
+    } catch (err) {
+      console.error("[NotifBell] Failed to unlock audio:", err);
+      // Still enable the state so subsequent real notifications attempt to play
+      setIsAudioUnlocked(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("salon_audio_unlocked", "true");
+      }
+      toast.success("Alert sounds enabled! 🔔");
     }
-    toast.success("Alert sounds enabled! 🔔");
-    console.log("[NotifBell] Audio unlocked successfully via user gesture ✔");
   };
 
   const toggleAudioUnlock = async () => {
@@ -192,18 +170,33 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     }
   };
 
-  // Play audio alert when unread count increases (only if user has unlocked audio)
+  // Play audio alert and vibrate when a new booking arrives (unread count increases)
   useEffect(() => {
     if (prevUnreadRef.current !== null && unread > prevUnreadRef.current) {
-      console.log(`[NotifBell] Unread count rose ${prevUnreadRef.current} → ${unread}.`);
-      if (!isAudioUnlocked) {
-        console.warn("[NotifBell] Audio playback skipped: alert sounds are locked or muted (isAudioUnlocked=false).");
-        return;
+      console.log(`[NotifBell] New booking arrived! Unread count rose ${prevUnreadRef.current} → ${unread}.`);
+      if (isAudioUnlocked) {
+        playAlertSoundAndVibrate();
+      } else {
+        console.warn("[NotifBell] Alert sounds are locked or muted. Click 'Enable Alert Sounds' to unlock.");
       }
-      playChime();
     }
     prevUnreadRef.current = unread;
-  }, [unread, isAudioUnlocked, playChime]);
+  }, [unread, isAudioUnlocked, playAlertSoundAndVibrate]);
+
+  // Listen for Service Worker push messages when the app tab is open in foreground
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "BOOKING_NOTIFICATION") {
+        console.log("[NotifBell] Foreground push message from Service Worker received:", event.data);
+        if (isAudioUnlocked) {
+          playAlertSoundAndVibrate();
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [isAudioUnlocked, playAlertSoundAndVibrate]);
 
   // Push prompt state
   // Show if: push supported + permission not yet decided + user hasn't permanently dismissed

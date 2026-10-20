@@ -70,7 +70,14 @@ self.addEventListener("push", function (event) {
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    Promise.all([
+      self.registration.showNotification(title, options),
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (windowClients) {
+        windowClients.forEach(function (client) {
+          client.postMessage({ type: "BOOKING_NOTIFICATION", title: title, body: body });
+        });
+      }),
+    ])
   );
 });
 
