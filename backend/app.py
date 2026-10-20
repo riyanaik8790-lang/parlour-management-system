@@ -480,7 +480,16 @@ def update_profile():
             updates.append("avatar_url = %s")
             values.append(str(val).strip() if val else None)
 
-        if not updates:
+        # Handle multi-device push subscription if passed in profile payload
+        push_sub = data.get("push_subscription") or data.get("push_subscriptions")
+        if push_sub:
+            if isinstance(push_sub, list):
+                for s in push_sub:
+                    _add_or_update_user_push_sub(db, user["id"], s)
+            elif isinstance(push_sub, dict):
+                _add_or_update_user_push_sub(db, user["id"], push_sub)
+
+        if not updates and not push_sub:
             cur.close()
             return jsonify({"error": "Nothing to update"}), 400
 
@@ -775,11 +784,163 @@ def book():
 # ---------------------------------------------------------------------------
 
 
+def _normalize_subscription_obj(sub_data: dict) -> dict:
+    """Normalize a subscription dictionary to have endpoint, p256dh, and auth."""
+    if not isinstance(sub_data, dict):
+        return {}
+    endpoint = (sub_data.get("endpoint") or "").strip()
+    keys = sub_data.get("keys") or {}
+    p256dh = (sub_data.get("p256dh") or (keys.get("p256dh") if isinstance(keys, dict) else "") or "").strip()
+    auth = (sub_data.get("auth") or (keys.get("auth") if isinstance(keys, dict) else "") or "").strip()
+    if not endpoint or not p256dh or not auth:
+        return {}
+    return {
+        "endpoint": endpoint,
+        "p256dh": p256dh,
+        "auth": auth,
+        "keys": {"p256dh": p256dh, "auth": auth},
+    }
+
+
+def _add_or_update_user_push_sub(db, user_id: int, sub_input: dict) -> bool:
+    """
+    Saves a push subscription without overwriting other devices.
+    Appends to users.push_subscriptions array and syncs with push_subscriptions table.
+    """
+    normalized = _normalize_subscription_obj(sub_input)
+    if not normalized:
+        return False
+
+    endpoint = normalized["endpoint"]
+    p256dh = normalized["p256dh"]
+    auth = normalized["auth"]
+
+    try:
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # 1. Update push_subscriptions table (unique per endpoint)
+        cur.execute(
+            """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+               VALUES (%s, %s, %s, %s)
+               ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth""",
+            (user_id, endpoint, p256dh, auth),
+        )
+
+        # 2. Update users table push_subscriptions array
+        cur.execute(
+            "SELECT push_subscriptions, push_subscription FROM users WHERE id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+        raw_subs = row.get("push_subscriptions") or row.get("push_subscription") or []
+
+        import json as _json
+        if isinstance(raw_subs, str):
+            try:
+                raw_subs = _json.loads(raw_subs)
+            except Exception:
+                raw_subs = []
+        if isinstance(raw_subs, dict):
+            raw_subs = [raw_subs]
+        elif not isinstance(raw_subs, list):
+            raw_subs = []
+
+        # Check if endpoint already exists in the array
+        exists = False
+        new_list = []
+        for s in raw_subs:
+            if isinstance(s, dict) and s.get("endpoint") == endpoint:
+                new_list.append(normalized)
+                exists = True
+            elif isinstance(s, dict) and s.get("endpoint"):
+                new_list.append(s)
+
+        if not exists:
+            new_list.append(normalized)
+
+        json_str = _json.dumps(new_list)
+        cur.execute(
+            """UPDATE users
+               SET push_subscriptions = %s::jsonb,
+                   push_subscription  = %s::jsonb,
+                   push_enabled       = true
+               WHERE id = %s""",
+            (json_str, json_str, user_id),
+        )
+        db.commit()
+        cur.close()
+        print(f"[push] Device subscription saved for user_id={user_id}. Total active devices: {len(new_list)}")
+        return True
+    except Exception as e:
+        print(f"[push] Error saving subscription for user_id={user_id}: {e}")
+        db.rollback()
+        return False
+
+
+def _remove_user_push_sub(db, user_id: int, endpoint: str = None) -> bool:
+    """
+    Removes a specific device subscription, or all subscriptions if endpoint is None.
+    Keeps push_enabled = true if user still has other active devices registered.
+    """
+    try:
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        import json as _json
+        if endpoint:
+            ep_clean = endpoint.strip()
+            cur.execute(
+                "DELETE FROM push_subscriptions WHERE user_id = %s AND endpoint = %s",
+                (user_id, ep_clean),
+            )
+            # Remove from users.push_subscriptions
+            cur.execute("SELECT push_subscriptions FROM users WHERE id = %s", (user_id,))
+            row = cur.fetchone() or {}
+            raw_subs = row.get("push_subscriptions") or []
+            if isinstance(raw_subs, str):
+                try:
+                    raw_subs = _json.loads(raw_subs)
+                except Exception:
+                    raw_subs = []
+            if isinstance(raw_subs, dict):
+                raw_subs = [raw_subs]
+            elif not isinstance(raw_subs, list):
+                raw_subs = []
+
+            remaining = [s for s in raw_subs if isinstance(s, dict) and s.get("endpoint") != ep_clean]
+            still_enabled = len(remaining) > 0
+            json_str = _json.dumps(remaining)
+            cur.execute(
+                """UPDATE users
+                   SET push_subscriptions = %s::jsonb,
+                       push_subscription  = %s::jsonb,
+                       push_enabled       = %s
+                   WHERE id = %s""",
+                (json_str, json_str, still_enabled, user_id),
+            )
+            print(f"[push] Removed subscription for endpoint {ep_clean[:40]}… Remaining devices: {len(remaining)}")
+        else:
+            cur.execute("DELETE FROM push_subscriptions WHERE user_id = %s", (user_id,))
+            cur.execute(
+                """UPDATE users
+                   SET push_subscriptions = '[]'::jsonb,
+                       push_subscription  = '[]'::jsonb,
+                       push_enabled       = false
+                   WHERE id = %s""",
+                (user_id,),
+            )
+            print(f"[push] Removed all subscriptions for user_id={user_id}")
+        db.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        print(f"[push] Error removing subscription for user_id={user_id}: {e}")
+        db.rollback()
+        return False
+
+
 def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
     """
     Send a browser push notification to every stored subscription for user_id.
-    Any per-subscription error is caught and logged; stale 410/404 subscriptions
-    are removed automatically. Never raises — push is always additive.
+    Broadcasts across all user devices (laptops, phones, tablets).
+    If a subscription fails with 404/410 Gone, prunes it immediately from database.
     """
     print(f"[push] _send_push() called — user_id={user_id}, title={title!r}")
 
@@ -790,44 +951,85 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
         print("[push] SKIPPED — VAPID_PRIVATE_KEY is empty. Check backend .env file.")
         return
 
-    print(f"[push] VAPID_CLAIMS_EMAIL={VAPID_CLAIMS_EMAIL!r}")
-    print(f"[push] VAPID_PUBLIC_KEY (first 20 chars): {VAPID_PUBLIC_KEY[:20]!r}")
+    all_subs = []
+    seen_endpoints = set()
 
     try:
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # 1. Fetch from push_subscriptions table
         cur.execute(
             "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = %s",
             (user_id,),
         )
-        subs = cur.fetchall()
+        for row in cur.fetchall():
+            ep = row["endpoint"]
+            if ep and ep not in seen_endpoints:
+                seen_endpoints.add(ep)
+                all_subs.append({
+                    "id": row["id"],
+                    "endpoint": ep,
+                    "p256dh": row["p256dh"],
+                    "auth": row["auth"],
+                })
+
+        # 2. Fetch from users.push_subscriptions / push_subscription array (backup & sync)
+        cur.execute(
+            "SELECT push_subscriptions, push_subscription FROM users WHERE id = %s",
+            (user_id,),
+        )
+        u_row = cur.fetchone() or {}
         cur.close()
+
+        import json as _json
+        user_subs = u_row.get("push_subscriptions") or u_row.get("push_subscription") or []
+        if isinstance(user_subs, str):
+            try:
+                user_subs = _json.loads(user_subs)
+            except Exception:
+                user_subs = []
+        if isinstance(user_subs, dict):
+            user_subs = [user_subs]
+        elif not isinstance(user_subs, list):
+            user_subs = []
+
+        for item in user_subs:
+            normalized = _normalize_subscription_obj(item)
+            if normalized and normalized["endpoint"] not in seen_endpoints:
+                seen_endpoints.add(normalized["endpoint"])
+                all_subs.append({
+                    "id": None,
+                    "endpoint": normalized["endpoint"],
+                    "p256dh": normalized["p256dh"],
+                    "auth": normalized["auth"],
+                })
     except Exception as e:
         print(f"[push] DB read error for user_id={user_id}: {e}")
         return
 
-    print(f"[push] Found {len(subs)} subscription(s) for user_id={user_id}.")
-    if not subs:
-        print(f"[push] No subscriptions found — user has not subscribed or subscription was deleted.")
+    print(f"[push] Found {len(all_subs)} subscription(s) across all devices for user_id={user_id}.")
+    if not all_subs:
+        print(f"[push] No subscriptions found — user has no active push devices.")
         return
 
     import json as _json
     payload = _json.dumps({"title": title, "body": body, "url": url})
-    print(f"[push] Payload JSON: {payload}")
-    stale_ids = []
+    stale_endpoints = []
 
-    for sub in subs:
-        print(f"[push] Sending to sub id={sub['id']}, endpoint={sub['endpoint'][:60]}…")
+    # Broadcast to all registered devices
+    for sub in all_subs:
+        ep = sub["endpoint"]
+        print(f"[push] Sending push to device endpoint={ep[:60]}…")
         try:
             webpush(
                 subscription_info={
-                    "endpoint": sub["endpoint"],
+                    "endpoint": ep,
                     "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
                 },
                 data=payload,
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
             )
-            print(f"[push] ✔ Push sent successfully to sub id={sub['id']}")
+            print(f"[push] ✔ Push sent successfully to device {ep[:60]}")
         except WebPushException as e:
             status = getattr(e.response, "status_code", None)
             resp_text = ""
@@ -835,30 +1037,22 @@ def _send_push(db, user_id: int, title: str, body: str, url: str = "/") -> None:
                 resp_text = e.response.text[:200] if e.response else ""
             except Exception:
                 pass
-            print(f"[push] ✘ WebPushException for sub id={sub['id']}: status={status}, error={e}, response_body={resp_text!r}")
+            print(f"[push] ✘ WebPushException: status={status}, error={e}, response_body={resp_text!r}")
             if status in (404, 410):
-                print(f"[push] Subscription id={sub['id']} is stale (HTTP {status}) — will delete.")
-                stale_ids.append(sub["id"])
+                print(f"[push] Device subscription is stale (HTTP {status} Gone) — marking for removal.")
+                stale_endpoints.append(ep)
             elif status == 401:
-                print(f"[push] HTTP 401 — VAPID key mismatch or expired. Check VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY in .env.")
+                print(f"[push] HTTP 401 — VAPID key mismatch or expired.")
             elif status == 400:
-                print(f"[push] HTTP 400 — Bad push request. Likely malformed payload or subscription keys.")
+                print(f"[push] HTTP 400 — Bad push request.")
         except Exception as e:
-            print(f"[push] ✘ Unexpected error for sub id={sub['id']}: {type(e).__name__}: {e}")
+            print(f"[push] ✘ Unexpected error sending push to {ep[:60]}: {type(e).__name__}: {e}")
 
-    if stale_ids:
-        print(f"[push] Removing {len(stale_ids)} stale subscription(s): {stale_ids}")
-        try:
-            cur2 = db.cursor()
-            cur2.executemany(
-                "DELETE FROM push_subscriptions WHERE id = %s",
-                [(sid,) for sid in stale_ids],
-            )
-            db.commit()
-            cur2.close()
-            print(f"[push] Stale subscriptions removed ✔")
-        except Exception as e:
-            print(f"[push] Failed to remove stale subscriptions: {e}")
+    # Prune any devices that revoked permission (HTTP 410 / 404)
+    if stale_endpoints:
+        print(f"[push] Pruning {len(stale_endpoints)} stale device(s) from database…")
+        for sep in stale_endpoints:
+            _remove_user_push_sub(db, user_id, sep)
 
 
 
@@ -869,53 +1063,43 @@ def push_vapid_public_key():
     return jsonify({"public_key": VAPID_PUBLIC_KEY})
 
 
-# ── Save/update a push subscription ──────────────────────────────────────────
+# ── Save/update a push subscription (multi-device safe) ──────────────────────
 
 @app.post("/api/push/subscribe")
 @require_auth
 def push_subscribe():
     user_id = g.current_user["id"]
     data = request.get_json(silent=True) or {}
-    endpoint = (data.get("endpoint") or "").strip()
-    p256dh   = (data.get("p256dh")   or "").strip()
-    auth     = (data.get("auth")     or "").strip()
 
-    if not endpoint or not p256dh or not auth:
+    # Support { endpoint, p256dh, auth }, { endpoint, keys: { ... } }, or wrapped in push_subscription
+    sub_data = data.get("push_subscription") or data.get("subscription") or data
+    normalized = _normalize_subscription_obj(sub_data)
+
+    if not normalized:
         return jsonify({"error": "endpoint, p256dh, and auth are required"}), 400
 
-    try:
-        db = get_db()
-        cur = db.cursor()
-        # INSERT … ON DUPLICATE KEY UPDATE so re-subscribing the same endpoint is idempotent
-        cur.execute(
-            """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
-               VALUES (%s, %s, %s, %s)
-               ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth""",
-            (user_id, endpoint, p256dh, auth),
-        )
-        db.commit()
-        cur.close()
+    db = get_db()
+    ok = _add_or_update_user_push_sub(db, user_id, normalized)
+    if ok:
         return jsonify({"ok": True}), 201
-    except PGError as err:
-        return db_error(err)
+    else:
+        return jsonify({"error": "Failed to save push subscription"}), 500
 
 
-# ── Remove a push subscription ────────────────────────────────────────────────
+# ── Remove a push subscription (device-specific or all) ──────────────────────
 
 @app.delete("/api/push/unsubscribe")
 @require_auth
 def push_unsubscribe():
     user_id = g.current_user["id"]
-    try:
-        db = get_db()
-        cur = db.cursor()
-        # Delete all subscriptions for this user (simple; could target a specific endpoint)
-        cur.execute("DELETE FROM push_subscriptions WHERE user_id = %s", (user_id,))
-        db.commit()
-        cur.close()
+    data = request.get_json(silent=True) or {}
+    endpoint = (data.get("endpoint") or request.args.get("endpoint") or "").strip()
+    db = get_db()
+    ok = _remove_user_push_sub(db, user_id, endpoint if endpoint else None)
+    if ok:
         return jsonify({"ok": True})
-    except PGError as err:
-        return db_error(err)
+    else:
+        return jsonify({"error": "Failed to unsubscribe"}), 500
 
 
 # ---------------------------------------------------------------------------

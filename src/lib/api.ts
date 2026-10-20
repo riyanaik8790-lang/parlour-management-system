@@ -500,7 +500,11 @@ export const api = {
       body: JSON.stringify(sub),
     }),
 
-  unsubscribePush: () => request<{ ok: boolean }>("/api/push/unsubscribe", { method: "DELETE" }),
+  unsubscribePush: (endpoint?: string) =>
+    request<{ ok: boolean }>("/api/push/unsubscribe", {
+      method: "DELETE",
+      body: endpoint ? JSON.stringify({ endpoint }) : undefined,
+    }),
 
   deleteAccount: (password: string) =>
     request<{ ok: boolean }>("/api/account", {

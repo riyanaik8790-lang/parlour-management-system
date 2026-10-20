@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
   role       VARCHAR(10)  NOT NULL DEFAULT 'USER'
                CHECK (role IN ('USER', 'ADMIN')),
   push_enabled BOOLEAN    NOT NULL DEFAULT false,
+  push_subscriptions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  push_subscription  JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ  DEFAULT NOW()
 );
 

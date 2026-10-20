@@ -171,10 +171,11 @@ export async function unsubscribeFromPush(): Promise<void> {
       console.warn("[push] No active push subscription found in browser.");
       return;
     }
+    const endpoint = sub.endpoint;
     await sub.unsubscribe();
     console.log("[push] Browser push subscription removed ✔");
-    await api.unsubscribePush();
-    console.log("[push] Backend subscription record deleted ✔");
+    await api.unsubscribePush(endpoint);
+    console.log("[push] Backend subscription record for this device deleted ✔");
   } catch (err) {
     console.error("[push] unsubscribeFromPush() error:", err);
   }
