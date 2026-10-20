@@ -85,6 +85,35 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   const [marking, setMarking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // ── Audio Alert Setup ────────────────────────────────────────────────────────
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const prevUnreadRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Create HTML5 Audio instance for notification sound
+    audioRef.current = new Audio("/notification-ding.mp3");
+  }, []);
+
+  // Play audio alert when unread count increases (after initial mount)
+  useEffect(() => {
+    if (prevUnreadRef.current !== null && unread > prevUnreadRef.current) {
+      if (audioRef.current) {
+        try {
+          audioRef.current.currentTime = 0;
+          const playPromise = audioRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(() => {
+              // Browser autoplay policy prevented audio without prior user gesture; catch silently
+            });
+          }
+        } catch {
+          // Silently catch synchronous playback errors
+        }
+      }
+    }
+    prevUnreadRef.current = unread;
+  }, [unread]);
+
   // Push prompt state
   // Show if: push supported + permission not yet decided + user hasn't permanently dismissed
   const [showPushPrompt, setShowPushPrompt] = useState(false);
@@ -118,10 +147,11 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     load();
   }, [load]);
 
-  // Auto-refresh (for admin panel live updates)
+  // Auto-refresh (for live updates across users and admin)
   useEffect(() => {
-    if (!autoRefreshMs) return;
-    const id = setInterval(load, autoRefreshMs);
+    // Poll every 15 seconds if not explicitly set, or use custom ms
+    const pollInterval = autoRefreshMs || 15000;
+    const id = setInterval(load, pollInterval);
     return () => clearInterval(id);
   }, [autoRefreshMs, load]);
 
