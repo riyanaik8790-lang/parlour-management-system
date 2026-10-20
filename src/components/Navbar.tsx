@@ -267,25 +267,57 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile menu trigger — avatar for logged-in, hamburger lines for guests */}
           <button
-            className="ml-1 flex h-11 w-11 flex-col items-center justify-center gap-1.5 rounded-full md:hidden"
-            style={{ background: "oklch(0.90 0.055 82)" }}
+            className="ml-1 flex h-11 w-11 items-center justify-center rounded-full overflow-hidden md:hidden focus:outline-none transition-transform hover:scale-105"
+            style={{
+              boxShadow: menuOpen
+                ? "0 0 0 2px oklch(0.35 0.15 22)"
+                : "0 0 0 2px oklch(0.88 0.030 82)",
+            }}
             onClick={() => setMenuOpen((p) => !p)}
             aria-label="Toggle menu"
+            aria-expanded={menuOpen}
           >
-            <span
-              className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-2" : ""}`}
-              style={{ background: "oklch(0.35 0.15 22)" }}
-            />
-            <span
-              className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "opacity-0" : ""}`}
-              style={{ background: "oklch(0.35 0.15 22)" }}
-            />
-            <span
-              className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`}
-              style={{ background: "oklch(0.35 0.15 22)" }}
-            />
+            {user ? (
+              avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={`${user.name} avatar`}
+                  className="h-full w-full object-cover"
+                  onError={() => setAvatarUrl(null)}
+                />
+              ) : (
+                <div
+                  className="flex h-full w-full items-center justify-center text-sm font-bold select-none"
+                  style={{
+                    background: initialsColor(getInitials(user.name)),
+                    color: BURGUNDY,
+                  }}
+                >
+                  {getInitials(user.name)}
+                </div>
+              )
+            ) : (
+              /* Guest — classic animated hamburger lines */
+              <div
+                className="flex h-full w-full flex-col items-center justify-center gap-1.5"
+                style={{ background: "oklch(0.90 0.055 82)" }}
+              >
+                <span
+                  className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "rotate-45 translate-y-2" : ""}`}
+                  style={{ background: "oklch(0.35 0.15 22)" }}
+                />
+                <span
+                  className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "opacity-0" : ""}`}
+                  style={{ background: "oklch(0.35 0.15 22)" }}
+                />
+                <span
+                  className={`block h-0.5 w-5 rounded transition-all duration-300 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`}
+                  style={{ background: "oklch(0.35 0.15 22)" }}
+                />
+              </div>
+            )}
           </button>
         </div>
       </div>
@@ -299,29 +331,41 @@ export function Navbar() {
           <nav className="flex flex-col px-4 py-3 gap-1">
             {user && (
               <div
-                className="mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-sm border"
+                className="mb-3 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-sm border"
                 style={{ background: "oklch(0.99 0.01 85)", borderColor: "oklch(0.91 0.025 82)" }}
               >
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-inner text-lg font-semibold"
-                  style={{
-                    background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.68 0.13 68))",
-                  }}
-                >
-                  {user.name.charAt(0).toUpperCase()}
+                {/* Avatar: real photo or initials fallback */}
+                <div className="relative h-12 w-12 shrink-0 rounded-full overflow-hidden shadow ring-2" style={{ ringColor: "oklch(0.88 0.030 82)" }}>
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={`${user.name} avatar`}
+                      className="h-full w-full object-cover"
+                      onError={() => setAvatarUrl(null)}
+                    />
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center text-lg font-bold select-none"
+                      style={{
+                        background: initialsColor(getInitials(user.name)),
+                        color: BURGUNDY,
+                      }}
+                    >
+                      {getInitials(user.name)}
+                    </div>
+                  )}
                 </div>
-                <div>
+
+                {/* Name + Email */}
+                <div className="min-w-0">
                   <p
-                    className="text-[11px] uppercase tracking-wider font-semibold"
-                    style={{ color: "oklch(0.68 0.13 68)" }}
+                    className="text-sm font-semibold truncate leading-tight"
+                    style={{ color: BURGUNDY }}
                   >
-                    Welcome back
+                    {user.name}
                   </p>
-                  <p
-                    className="font-serif text-xl leading-tight"
-                    style={{ color: "oklch(0.35 0.15 22)" }}
-                  >
-                    {user.name.split(" ")[0]}
+                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                    {user.email}
                   </p>
                 </div>
               </div>
@@ -367,8 +411,9 @@ export function Navbar() {
                     setMenuOpen(false);
                     handleLogout();
                   }}
-                  className="text-left px-3 py-2.5 text-sm rounded-xl font-medium text-foreground/80 hover:text-primary hover:bg-secondary/60 transition-all min-h-[44px] flex items-center sm:hidden"
+                  className="text-left px-3 py-2.5 text-sm rounded-xl font-medium text-rose-600 hover:bg-rose-50 transition-all min-h-[44px] flex items-center gap-2"
                 >
+                  <LogOut className="h-4 w-4 text-rose-500" />
                   Logout
                 </button>
               </>
