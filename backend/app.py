@@ -708,22 +708,32 @@ def book():
         try:
             svc_display = ", ".join(service_names) if service_names else primary_service_id
             customer_name = g.current_user["name"]
-            msg = f"New booking: {customer_name} booked {svc_display} on {date_str} at {time_str}"
+            db_msg = f"New booking: {customer_name} booked {svc_display} on {date_str} at {time_str}"
+            push_body = f"{customer_name} booked {svc_display} on {date_str} at {time_str}."
             cur2 = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur2.execute("SELECT id FROM users WHERE role = 'ADMIN'")
             admins = cur2.fetchall()
             for admin in admins:
                 cur2.execute(
                     "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'new_booking', %s, %s)",
-                    (admin["id"], msg, booking_id),
+                    (admin["id"], db_msg, booking_id),
                 )
             db.commit()
             cur2.close()
-            # Send push to each admin (additive — never fails the booking)
+            # Instant push to each admin — title/body match the requested format exactly
             for admin in admins:
-                _send_push(db, admin["id"], "New Booking", msg, "/admin")
+                _send_push(db, admin["id"], "New Booking!", push_body, "/admin")
+            # Confirmation push to the customer who just booked
+            _send_push(
+                db,
+                g.current_user["id"],
+                "Booking Confirmed! 🎉",
+                f"Your appointment for {svc_display} on {date_str} at {time_str} is confirmed.",
+                "/my-bookings",
+            )
         except Exception:
             pass  # never fail the booking because of a notification error
+
 
         # ── Twilio SMS ───────────────────────────────────────────────────────
         try:

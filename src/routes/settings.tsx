@@ -812,48 +812,51 @@ function SettingsPage() {
                       if (savingPush) return;
                       const previousState = pushEnabled;
 
+                      // ── Optimistic UI: flip the toggle instantly ──────────
+                      setPushEnabled(!previousState);
+                      setSavingPush(true);
+
                       try {
                         if (!previousState) {
-                          // Turning ON: Request permission FIRST to satisfy browser gesture requirements
+                          // Turning ON
+                          // requestPermission must be called from a user gesture — we're
+                          // still inside the synchronous click handler at this point.
                           const permission = await Notification.requestPermission();
 
                           if (permission === "denied") {
-                            toast.error("Notifications blocked in browser.");
-                            setPushEnabled(false);
+                            setPushEnabled(false); // revert — user blocked it
+                            toast.error("Notifications blocked. Please allow them in your browser settings.");
                             return;
                           }
 
-                          if (permission === "granted") {
-                            // Optimistic UI update
-                            setPushEnabled(true);
-                            setSavingPush(true);
+                          if (permission !== "granted") {
+                            setPushEnabled(false); // revert — user dismissed
+                            return;
+                          }
 
-                            const result = await subscribeToPush();
-                            if (result === "granted" || result === "already") {
-                              await api.updateProfile({ push_enabled: true });
-                              queryClient.invalidateQueries({ queryKey: ["profile"] });
-                              toast.success("Push notifications enabled!");
-                            } else {
-                              setPushEnabled(false);
-                              toast.error("Failed to enable push notifications.");
-                            }
+                          // subscribeToPush handles SW registration + backend POST
+                          const result = await subscribeToPush();
+                          if (result === "granted" || result === "already") {
+                            await api.updateProfile({ push_enabled: true });
+                            queryClient.invalidateQueries({ queryKey: ["profile"] });
+                            toast.success("Push notifications enabled!");
+                          } else {
+                            setPushEnabled(false); // revert — subscribe failed
+                            toast.error("Failed to subscribe. Please try again.");
                           }
                         } else {
                           // Turning OFF
-                          setPushEnabled(false);
-                          setSavingPush(true);
-
                           await unsubscribeFromPush();
                           await api.updateProfile({ push_enabled: false });
                           queryClient.invalidateQueries({ queryKey: ["profile"] });
                           toast.success("Push notifications disabled.");
                         }
                       } catch (e) {
-                        // Revert on any API error
+                        // Revert on any unexpected error
                         setPushEnabled(previousState);
-                        console.error(e);
+                        console.error("[push toggle]", e);
                         toast.error(
-                          e instanceof Error ? e.message : "An unexpected error occurred",
+                          e instanceof Error ? e.message : "An unexpected error occurred.",
                         );
                       } finally {
                         setSavingPush(false);
