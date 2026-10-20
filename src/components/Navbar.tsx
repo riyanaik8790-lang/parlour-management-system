@@ -1,29 +1,65 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { clearSession, getUser, type StoredUser } from "@/lib/api";
-import { ShieldCheck, Settings } from "lucide-react";
+import { api, clearSession, getUser, type StoredUser } from "@/lib/api";
+import { ShieldCheck, Settings, LogOut, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { NotificationBell } from "@/components/NotificationBell";
 
 const BURGUNDY = "oklch(0.35 0.15 22)";
 
+/** Generate initials (up to 2 chars) from a display name. */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** Deterministic soft background color from initials. */
+function initialsColor(initials: string): string {
+  const palettes = [
+    "oklch(0.82 0.08 22)",   // soft rose
+    "oklch(0.80 0.07 68)",   // warm gold
+    "oklch(0.78 0.09 160)",  // sage green
+    "oklch(0.80 0.08 250)",  // sky blue
+    "oklch(0.78 0.08 300)",  // soft lavender
+    "oklch(0.80 0.08 30)",   // peach
+  ];
+  const code = initials.charCodeAt(0) + (initials.charCodeAt(1) || 0);
+  return palettes[code % palettes.length];
+}
+
 export function Navbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState<StoredUser | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarDropdownOpen, setAvatarDropdownOpen] = useState(false);
+  const avatarDropdownRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   function handleLogout() {
-    // Clear mock data so previous account's bookings don't bleed over
     window.localStorage.removeItem("salon_mock_bookings");
     window.localStorage.removeItem("salon_mock_analyses");
     clearSession();
+    setAvatarDropdownOpen(false);
     navigate({ to: "/" });
   }
 
+  // Sync session & fetch fresh profile avatar
   useEffect(() => {
-    const sync = () => setUser(getUser());
+    const sync = () => {
+      const u = getUser();
+      setUser(u);
+      if (u) {
+        api.getProfile()
+          .then((p) => setAvatarUrl(p.avatar_url ?? null))
+          .catch(() => setAvatarUrl(null));
+      } else {
+        setAvatarUrl(null);
+      }
+    };
     sync();
     window.addEventListener("salon-auth-change", sync);
     window.addEventListener("salon-admin-auth-change", sync);
@@ -34,6 +70,24 @@ export function Navbar() {
       window.removeEventListener("storage", sync);
     };
   }, []);
+
+  // Close avatar dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        avatarDropdownRef.current &&
+        !avatarDropdownRef.current.contains(e.target as Node)
+      ) {
+        setAvatarDropdownOpen(false);
+      }
+    }
+    if (avatarDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [avatarDropdownOpen]);
 
   // Show Admin link if the logged-in user has ADMIN role
   const isAdmin = user?.role === "ADMIN";
@@ -112,39 +166,86 @@ export function Navbar() {
 
           <div className="hidden sm:flex items-center gap-2">
             {user ? (
-              <>
-                <Link
-                  to="/settings"
-                  className="flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
+              <div className="flex items-center gap-3">
+                {/* Greeting */}
+                <span
+                  className="text-sm font-medium select-none"
                   style={{ color: BURGUNDY }}
                 >
                   Hi, {user.name.split(" ")[0]} !
-                </Link>
-                <Link
-                  to="/settings"
-                  className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
-                  style={{ color: BURGUNDY }}
-                  title="Settings"
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.background =
-                      "oklch(0.35 0.15 22 / 8%)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
-                  }}
-                >
-                  <Settings className="h-4 w-4" />
-                </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleLogout()}
-                  className="rounded-full border-2 text-sm min-h-[44px]"
-                  style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}
-                >
-                  Logout
-                </Button>
-              </>
+                </span>
+
+                {/* Avatar with relative dropdown container */}
+                <div ref={avatarDropdownRef} className="relative">
+                  {/* Clickable circular Avatar */}
+                  <button
+                    type="button"
+                    onClick={() => setAvatarDropdownOpen((prev) => !prev)}
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-sm ring-2 transition-transform hover:scale-105 focus:outline-none"
+                    style={{ ringColor: "oklch(0.88 0.030 82)" }}
+                    aria-label="User menu"
+                    aria-expanded={avatarDropdownOpen}
+                  >
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={`${user.name} avatar`}
+                        className="h-full w-full object-cover"
+                        onError={() => setAvatarUrl(null)}
+                      />
+                    ) : (
+                      <div
+                        className="flex h-full w-full items-center justify-center text-sm font-bold select-none text-white"
+                        style={{
+                          background: initialsColor(getInitials(user.name)),
+                          color: BURGUNDY,
+                        }}
+                      >
+                        {getInitials(user.name)}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Absolute Dropdown Menu positioned right-0 mt-2 */}
+                  {avatarDropdownOpen && (
+                    <div
+                      className="absolute right-0 mt-2 w-60 rounded-2xl bg-white p-2 shadow-xl border animate-fade-up z-50"
+                      style={{ borderColor: "oklch(0.88 0.030 82)" }}
+                    >
+                      {/* Non-clickable Header showing full name and email */}
+                      <div className="px-3 py-2.5 border-b" style={{ borderColor: "oklch(0.92 0.02 85)" }}>
+                        <p className="text-sm font-semibold truncate" style={{ color: BURGUNDY }}>
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      {/* Menu links */}
+                      <div className="pt-1.5 space-y-1">
+                        <Link
+                          to="/settings"
+                          onClick={() => setAvatarDropdownOpen(false)}
+                          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors w-full"
+                        >
+                          <Settings className="h-4 w-4 text-gray-500" />
+                          <span>Settings</span>
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => handleLogout()}
+                          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors w-full text-left"
+                        >
+                          <LogOut className="h-4 w-4 text-rose-500" />
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <>
                 <Button
