@@ -25,6 +25,7 @@ import {
   Pencil,
   ExternalLink,
   Image as ImageIcon,
+  X,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -95,6 +96,7 @@ function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const [isWebcamOpen, setIsWebcamOpen] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const avatarContainerRef = useRef<HTMLDivElement>(null);
@@ -176,13 +178,8 @@ function SettingsPage() {
       .finally(() => setLoadingProfile(false));
   }, []);
 
-  // ── Avatar upload ──────────────────────────────────────────────────────────
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-
-    if (!file) return;
-
+  // ── Upload Avatar File helper ──────────────────────────────────────────────
+  async function uploadAvatarFile(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
       toast.error(`Image is too large. Maximum size is 2 MB (your file: ${(file.size / 1_048_576).toFixed(1)} MB).`);
       return;
@@ -236,6 +233,15 @@ function SettingsPage() {
       toast.error(msg);
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  // ── Avatar input change ────────────────────────────────────────────────────
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) {
+      await uploadAvatarFile(file);
     }
   }
 
@@ -621,7 +627,12 @@ function SettingsPage() {
                                 type="button"
                                 onClick={() => {
                                   setIsAvatarMenuOpen(false);
-                                  cameraRef.current?.click();
+                                  // If browser supports getUserMedia (desktop webcam or modern mobile), open live camera modal
+                                  if (navigator.mediaDevices?.getUserMedia) {
+                                    setIsWebcamOpen(true);
+                                  } else {
+                                    cameraRef.current?.click();
+                                  }
                                 }}
                                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                               >
@@ -661,6 +672,14 @@ function SettingsPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Live Camera Viewfinder Modal */}
+                    {isWebcamOpen && (
+                      <WebcamAvatarModal
+                        onCapture={(file) => uploadAvatarFile(file)}
+                        onClose={() => setIsWebcamOpen(false)}
+                      />
+                    )}
 
                     <form onSubmit={saveInfo} className="space-y-4">
                       {infoSuccess && <Banner type="success" msg="Profile updated successfully!" />}
@@ -1366,6 +1385,169 @@ function PwField({
           {hint}
         </p>
       )}
+    </div>
+  );
+}
+
+// ── Webcam Modal for Profile Photo ───────────────────────────────────────────
+function WebcamAvatarModal({
+  onCapture,
+  onClose,
+}: {
+  onCapture: (file: File) => void;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [ready, setReady] = useState(false);
+  const [camError, setCamError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCamError("Camera is not supported on this browser or connection.");
+      return;
+    }
+
+    navigator.mediaDevices
+      .getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: "user" },
+        audio: false,
+      })
+      .then((stream) => {
+        if (!active) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().then(() => setReady(true)).catch(() => {});
+        }
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        const name = err instanceof DOMException ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setCamError("Camera permission was denied. Please allow camera access in browser settings.");
+        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          setCamError("No camera detected on this device.");
+        } else {
+          setCamError("Could not access camera. Please check permissions.");
+        }
+      });
+
+    return () => {
+      active = false;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  const snap = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    // Make it a clean square capture
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Crop center and mirror
+    const startX = (video.videoWidth - size) / 2;
+    const startY = (video.videoHeight - size) / 2;
+    ctx.translate(size, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `avatar-${Date.now()}.jpg`, { type: "image/jpeg" });
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        onCapture(file);
+        onClose();
+      },
+      "image/jpeg",
+      0.92,
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "oklch(0 0 0 / 70%)" }}>
+      <div
+        className="w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl animate-fade-up"
+        style={{ border: "1px solid oklch(0.88 0.030 82)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "oklch(0.92 0.02 85)" }}>
+          <div className="flex items-center gap-2">
+            <Camera className="h-4 w-4" style={{ color: BURGUNDY }} />
+            <h3 className="text-sm font-semibold" style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}>
+              Take Profile Photo
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <X className="h-4 w-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Video stream container */}
+        <div className="relative aspect-square w-full bg-black overflow-hidden flex items-center justify-center">
+          {camError ? (
+            <div className="p-6 text-center text-white">
+              <Camera className="mx-auto mb-2 h-8 w-8 text-rose-400" />
+              <p className="text-xs text-rose-300">{camError}</p>
+            </div>
+          ) : (
+            <>
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className="-scale-x-100 h-full w-full object-cover"
+              />
+              {/* Circular guide outline */}
+              <div
+                className="pointer-events-none absolute inset-8 rounded-full border-2 border-dashed border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+              />
+              {!ready && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-3 p-4 bg-gray-50 border-t" style={{ borderColor: "oklch(0.92 0.02 85)" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl py-2.5 text-xs font-semibold border bg-white transition-colors hover:bg-gray-100"
+            style={{ color: "oklch(0.40 0.04 50)", borderColor: "oklch(0.88 0.030 82)" }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!ready || Boolean(camError)}
+            onClick={snap}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+            style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
+          >
+            <Camera className="h-4 w-4" />
+            Capture Photo
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
