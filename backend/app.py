@@ -2629,11 +2629,11 @@ def analyze_skin():
             confidence_reason = "Subject seems to be partially out of frame. Please centre your face."
         elif region_std_conf > 38:
             confidence        = "low"
-            confidence_reason = "Lighting looks very uneven — try a well-lit, front-facing photo."
+            confidence_reason = "Lighting looks very uneven - try a well-lit, front-facing photo."
         elif eyewear_glare:
             confidence        = "low"
             confidence_reason = (
-                "Reflections detected — try removing glasses or "
+                "Reflections detected - try removing glasses or "
                 "stepping away from direct light to reduce glare."
             )
         elif region_std_conf > 20 or any_glare:
