@@ -214,13 +214,9 @@ function Index() {
               <p className="text-sm text-muted-foreground mt-2">A mood board for your next glow-up</p>
             </div>
 
-            {/* Marquee Outer Wrapper with smooth edge fades */}
+            {/* Marquee Outer Wrapper */}
             <div className="relative w-full overflow-hidden marquee-container py-2">
-              {/* Left & right gradient masks for a smooth fade edge */}
-              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-28 bg-gradient-to-r from-[#FAF6F0] to-transparent z-10" />
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-28 bg-gradient-to-l from-[#FAF6F0] to-transparent z-10" />
-
-              <div className="animate-marquee flex items-center gap-6 sm:gap-8">
+              <div className="animate-marquee flex items-center gap-4 sm:gap-6 md:gap-8">
                 {/* Render items duplicated (first set + duplicate set) for infinite looping */}
                 {[
                   { src: facialGoldImg, label: "Gold Facial", position: "center 30%" },
@@ -238,7 +234,7 @@ function Index() {
                 ].map((g, i) => (
                   <div
                     key={i}
-                    className="group relative shrink-0 w-64 sm:w-80 h-72 sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                    className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
                   >
                     <img
                       src={g.src}
@@ -246,9 +242,9 @@ function Index() {
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       style={{ objectPosition: g.position || "center" }}
                     />
-                    {/* Subtle dark gradient overlay on hover with label */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/80%)] via-[oklch(0.35_0.15_22/20%)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-5">
-                      <span className="text-white font-serif text-lg sm:text-xl tracking-wide font-medium">
+                    {/* Dark gradient overlay with label */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5">
+                      <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
                         {g.label}
                       </span>
                     </div>

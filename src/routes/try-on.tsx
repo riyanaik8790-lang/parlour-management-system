@@ -219,16 +219,16 @@ function SkinAdvisorPage() {
   };
 
   return (
-    <div className="relative w-full bg-[#FAF6F0] overflow-hidden">
+    <div className="relative w-full bg-[#FAF6F0] overflow-hidden min-h-[calc(100vh-80px)]">
       {/* ── Background Image with Subtle Slow Zoom (scoped strictly to this page's content) ── */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <img
           src={salonBgImg}
           alt="Salon Ambient Texture"
-          className="h-full w-full object-cover object-center auth-kenburns-img opacity-25 filter blur-[0.5px]"
+          className="h-full w-full object-cover object-center sm:object-center auth-kenburns-img opacity-45 sm:opacity-30 filter blur-[0.3px]"
         />
-        {/* Semi-transparent beige/cream overlay for 100% crisp legibility */}
-        <div className="absolute inset-0 bg-[#FAF6F0]/85 backdrop-blur-[1px]" />
+        {/* Semi-transparent warm cream overlay balanced for mobile & desktop */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#FAF6F0]/65 via-[#FAF6F0]/80 to-[#FAF6F0]/70 backdrop-blur-[0.5px]" />
       </div>
 
       {/* ── Page Content Container ── */}
@@ -330,10 +330,10 @@ const LIGHTING_TIPS = [
 function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <div className="rounded-2xl border border-amber-200/70 bg-amber-50/50 p-8 shadow-sm backdrop-blur-[2px]">
+      <div className="rounded-2xl border border-amber-200/80 bg-white/70 p-6 sm:p-8 shadow-md backdrop-blur-md">
         {/* Header with Sun Icon */}
         <div className="mb-6 flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100/90 shadow-xs">
             <Sun className="h-6 w-6 text-amber-600" />
           </div>
           <div>
@@ -350,7 +350,7 @@ function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
           {LIGHTING_TIPS.map((tip) => (
             <div
               key={tip.title}
-              className="flex gap-3 rounded-xl border border-amber-200/60 bg-white/80 p-4 shadow-2xs"
+              className="flex gap-3 rounded-xl border border-amber-200/60 bg-white/85 p-4 shadow-2xs backdrop-blur-xs"
             >
               <span className="shrink-0 text-xl" aria-hidden>
                 {tip.icon}

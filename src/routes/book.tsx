@@ -8,7 +8,14 @@ import { toast } from "sonner";
 import { CalendarIcon, CheckCircle2, ShoppingCart, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
-import { ALL_SERVICES, SERVICE_CATEGORIES, TIME_SLOTS, BUFFER_MINS } from "@/lib/services-data";
+import {
+  ALL_SERVICES,
+  SERVICE_CATEGORIES,
+  TIME_SLOTS,
+  BUFFER_MINS,
+  getAllServiceCategories,
+  type ServiceCategory,
+} from "@/lib/services-data";
 
 export const Route = createFileRoute("/book")({
   validateSearch: (search: Record<string, unknown>): { service?: string } => ({
@@ -59,10 +66,25 @@ function BookPage() {
 
   const isoDate = useMemo(() => (date ? format(date, "yyyy-MM-dd") : ""), [date]);
 
+  // Live categories & services
+  const [categories, setCategories] = useState<ServiceCategory[]>(() => getAllServiceCategories());
+
+  useEffect(() => {
+    const handleSync = () => setCategories(getAllServiceCategories());
+    window.addEventListener("salon-services-updated", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("salon-services-updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, []);
+
+  const allLiveServices = useMemo(() => categories.flatMap((c) => c.items), [categories]);
+
   // ── Derived cart values ────────────────────────────────────────────────────
   const selectedServices = useMemo(
-    () => ALL_SERVICES.filter((s) => selectedIds.includes(s.id)),
-    [selectedIds],
+    () => allLiveServices.filter((s) => selectedIds.includes(s.id)),
+    [allLiveServices, selectedIds],
   );
 
   /** Sum of all selected service durations in minutes */
@@ -300,7 +322,7 @@ function BookPage() {
               )}
             </label>
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-              {SERVICE_CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <div key={cat.name}>
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {cat.name}

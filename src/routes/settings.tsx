@@ -34,6 +34,8 @@ import {
   Info,
   Sparkles,
   FileText,
+  ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -873,230 +875,55 @@ function SettingsPage() {
             {/* ── Notifications ── */}
             {activeSection === "notifications" && (
               <Card gradient={`linear-gradient(90deg, ${BURGUNDY}, ${GOLD})`}>
-                <div className="flex items-center justify-between mb-5">
-                  <h2
-                    className="text-base font-semibold"
-                    style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-                  >
-                    Notification Preferences
-                  </h2>
-                  <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setNotifSubTab("preferences")}
-                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                        notifSubTab === "preferences"
-                          ? "bg-white text-primary shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Preferences
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNotifSubTab("history");
-                        loadNotifHistory();
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                        notifSubTab === "history"
-                          ? "bg-white text-primary shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <History className="h-3.5 w-3.5" />
-                      <span>Notification History</span>
-                    </button>
-                  </div>
-                </div>
-
-                {notifSubTab === "preferences" ? (
-                  <div className="space-y-4">
-                    {/* Alert Sounds On/Off Toggle */}
-                    <div
-                      className="flex items-center justify-between rounded-xl p-4"
-                      style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg"
-                          style={{
-                            background: alertSoundEnabled
-                              ? "oklch(0.42 0.18 150 / 12%)"
-                              : "oklch(0.50 0.04 50 / 10%)",
-                            color: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
-                          }}
-                        >
-                          {alertSoundEnabled ? (
-                            <Volume2 className="h-4 w-4" />
-                          ) : (
-                            <VolumeX className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                            <span>Alert Sounds</span>
-                            <span
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                                alertSoundEnabled
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-gray-200 text-gray-600"
-                              }`}
-                            >
-                              {alertSoundEnabled ? "ON" : "OFF"}
-                            </span>
-                          </h3>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Play audio chimes and vibrate device when new bookings or appointment alerts arrive.
-                          </p>
-                        </div>
-                      </div>
-
+                {notifSubTab === "history" ? (
+                  /* ── Notification History Sub-View ── */
+                  <div>
+                    <div className="flex items-center justify-between border-b pb-4 mb-4" style={{ borderColor: BORDER }}>
                       <button
                         type="button"
-                        id="alert-sound-toggle-btn"
-                        onClick={toggleAlertSounds}
-                        className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                        style={{
-                          backgroundColor: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
-                          boxShadow: alertSoundEnabled
-                            ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
-                            : "none",
-                        }}
-                        role="switch"
-                        aria-checked={alertSoundEnabled}
-                        aria-label="Toggle Alert Sounds"
+                        onClick={() => setNotifSubTab("preferences")}
+                        className="flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-80"
+                        style={{ color: BURGUNDY }}
                       >
-                        <span
-                          aria-hidden="true"
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            alertSoundEnabled ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
+                        <ArrowLeft className="h-4 w-4" />
+                        <span>Back to Notifications</span>
                       </button>
-                    </div>
-
-                    {/* Appointment Reminders Push Toggle */}
-                    <div
-                      className="flex items-center justify-between rounded-xl p-4"
-                      style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg"
-                          style={{
-                            background: pushEnabled
-                              ? "oklch(0.42 0.18 150 / 12%)"
-                              : "oklch(0.50 0.04 50 / 10%)",
-                            color: pushEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
-                          }}
-                        >
-                          <Bell className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-semibold text-gray-900">Push Notifications</h3>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Receive notifications on your device 30 minutes before your appointments and for status updates.
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={savingPush}
-                        onClick={async () => {
-                          if (savingPush) return;
-                          const previousState = pushEnabled;
-                          setPushEnabled(!previousState);
-                          setSavingPush(true);
-
-                          try {
-                            if (!previousState) {
-                              const permission = await Notification.requestPermission();
-                              if (permission === "denied") {
-                                setPushEnabled(false);
-                                toast.error("Notifications blocked. Please allow them in your browser settings.");
-                                return;
-                              }
-                              if (permission !== "granted") {
-                                setPushEnabled(false);
-                                return;
-                              }
-                              const result = await subscribeToPush();
-                              if (result === "granted" || result === "already") {
-                                await api.updateProfile({ push_enabled: true });
-                                queryClient.invalidateQueries({ queryKey: ["profile"] });
-                                toast.success("Push notifications enabled!");
-                              } else {
-                                setPushEnabled(false);
-                                toast.error("Failed to subscribe. Please try again.");
-                              }
-                            } else {
-                              await unsubscribeFromPush();
-                              await api.updateProfile({ push_enabled: false });
-                              queryClient.invalidateQueries({ queryKey: ["profile"] });
-                              toast.success("Push notifications disabled.");
-                            }
-                          } catch (e) {
-                            setPushEnabled(previousState);
-                            console.error("[push toggle]", e);
-                            toast.error(
-                              e instanceof Error ? e.message : "An unexpected error occurred.",
-                            );
-                          } finally {
-                            setSavingPush(false);
-                          }
-                        }}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50`}
-                        style={{
-                          backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
-                          boxShadow: pushEnabled
-                            ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
-                            : "none",
-                        }}
-                        role="switch"
-                        aria-checked={pushEnabled}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            pushEnabled ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* ── Notification History View ── */
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-2">
-                      <p className="text-xs text-muted-foreground">
-                        All previous alerts and notifications received on your account.
-                      </p>
                       <button
                         type="button"
                         onClick={loadNotifHistory}
-                        className="text-xs font-semibold hover:underline"
+                        className="text-xs font-medium hover:underline"
                         style={{ color: BURGUNDY }}
                       >
                         Refresh
                       </button>
                     </div>
 
+                    <div className="mb-3">
+                      <h2
+                        className="text-base font-semibold"
+                        style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+                      >
+                        Notification History
+                      </h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Past alerts and appointment updates for your account.
+                      </p>
+                    </div>
+
                     {loadingNotifHistory ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
                         <Loader2 className="h-6 w-6 animate-spin" style={{ color: BURGUNDY }} />
-                        <span className="text-xs">Loading notification history…</span>
+                        <span className="text-xs">Loading past notifications…</span>
                       </div>
                     ) : historyNotifications.length === 0 ? (
                       <div
                         className="flex flex-col items-center justify-center gap-2 py-12 rounded-xl border border-dashed text-center"
                         style={{ borderColor: BORDER, background: "oklch(0.99 0.005 85)" }}
                       >
-                        <History className="h-8 w-8 opacity-30" style={{ color: BURGUNDY }} />
-                        <p className="text-sm font-medium text-gray-700">No notification history</p>
+                        <History className="h-7 w-7 opacity-30" style={{ color: BURGUNDY }} />
+                        <p className="text-sm font-medium text-gray-700">No past notifications</p>
                         <p className="text-xs text-muted-foreground">
-                          Older notifications and alerts will appear here.
+                          Older notifications will appear here.
                         </p>
                       </div>
                     ) : (
@@ -1168,6 +995,195 @@ function SettingsPage() {
                         })}
                       </div>
                     )}
+                  </div>
+                ) : (
+                  /* ── Streamlined 3-Option Notification Settings ── */
+                  <div>
+                    <h2
+                      className="mb-1 text-base font-semibold"
+                      style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+                    >
+                      Notifications
+                    </h2>
+                    <p className="mb-5 text-xs text-muted-foreground">
+                      Manage sound alerts, device permissions, and past history.
+                    </p>
+
+                    <div className="divide-y" style={{ borderColor: BORDER }}>
+                      {/* Option 1: Notification Sounds */}
+                      <div className="flex items-center justify-between py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            style={{
+                              background: alertSoundEnabled
+                                ? "oklch(0.42 0.18 150 / 12%)"
+                                : "oklch(0.50 0.04 50 / 10%)",
+                              color: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
+                            }}
+                          >
+                            {alertSoundEnabled ? (
+                              <Volume2 className="h-4 w-4" />
+                            ) : (
+                              <VolumeX className="h-4 w-4" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 block">
+                              Notification Sounds
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {alertSoundEnabled ? "Sounds are turned on" : "Sounds are muted"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          id="alert-sound-toggle-btn"
+                          onClick={toggleAlertSounds}
+                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                          style={{
+                            backgroundColor: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
+                            boxShadow: alertSoundEnabled
+                              ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
+                              : "none",
+                          }}
+                          role="switch"
+                          aria-checked={alertSoundEnabled}
+                          aria-label="Toggle Notification Sounds"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              alertSoundEnabled ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Option 2: Allow Notifications */}
+                      <div className="flex items-center justify-between py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            style={{
+                              background: pushEnabled
+                                ? "oklch(0.42 0.18 150 / 12%)"
+                                : "oklch(0.50 0.04 50 / 10%)",
+                              color: pushEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
+                            }}
+                          >
+                            <Bell className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 block">
+                              Allow Notifications
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {pushEnabled ? "Device notifications enabled" : "Device notifications disabled"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={savingPush}
+                          onClick={async () => {
+                            if (savingPush) return;
+                            const previousState = pushEnabled;
+                            setPushEnabled(!previousState);
+                            setSavingPush(true);
+
+                            try {
+                              if (!previousState) {
+                                const permission = await Notification.requestPermission();
+                                if (permission === "denied") {
+                                  setPushEnabled(false);
+                                  toast.error("Notifications blocked. Please allow them in your browser settings.");
+                                  return;
+                                }
+                                if (permission !== "granted") {
+                                  setPushEnabled(false);
+                                  return;
+                                }
+                                const result = await subscribeToPush();
+                                if (result === "granted" || result === "already") {
+                                  await api.updateProfile({ push_enabled: true });
+                                  queryClient.invalidateQueries({ queryKey: ["profile"] });
+                                  toast.success("Notifications allowed!");
+                                } else {
+                                  setPushEnabled(false);
+                                  toast.error("Failed to enable notifications. Please try again.");
+                                }
+                              } else {
+                                await unsubscribeFromPush();
+                                await api.updateProfile({ push_enabled: false });
+                                queryClient.invalidateQueries({ queryKey: ["profile"] });
+                                toast.success("Notifications turned off.");
+                              }
+                            } catch (e) {
+                              setPushEnabled(previousState);
+                              console.error("[push toggle]", e);
+                              toast.error(
+                                e instanceof Error ? e.message : "An unexpected error occurred.",
+                              );
+                            } finally {
+                              setSavingPush(false);
+                            }
+                          }}
+                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50"
+                          style={{
+                            backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
+                            boxShadow: pushEnabled
+                              ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
+                              : "none",
+                          }}
+                          role="switch"
+                          aria-checked={pushEnabled}
+                          aria-label="Toggle Allow Notifications"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              pushEnabled ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Option 3: Notification History */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotifSubTab("history");
+                          loadNotifHistory();
+                        }}
+                        className="w-full flex items-center justify-between py-4 text-left transition-colors hover:bg-black/[0.02] rounded-xl px-1"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            style={{
+                              background: "oklch(0.35 0.15 22 / 8%)",
+                              color: BURGUNDY,
+                            }}
+                          >
+                            <History className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 block">
+                              Notification History
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              View all past alerts and appointment updates
+                            </span>
+                          </div>
+                        </div>
+
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </Card>

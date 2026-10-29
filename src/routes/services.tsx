@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { SERVICE_CATEGORIES } from "@/lib/services-data";
+import {
+  SERVICE_CATEGORIES,
+  getAllServiceCategories,
+  calculateCategoryStartingPrice,
+  type ServiceCategory,
+} from "@/lib/services-data";
 import { CalendarCheck } from "lucide-react";
 
 import salonHeroBg from "@/assets/new_salon_hero_bg.jpg";
@@ -100,7 +105,7 @@ function ServiceCard({
   cat,
   index,
 }: {
-  cat: (typeof SERVICE_CATEGORIES)[number];
+  cat: ServiceCategory;
   index: number;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -122,16 +127,13 @@ function ServiceCard({
     return () => obs.disconnect();
   }, []);
 
-  const imgData = SERVICE_IMAGES[cat.name];
-  const img = imgData?.src;
-  const position = imgData?.position || "center";
-  const firstItem = cat.items[0];
-  const priceDisplay =
-    firstItem?.price === "On request" || firstItem?.price === "Included"
-      ? firstItem.price
-      : firstItem
-        ? `from ₹${firstItem.price}`
-        : "";
+  const defaultImgData = SERVICE_IMAGES[cat.name];
+  // Priority: cat.image (custom admin upload/URL) -> built-in image -> fallback
+  const img = cat.image || defaultImgData?.src;
+  const position = cat.imagePosition || defaultImgData?.position || "center";
+  
+  // Calculate lowest starting price automatically across all sub-services
+  const priceDisplay = calculateCategoryStartingPrice(cat.items);
 
   return (
     <div
@@ -184,7 +186,9 @@ function ServiceCard({
               <span className="svc-item-price">
                 {s.price === "On request" || s.price === "Included"
                   ? s.price
-                  : `₹${s.price}`}
+                  : s.price.startsWith("₹")
+                    ? s.price
+                    : `₹${s.price}`}
               </span>
             </li>
           ))}
@@ -196,10 +200,25 @@ function ServiceCard({
 
 function ServicesPage() {
   const [activeTab, setActiveTab] = useState<TabId>("All");
+  const [categories, setCategories] = useState<ServiceCategory[]>(() => getAllServiceCategories());
 
-  const filtered = SERVICE_CATEGORIES.filter((cat) =>
-    activeTab === "All" ? true : CATEGORY_TAB[cat.name] === activeTab,
-  );
+  useEffect(() => {
+    const handleUpdate = () => {
+      setCategories(getAllServiceCategories());
+    };
+    window.addEventListener("salon-services-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("salon-services-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, []);
+
+  const filtered = categories.filter((cat) => {
+    if (activeTab === "All") return true;
+    const catTab = cat.tab || CATEGORY_TAB[cat.name] || "Skin";
+    return catTab === activeTab;
+  });
 
   return (
     <div

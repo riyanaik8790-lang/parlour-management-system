@@ -106,6 +106,7 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
 
   // Today's notifications only for main dropdown
   const todayItems = items.filter((n) => isToday(n.created_at));
+  const todayUnread = todayItems.filter((n) => !n.is_read).length;
 
   // ── Audio Alert Setup & Autoplay Unlock ─────────────────────────────────────
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -390,29 +391,22 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
                 className="flex items-center justify-between border-b px-4 py-3"
                 style={{ borderColor: "oklch(0.91 0.025 82)", background: "oklch(0.995 0.006 84)" }}
               >
-                <div className="flex items-center gap-1.5">
+                <span
+                  className="text-sm font-semibold tracking-wide"
+                  style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+                >
+                  Today's Notifications
+                </span>
+                {todayUnread > 0 && (
                   <span
-                    className="text-sm font-semibold"
-                    style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{
+                      background: "oklch(0.68 0.13 68 / 12%)",
+                      color: GOLD,
+                    }}
                   >
-                    Today's Notifications
+                    {todayUnread} new
                   </span>
-                  {unread > 0 && (
-                    <span className="text-xs font-normal" style={{ color: GOLD }}>
-                      ({unread} new)
-                    </span>
-                  )}
-                </div>
-                {unread > 0 && (
-                  <button
-                    onClick={markAll}
-                    disabled={marking}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-opacity hover:opacity-70 disabled:opacity-40"
-                    style={{ color: BURGUNDY, background: "oklch(0.35 0.15 22 / 6%)" }}
-                  >
-                    <CheckCheck className="h-3 w-3" />
-                    Mark read
-                  </button>
                 )}
               </div>
 
