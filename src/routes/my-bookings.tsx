@@ -237,31 +237,80 @@ function MyBookingsPage() {
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-serif text-3xl text-primary">Please login</h1>
-        <p className="mt-2 text-muted-foreground">Login to view your bookings.</p>
-        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
-          Login
-        </Button>
+      <div className="relative min-h-[calc(100vh-4rem)] w-full overflow-hidden flex items-center justify-center">
+        {/* ── Luxury floral/geometric background texture watermark ── */}
+        <div
+          className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+          style={{
+            backgroundImage: "url('/luxury-floral-bg.png')",
+            backgroundRepeat: "repeat",
+            backgroundPosition: "center",
+            backgroundSize: "480px auto",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative z-0 mx-auto max-w-md px-4 py-16 text-center">
+          <div
+            className="rounded-2xl border bg-card/95 backdrop-blur-sm p-8 shadow-sm"
+            style={{ borderColor: BORDER }}
+          >
+            <h1 className="font-serif text-3xl text-primary">Please login</h1>
+            <p className="mt-2 text-muted-foreground">Login to view your bookings.</p>
+            <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
+              Login
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (sessionExpired) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-serif text-3xl text-primary">Session expired</h1>
-        <p className="mt-2 text-muted-foreground">Your session has expired. Please log in again.</p>
-        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
-          Log in again
-        </Button>
+      <div className="relative min-h-[calc(100vh-4rem)] w-full overflow-hidden flex items-center justify-center">
+        {/* ── Luxury floral/geometric background texture watermark ── */}
+        <div
+          className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+          style={{
+            backgroundImage: "url('/luxury-floral-bg.png')",
+            backgroundRepeat: "repeat",
+            backgroundPosition: "center",
+            backgroundSize: "480px auto",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative z-0 mx-auto max-w-md px-4 py-16 text-center">
+          <div
+            className="rounded-2xl border bg-card/95 backdrop-blur-sm p-8 shadow-sm"
+            style={{ borderColor: BORDER }}
+          >
+            <h1 className="font-serif text-3xl text-primary">Session expired</h1>
+            <p className="mt-2 text-muted-foreground">Your session has expired. Please log in again.</p>
+            <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
+              Log in again
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
-      <h1 className="font-serif text-3xl sm:text-4xl text-primary">My bookings</h1>
+    <div className="relative min-h-[calc(100vh-4rem)] w-full overflow-hidden">
+      {/* ── Luxury floral/geometric background texture watermark ── */}
+      <div
+        className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+        style={{
+          backgroundImage: "url('/luxury-floral-bg.png')",
+          backgroundRepeat: "repeat",
+          backgroundPosition: "center",
+          backgroundSize: "480px auto",
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative z-0 mx-auto max-w-2xl px-4 py-6 sm:py-10">
+        <h1 className="font-serif text-3xl sm:text-4xl text-primary">My bookings</h1>
 
       {error && (
         <div
@@ -293,7 +342,7 @@ function MyBookingsPage() {
         {bookings?.map((b) => (
           <li
             key={b.id}
-            className="rounded-2xl border bg-card shadow-sm overflow-hidden transition-shadow hover:shadow-md"
+            className="rounded-2xl border bg-card/95 backdrop-blur-sm shadow-sm overflow-hidden transition-shadow hover:shadow-md"
             style={{ borderColor: BORDER }}
           >
             {editingId === b.id ? (
@@ -467,8 +516,29 @@ function MyBookingsPage() {
                   <div className="font-medium text-foreground truncate text-sm sm:text-base">
                     {b.service_name}
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                    {b.date} &middot; {b.time}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
+                      {b.date} &middot; {b.time}
+                    </span>
+                    <span
+                      className="sm:hidden rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize"
+                      style={{
+                        background:
+                          b.status === "confirmed"
+                            ? "oklch(0.35 0.15 22 / 10%)"
+                            : b.status === "cancelled"
+                              ? "oklch(0.577 0.245 27 / 10%)"
+                              : "oklch(0.68 0.13 68 / 12%)",
+                        color:
+                          b.status === "confirmed"
+                            ? BURGUNDY
+                            : b.status === "cancelled"
+                              ? "oklch(0.50 0.22 27)"
+                              : GOLD,
+                      }}
+                    >
+                      {b.status}
+                    </span>
                   </div>
                 </div>
 
@@ -528,6 +598,7 @@ function MyBookingsPage() {
           </li>
         ))}
       </ul>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { CalendarIcon, CheckCircle2, ShoppingCart, X } from "lucide-react";
+import { CalendarIcon, CheckCircle2, ShoppingCart, X, Ban, CalendarX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
 import {
@@ -16,6 +16,12 @@ import {
   getAllServiceCategories,
   type ServiceCategory,
 } from "@/lib/services-data";
+import {
+  isDateClosed,
+  getClosureForDate,
+  getAllClosures,
+  type SalonClosure,
+} from "@/lib/closures-data";
 
 export const Route = createFileRoute("/book")({
   validateSearch: (search: Record<string, unknown>): { service?: string } => ({
@@ -78,6 +84,24 @@ function BookPage() {
       window.removeEventListener("storage", handleSync);
     };
   }, []);
+
+  // Live salon closures
+  const [closures, setClosures] = useState<SalonClosure[]>(() => getAllClosures());
+
+  useEffect(() => {
+    const handleSync = () => setClosures(getAllClosures());
+    window.addEventListener("salon-closures-updated", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("salon-closures-updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, []);
+
+  const dateClosure = useMemo(
+    () => (isoDate ? getClosureForDate(isoDate) : undefined),
+    [isoDate, closures],
+  );
 
   const allLiveServices = useMemo(() => categories.flatMap((c) => c.items), [categories]);
 
@@ -218,6 +242,15 @@ function BookPage() {
         toast.error("Cannot book an appointment in the past.");
         return;
       }
+    }
+
+    // Salon closure check
+    if (isDateClosed(isoDate)) {
+      const cl = getClosureForDate(isoDate);
+      toast.error(
+        `Salon is closed on this date (${cl?.reason || "Holiday"}). Please select another day.`,
+      );
+      return;
     }
 
     const user = getUser();
@@ -390,7 +423,8 @@ function BookPage() {
                   disabled={(d) => {
                     const istToday = getISTNow();
                     istToday.setHours(0, 0, 0, 0);
-                    return d < istToday || d.getDay() === 5;
+                    const dStr = format(d, "yyyy-MM-dd");
+                    return d < istToday || d.getDay() === 5 || isDateClosed(dStr);
                   }}
                   initialFocus
                   className={cn("p-3 pointer-events-auto")}
@@ -436,6 +470,19 @@ function BookPage() {
               )}
             </label>
 
+            {/* Salon Closure / Holiday Banner */}
+            {dateClosure && date && (
+              <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50/90 p-3 text-xs text-red-900 shadow-xs animate-fade-up">
+                <Ban className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                <div>
+                  <p className="font-bold">Salon Closed: {dateClosure.reason}</p>
+                  <p className="mt-0.5 text-red-700">
+                    Appointments and booking slots are blocked on this date. Please select another day.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Pre-Bridal Package fully-booked banner */}
             {isPreBridalBlocked && date && (
               <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300">
@@ -461,6 +508,9 @@ function BookPage() {
                 // Disable ALL slots when Pre-Bridal Package is fully booked for this date
                 const isPreBridalDisabled = hasPreBridal && preBridalFullyBooked;
 
+                // Disable ALL slots when Salon is closed on this date
+                const isDateClosedBlocked = Boolean(dateClosure);
+
                 // No services selected → keep slots visible but unclickable
                 const noServices = selectedIds.length === 0;
 
@@ -483,6 +533,7 @@ function BookPage() {
                   !date ||
                   isPastTime ||
                   isPreBridalDisabled ||
+                  isDateClosedBlocked ||
                   noServices;
 
                 return (

@@ -28,6 +28,7 @@ import {
   User,
   Image as ImageIcon,
   Layers,
+  CalendarX,
   Trash2,
   Plus,
   Upload,
@@ -510,438 +511,17 @@ function WalkinModal({
   );
 }
 
-// ── Add New Service Category Modal ───────────────────────────────────────────
-type SubItemRow = {
-  name: string;
-  price: string;
-  durationMins: number;
-};
-
-function CategoryModal({
-  open,
-  categoryToEdit,
-  onClose,
-  onSuccess,
-}: {
-  open: boolean;
-  categoryToEdit?: ServiceCategory | null;
-  onClose: () => void;
-  onSuccess?: () => void;
-}) {
-  const isEditing = Boolean(categoryToEdit);
-  const [categoryName, setCategoryName] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [tab, setTab] = useState("Skin");
-  const [rows, setRows] = useState<SubItemRow[]>([
-    { name: "", price: "", durationMins: 30 },
-  ]);
-  const [saving, setSaving] = useState(false);
-
-  // Reset or pre-fill form when modal opens
-  useEffect(() => {
-    if (open) {
-      if (categoryToEdit) {
-        setCategoryName(categoryToEdit.name);
-        setImageUrl(categoryToEdit.image || "");
-        setTab(categoryToEdit.tab || "Skin");
-        setRows(
-          categoryToEdit.items && categoryToEdit.items.length > 0
-            ? categoryToEdit.items.map((it) => ({
-                name: it.name,
-                price: it.price,
-                durationMins: it.durationMins || 30,
-              }))
-            : [{ name: "", price: "", durationMins: 30 }],
-        );
-      } else {
-        setCategoryName("");
-        setImageUrl("");
-        setTab("Skin");
-        setRows([{ name: "", price: "", durationMins: 30 }]);
-      }
-    }
-  }, [open, categoryToEdit]);
-
-  const handleAddRow = () => {
-    setRows((prev) => [...prev, { name: "", price: "", durationMins: 30 }]);
-  };
-
-  const handleRemoveRow = (index: number) => {
-    if (rows.length <= 1) return;
-    setRows((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleRowChange = (index: number, field: keyof SubItemRow, value: string | number) => {
-    setRows((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      return next;
-    });
-  };
-
-  // Handle local image file upload preview (data URL)
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select a valid image file.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setImageUrl(reader.result);
-        toast.success("Image selected!");
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Calculate live preview of starting price badge based on rows entered
-  const livePreviewItems: Service[] = rows
-    .filter((r) => r.name.trim())
-    .map((r, i) => ({
-      id: `preview-${i}`,
-      name: r.name,
-      price: r.price || "0",
-      category: categoryName || "New Category",
-      durationMins: Number(r.durationMins) || 30,
-    }));
-  const startingPriceBadge = calculateCategoryStartingPrice(livePreviewItems);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanName = categoryName.trim();
-    if (!cleanName) {
-      toast.error("Please enter a category heading.");
-      return;
-    }
-
-    const validRows = rows.filter((r) => r.name.trim() && r.price.trim());
-    if (validRows.length === 0) {
-      toast.error("Please add at least one sub-service with name and price.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const serviceItems: Service[] = validRows.map((r, index) => ({
-        id: `${slug}-${index}-${Date.now().toString(36)}`,
-        name: r.name.trim(),
-        price: r.price.trim().replace(/^₹\s*/, ""),
-        category: cleanName,
-        durationMins: Number(r.durationMins) || 30,
-      }));
-
-      const newCategory: ServiceCategory = {
-        name: cleanName,
-        image: imageUrl.trim() || undefined,
-        tab,
-        items: serviceItems,
-      };
-
-      saveCustomServiceCategory(newCategory, categoryToEdit?.name);
-      toast.success(
-        isEditing
-          ? `Category "${cleanName}" updated successfully!`
-          : `Category "${cleanName}" created successfully!`,
-      );
-      if (onSuccess) onSuccess();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      toast.error(isEditing ? "Failed to update category." : "Failed to create category.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent
-        className="max-w-2xl max-h-[92vh] overflow-y-auto p-0"
-        style={{
-          background: "oklch(0.998 0.004 85)",
-          borderRadius: "1.25rem",
-          border: "1px solid oklch(0.88 0.030 82)",
-          boxShadow: "0 24px 80px oklch(0.35 0.15 22 / 14%), 0 8px 32px oklch(0.35 0.15 22 / 8%)",
-        }}
-      >
-        {/* Header */}
-        <DialogHeader
-          className="px-6 pt-6 pb-4"
-          style={{
-            background: `linear-gradient(135deg, oklch(0.35 0.15 22 / 6%) 0%, oklch(0.68 0.13 68 / 8%) 100%)`,
-            borderBottom: "1px solid oklch(0.90 0.025 82)",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-md"
-              style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-            >
-              {isEditing ? (
-                <Pencil className="h-5 w-5 text-white" />
-              ) : (
-                <Layers className="h-5 w-5 text-white" />
-              )}
-            </div>
-            <div>
-              <DialogTitle
-                className="text-lg font-bold leading-tight"
-                style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-              >
-                {isEditing ? `Edit Category: ${categoryToEdit?.name}` : "Add New Service Category"}
-              </DialogTitle>
-              <DialogDescription className="mt-0.5 text-xs" style={{ color: TEXT_MUTED }}>
-                {isEditing
-                  ? "Update category heading, cover image, and sub-services list."
-                  : "Create a luxury category card with custom image and dynamic sub-services."}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
-          {/* Main Category Heading */}
-          <div className="space-y-1.5">
-            <label
-              className="text-xs font-semibold uppercase tracking-wide flex items-center justify-between"
-              style={{ color: TEXT_MUTED }}
-            >
-              <span>Main Category Heading <span style={{ color: BURGUNDY }}>*</span></span>
-              {startingPriceBadge && (
-                <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                  Auto badge: {startingPriceBadge}
-                </span>
-              )}
-            </label>
-            <Input
-              id="new-category-name"
-              placeholder='e.g., "Waxing", "Bridal Glow", "Body Spa"'
-              value={categoryName}
-              onChange={(e) => setCategoryName(e.target.value)}
-              required
-              className="h-10 text-sm font-medium"
-            />
-          </div>
-
-          {/* Navigation Category Tab */}
-          <div className="space-y-1.5">
-            <label
-              className="text-xs font-semibold uppercase tracking-wide"
-              style={{ color: TEXT_MUTED }}
-            >
-              Services Page Filter Tab
-            </label>
-            <Select value={tab} onValueChange={setTab}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="Select tab" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Skin">Skin</SelectItem>
-                <SelectItem value="Hair">Hair</SelectItem>
-                <SelectItem value="Waxing">Waxing</SelectItem>
-                <SelectItem value="Nails">Nails</SelectItem>
-                <SelectItem value="Packages">Packages</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cover Image */}
-          <div className="space-y-2">
-            <label
-              className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
-              style={{ color: TEXT_MUTED }}
-            >
-              <ImageIcon className="h-3.5 w-3.5" />
-              <span>Cover Image (URL or Upload)</span>
-            </label>
-            <div className="flex items-center gap-3">
-              <Input
-                id="new-category-image-url"
-                placeholder="https://example.com/photo.jpg or choose file"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="h-10 text-xs flex-1"
-              />
-              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors shrink-0">
-                <Upload className="h-3.5 w-3.5 text-gray-500" />
-                <span>Upload</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageFileChange}
-                  className="hidden"
-                />
-              </label>
-            </div>
-            {imageUrl && (
-              <div className="relative mt-2 h-32 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner group">
-                <img
-                  src={imageUrl}
-                  alt="Category preview"
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => setImageUrl("")}
-                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Sub-items List (1 to n) */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "oklch(0.90 0.025 82)" }}>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-800 block">
-                  Sub-Services List (1 to n)
-                </label>
-                <span className="text-[11px] text-gray-400">
-                  Enter sub-service names and pricing (e.g. Underarms: ₹60, Hand Wax: ₹200 - 300)
-                </span>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddRow}
-                className="h-8 gap-1 text-xs font-semibold"
-                style={{ borderColor: GOLD, color: BURGUNDY }}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Row
-              </Button>
-            </div>
-
-            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-              {rows.map((row, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-100 bg-white/70 shadow-sm"
-                >
-                  <span className="text-xs font-semibold text-gray-400 w-5 text-center">
-                    {idx + 1}.
-                  </span>
-                  <Input
-                    placeholder="Sub-service name (e.g. Underarms)"
-                    value={row.name}
-                    onChange={(e) => handleRowChange(idx, "name", e.target.value)}
-                    required
-                    className="h-9 text-xs flex-1"
-                  />
-                  <div className="relative w-36">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">
-                      ₹
-                    </span>
-                    <Input
-                      placeholder="e.g. 60 or 200 - 300"
-                      value={row.price}
-                      onChange={(e) => handleRowChange(idx, "price", e.target.value)}
-                      required
-                      className="h-9 text-xs pl-6"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRow(idx)}
-                    disabled={rows.length <= 1}
-                    className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors"
-                    title="Delete row"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-2 border-t" style={{ borderColor: "oklch(0.90 0.025 82)" }}>
-            <Button
-              type="submit"
-              disabled={saving}
-              className="flex-1 min-h-[44px] gap-2 font-semibold text-white"
-              style={{
-                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
-                boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
-              }}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Saving…
-                </>
-              ) : isEditing ? (
-                "Save Changes"
-              ) : (
-                "Create Category"
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="min-h-[44px] px-5"
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [categoryToEdit, setCategoryToEdit] = useState<ServiceCategory | null>(null);
 
-  // Categories list for management section
+  // Categories list for stats & card preview
   const [allCategories, setAllCategories] = useState<ServiceCategory[]>(() => getAllServiceCategories());
-
-  // Delete confirmation modal state
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    open: boolean;
-    type: "category" | "sub-service";
-    categoryName: string;
-    serviceId?: string;
-    title: string;
-    description: string;
-  }>({
-    open: false,
-    type: "category",
-    categoryName: "",
-    title: "",
-    description: "",
-  });
-
   const [totalServicesCount, setTotalServicesCount] = useState<number>(() => {
     return getAllServiceCategories().flatMap((c) => c.items).length;
   });
-
-  const [categorySearchQuery, setCategorySearchQuery] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-
-  // View state: "dashboard" shows overview, "services" shows full service management
-  const [activeView, setActiveView] = useState<"dashboard" | "services">("dashboard");
-
-  const toggleCategoryExpand = (catName: string) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [catName]: !prev[catName],
-    }));
-  };
 
   function loadStats() {
     api
@@ -970,49 +550,6 @@ function AdminDashboard() {
       window.removeEventListener("storage", handleUpdate);
     };
   }, []);
-
-  const handleEditCategory = (cat: ServiceCategory) => {
-    setCategoryToEdit(cat);
-    setCategoryModalOpen(true);
-  };
-
-  const handleAddNewCategory = () => {
-    setCategoryToEdit(null);
-    setCategoryModalOpen(true);
-  };
-
-  const confirmDeleteCategory = (cat: ServiceCategory) => {
-    setDeleteConfirm({
-      open: true,
-      type: "category",
-      categoryName: cat.name,
-      title: `Delete Category "${cat.name}"?`,
-      description: `Are you sure you want to delete the "${cat.name}" category and all its ${cat.items.length} sub-services? This will immediately remove it from the client menu and booking flow.`,
-    });
-  };
-
-  const confirmDeleteSubService = (categoryName: string, service: Service) => {
-    setDeleteConfirm({
-      open: true,
-      type: "sub-service",
-      categoryName,
-      serviceId: service.id,
-      title: `Delete Sub-service "${service.name}"?`,
-      description: `Are you sure you want to delete "${service.name}" from ${categoryName}? This service will no longer be bookable.`,
-    });
-  };
-
-  const executeDelete = () => {
-    if (deleteConfirm.type === "category") {
-      deleteServiceCategory(deleteConfirm.categoryName);
-      toast.success(`Category "${deleteConfirm.categoryName}" deleted.`);
-    } else if (deleteConfirm.type === "sub-service" && deleteConfirm.serviceId) {
-      deleteSubService(deleteConfirm.categoryName, deleteConfirm.serviceId);
-      toast.success("Sub-service deleted.");
-    }
-    setDeleteConfirm((prev) => ({ ...prev, open: false }));
-    loadStats();
-  };
 
   const STATS = [
     {
@@ -1075,54 +612,6 @@ function AdminDashboard() {
         {/* Walk-in modal */}
         <WalkinModal open={modalOpen} onClose={() => setModalOpen(false)} onSuccess={loadStats} />
 
-        {/* Add/Edit Service Category modal */}
-        <CategoryModal
-          open={categoryModalOpen}
-          categoryToEdit={categoryToEdit}
-          onClose={() => {
-            setCategoryModalOpen(false);
-            setCategoryToEdit(null);
-          }}
-          onSuccess={loadStats}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm(prev => ({ ...prev, open: false }))}>
-          <DialogContent className="max-w-md p-6 bg-white/95 backdrop-blur-md border border-neutral-200 shadow-2xl rounded-2xl">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center border border-red-200">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-900">{deleteConfirm.title}</h3>
-                <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-                  {deleteConfirm.description}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-neutral-100">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-                className="text-xs h-9 px-4 rounded-xl cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={executeDelete}
-                className="text-xs h-9 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white cursor-pointer shadow-sm"
-              >
-                Delete
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         {/* Header */}
         <div className="animate-fade-up flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1151,10 +640,10 @@ function AdminDashboard() {
 
         {/* ── Header Action Buttons ── */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Add Category Button */}
-          <button
-            id="admin-add-category-btn"
-            onClick={() => setCategoryModalOpen(true)}
+          {/* Manage Services Link */}
+          <Link
+            to="/admin/services"
+            id="admin-manage-services-btn"
             className="group inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             style={{
               background: "oklch(0.998 0.004 85)",
@@ -1164,8 +653,8 @@ function AdminDashboard() {
             }}
           >
             <Layers className="h-4 w-4" style={{ color: GOLD }} />
-            Add New Service Category
-          </button>
+            Manage Services
+          </Link>
 
           {/* Walk-in CTA button */}
           <button
@@ -1362,9 +851,8 @@ function AdminDashboard() {
           </Link>
 
           {/* Manage Services */}
-          <button
-            type="button"
-            onClick={() => setActiveView("services")}
+          <Link
+            to="/admin/services"
             className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300 text-left cursor-pointer"
             style={{
               background: CARD_WHITE,
@@ -1372,12 +860,12 @@ function AdminDashboard() {
               backdropFilter: "blur(8px)",
             }}
             onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
+              const el = e.currentTarget as HTMLAnchorElement;
               el.style.boxShadow = "0 12px 40px oklch(0.35 0.15 22 / 12%)";
               el.style.transform = "translateY(-3px)";
             }}
             onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
+              const el = e.currentTarget as HTMLAnchorElement;
               el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
               el.style.transform = "translateY(0)";
             }}
@@ -1403,270 +891,53 @@ function AdminDashboard() {
               className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
               style={{ color: GOLD }}
             />
-          </button>
-        </div>
-        {/* Services Management — shown only in services view */}
-        {activeView === "services" && (
-        <div className="animate-fade-up delay-300">
-          {/* Back button header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveView("dashboard")}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-neutral-100"
-                style={{ color: BURGUNDY }}
-              >
-                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                Back to Dashboard
-              </button>
-              <div className="hidden sm:block w-px h-4 bg-neutral-200" />
-              <div>
-                <h2
-                  className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: GOLD }}
-                >
-                  Services Management
-                </h2>
-                <p className="mt-0.5 text-[11px]" style={{ color: TEXT_MUTED }}>
-                  Edits sync immediately across the site and booking engine.
-                </p>
-              </div>
+          </Link>
+
+          {/* Closure Manager */}
+          <Link
+            to="/admin/closures"
+            className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300 text-left cursor-pointer"
+            style={{
+              background: CARD_WHITE,
+              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+              backdropFilter: "blur(8px)",
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLAnchorElement;
+              el.style.boxShadow = "0 12px 40px oklch(0.45 0.20 27 / 14%)";
+              el.style.transform = "translateY(-3px)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLAnchorElement;
+              el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
+              el.style.transform = "translateY(0)";
+            }}
+          >
+            <div
+              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+              style={{
+                background: "linear-gradient(135deg, oklch(0.45 0.20 27), oklch(0.55 0.18 22))",
+              }}
+            >
+              <CalendarX className="h-6 w-6 text-white" />
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative min-w-[220px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
-                <Input
-                  value={categorySearchQuery}
-                  onChange={(e) => setCategorySearchQuery(e.target.value)}
-                  placeholder="Filter categories or services..."
-                  className="pl-8 h-9 text-xs rounded-xl border-neutral-200 bg-white shadow-xs focus-visible:ring-1"
-                />
-              </div>
-              <Button
-                type="button"
-                onClick={handleAddNewCategory}
-                className="h-9 px-4 text-xs font-medium rounded-xl text-white shadow-md flex items-center gap-1.5 cursor-pointer flex-shrink-0"
-                style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
+            <div className="flex-1">
+              <p
+                className="font-semibold"
+                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
               >
-                <Plus className="h-3.5 w-3.5" />
-                Add Category
-              </Button>
+                Closure Manager
+              </p>
+              <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
+                Block dates, holidays &amp; salon maintenance
+              </p>
             </div>
-          </div>
-
-          {/* Categories Grid / List */}
-          <div className="space-y-4">
-            {allCategories
-              .filter((cat) => {
-                if (!categorySearchQuery.trim()) return true;
-                const q = categorySearchQuery.toLowerCase();
-                const matchCat = cat.name.toLowerCase().includes(q) || (cat.tab || "").toLowerCase().includes(q);
-                const matchItems = cat.items.some((i) => i.name.toLowerCase().includes(q));
-                return matchCat || matchItems;
-              })
-              .map((cat) => {
-                const isExpanded = expandedCategories[cat.name] ?? false;
-                const startingPrice = calculateCategoryStartingPrice(cat.items);
-
-                return (
-                  <div
-                    key={cat.name}
-                    className="rounded-2xl transition-all duration-300 overflow-hidden"
-                    style={{
-                      background: CARD_WHITE,
-                      boxShadow: "0 4px 20px oklch(0.35 0.15 22 / 6%)",
-                      border: "1px solid oklch(0.35 0.15 22 / 8%)",
-                    }}
-                  >
-                    {/* Category Header Row */}
-                    <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 min-w-0">
-                        {/* Thumbnail */}
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden flex-shrink-0 bg-neutral-100 border border-neutral-200 shadow-xs relative">
-                          {cat.image ? (
-                            <img
-                              src={cat.image}
-                              alt={cat.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                              <ImageIcon className="w-6 h-6" />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Title and Badges */}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3
-                              className="font-bold text-base sm:text-lg truncate"
-                              style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-                            >
-                              {cat.name}
-                            </h3>
-                            {cat.tab && (
-                              <span
-                                className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
-                                style={{
-                                  background: "oklch(0.68 0.13 68 / 15%)",
-                                  color: BURGUNDY,
-                                  border: "1px solid oklch(0.68 0.13 68 / 25%)",
-                                }}
-                              >
-                                {cat.tab}
-                              </span>
-                            )}
-                            <span
-                              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                              style={{
-                                background: "oklch(0.35 0.15 22 / 8%)",
-                                color: BURGUNDY,
-                              }}
-                            >
-                              {startingPrice || `from ₹${cat.items[0]?.price || "0"}`}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs" style={{ color: TEXT_MUTED }}>
-                            {cat.items.length} sub-service{cat.items.length !== 1 ? "s" : ""} configured
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleCategoryExpand(cat.name)}
-                          className="h-8 px-2.5 text-xs rounded-lg border-neutral-200 text-neutral-700 hover:bg-neutral-50 cursor-pointer flex items-center gap-1"
-                        >
-                          {isExpanded ? (
-                            <>
-                              <ChevronUp className="w-3.5 h-3.5" />
-                              Hide Items
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="w-3.5 h-3.5" />
-                              View Items ({cat.items.length})
-                            </>
-                          )}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditCategory(cat)}
-                          className="h-8 px-3 text-xs rounded-lg border-neutral-200 hover:border-amber-400 hover:bg-amber-50/50 text-neutral-800 hover:text-amber-900 transition-colors cursor-pointer flex items-center gap-1.5"
-                        >
-                          <Pencil className="w-3.5 h-3.5 text-amber-600" />
-                          Edit
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => confirmDeleteCategory(cat)}
-                          className="h-8 px-3 text-xs rounded-lg border-neutral-200 hover:border-red-300 hover:bg-red-50 text-neutral-700 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1.5"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Sub-services table (expanded view) */}
-                    {isExpanded && (
-                      <div className="border-t border-neutral-100 bg-neutral-50/70 p-4 sm:p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                            Sub-services in {cat.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleEditCategory(cat)}
-                            className="text-xs font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                            style={{ color: BURGUNDY }}
-                          >
-                            <Plus className="w-3 h-3" />
-                            Add/Edit Sub-items
-                          </button>
-                        </div>
-
-                        {cat.items.length === 0 ? (
-                          <div className="py-6 text-center text-xs text-neutral-400 italic bg-white rounded-xl border border-neutral-200/60">
-                            No sub-services in this category yet. Click "Edit" to add rows.
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-xs">
-                            <table className="w-full text-left text-xs">
-                              <thead>
-                                <tr className="border-b border-neutral-100 bg-neutral-50/90 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                                  <th className="py-2.5 px-3.5">Service Name</th>
-                                  <th className="py-2.5 px-3.5">Price</th>
-                                  <th className="py-2.5 px-3.5">Duration</th>
-                                  <th className="py-2.5 px-3.5 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-neutral-100">
-                                {cat.items.map((item) => (
-                                  <tr key={item.id} className="hover:bg-neutral-50/80 transition-colors">
-                                    <td className="py-2.5 px-3.5 font-medium text-neutral-900">
-                                      {item.name}
-                                    </td>
-                                    <td className="py-2.5 px-3.5">
-                                      <span
-                                        className="font-bold px-2 py-0.5 rounded-md text-[11px]"
-                                        style={{
-                                          background: "oklch(0.68 0.13 68 / 15%)",
-                                          color: BURGUNDY,
-                                        }}
-                                      >
-                                        ₹{item.price}
-                                      </span>
-                                    </td>
-                                    <td className="py-2.5 px-3.5 text-neutral-600">
-                                      {item.durationMins} mins
-                                    </td>
-                                    <td className="py-2.5 px-3.5 text-right">
-                                      <div className="inline-flex items-center gap-1 justify-end">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleEditCategory(cat)}
-                                          title="Edit Service"
-                                          className="p-1.5 rounded-lg text-neutral-500 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
-                                        >
-                                          <Pencil className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => confirmDeleteSubService(cat.name, item)}
-                                          title="Delete Sub-Service"
-                                          className="p-1.5 rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
+            <ArrowRight
+              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
+              style={{ color: GOLD }}
+            />
+          </Link>
         </div>
-        )}
       </div>
     </div>
   </div>

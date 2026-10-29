@@ -233,8 +233,21 @@ function AdminBookingsPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-8 py-6 sm:py-8 max-w-[1400px] mx-auto">
-      {/* Header */}
+    <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-4 sm:px-6 lg:px-12 py-6 sm:py-8 overflow-hidden">
+      {/* ── Luxury floral/geometric background texture watermark ── */}
+      <div
+        className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+        style={{
+          backgroundImage: "url('/admin-floral-bg.png')",
+          backgroundRepeat: "repeat",
+          backgroundPosition: "center",
+          backgroundSize: "480px auto",
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto relative z-0">
+        {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
         <div>
           <h1
@@ -671,6 +684,7 @@ function AdminBookingsPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

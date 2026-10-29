@@ -152,7 +152,15 @@ function SettingsPage() {
 
   const toggleAlertSounds = () => {
     const next = !alertSoundEnabled;
+    // 1. Flip state
     setAlertSoundEnabled(next);
+    // 2. Show toast IMMEDIATELY — synchronous, before any I/O
+    if (next) {
+      toast.success("Alert sounds turned ON", { id: "audio-toggle", duration: 2500 });
+    } else {
+      toast.success("Alert sounds turned OFF", { id: "audio-toggle", duration: 2500 });
+    }
+    // 3. Persist & broadcast in background
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("salon_audio_unlocked", next ? "true" : "false");
@@ -161,16 +169,11 @@ function SettingsPage() {
         console.error("Failed to save audio preference:", err);
       }
     }
+    // 4. Play preview asynchronously — never blocks toast
     if (next) {
-      toast.success("Alert sounds turned ON");
-      // Fire audio preview asynchronously in background without delaying UI transition
       const audio = new Audio("/notification-ding.mp3");
       audio.volume = 1;
-      audio.play().catch(() => {
-        /* silent catch */
-      });
-    } else {
-      toast.info("Alert sounds turned OFF");
+      audio.play().catch(() => { /* silent catch */ });
     }
   };
 
@@ -1094,8 +1097,15 @@ function SettingsPage() {
                           onClick={async () => {
                             if (savingPush) return;
                             const nextState = !pushEnabled;
-                            // Optimistically flip the switch immediately
+                            // 1. Flip state immediately for instant visual feedback
                             setPushEnabled(nextState);
+                            // 2. Fire toast RIGHT NOW — before any async work
+                            const toastId = "push-toggle";
+                            if (nextState) {
+                              toast.loading("Enabling notifications…", { id: toastId, duration: 8000 });
+                            } else {
+                              toast.success("Notifications turned off.", { id: toastId, duration: 2500 });
+                            }
                             setSavingPush(true);
 
                             try {
@@ -1103,33 +1113,35 @@ function SettingsPage() {
                                 const permission = await Notification.requestPermission();
                                 if (permission === "denied") {
                                   setPushEnabled(false);
-                                  toast.error("Notifications blocked. Please allow them in your browser settings.");
+                                  toast.error("Notifications blocked. Please allow them in your browser settings.", { id: toastId });
                                   return;
                                 }
                                 if (permission !== "granted") {
                                   setPushEnabled(false);
+                                  toast.dismiss(toastId);
                                   return;
                                 }
                                 const result = await subscribeToPush();
                                 if (result === "granted" || result === "already") {
                                   await api.updateProfile({ push_enabled: true });
                                   queryClient.invalidateQueries({ queryKey: ["profile"] });
-                                  toast.success("Notifications allowed!");
+                                  toast.success("Notifications allowed!", { id: toastId, duration: 2500 });
                                 } else {
                                   setPushEnabled(false);
-                                  toast.error("Failed to enable notifications. Please try again.");
+                                  toast.error("Failed to enable notifications. Please try again.", { id: toastId });
                                 }
                               } else {
                                 await unsubscribeFromPush();
                                 await api.updateProfile({ push_enabled: false });
                                 queryClient.invalidateQueries({ queryKey: ["profile"] });
-                                toast.success("Notifications turned off.");
+                                // Toast already shown above — no-op
                               }
                             } catch (e) {
                               setPushEnabled(!nextState);
                               console.error("[push toggle]", e);
                               toast.error(
                                 e instanceof Error ? e.message : "An unexpected error occurred.",
+                                { id: toastId },
                               );
                             } finally {
                               setSavingPush(false);

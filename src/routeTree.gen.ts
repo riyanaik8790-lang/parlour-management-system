@@ -21,7 +21,9 @@ import { Route as TryOnRouteImport } from './routes/try-on'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminLayoutRouteImport } from './routes/admin/_layout'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
+import { Route as AdminClosuresRouteImport } from './routes/admin/closures'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as AdminServicesRouteImport } from './routes/admin/services'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 
 const IndexRoute = IndexRouteImport.update({
@@ -84,9 +86,19 @@ const AdminBookingsRoute = AdminBookingsRouteImport.update({
   path: '/admin/bookings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminClosuresRoute = AdminClosuresRouteImport.update({
+  id: '/admin/closures',
+  path: '/admin/closures',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminServicesRoute = AdminServicesRouteImport.update({
+  id: '/admin/services',
+  path: '/admin/services',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -107,7 +119,9 @@ export interface FileRoutesByFullPath {
   '/try-on': typeof TryOnRoute
   '/admin': typeof AdminLayoutRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/closures': typeof AdminClosuresRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
 }
@@ -123,7 +137,9 @@ export interface FileRoutesByTo {
   '/try-on': typeof TryOnRoute
   '/admin': typeof AdminIndexRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/closures': typeof AdminClosuresRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRoutesById {
@@ -139,7 +155,9 @@ export interface FileRoutesById {
   '/try-on': typeof TryOnRoute
   '/admin/_layout': typeof AdminLayoutRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/closures': typeof AdminClosuresRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
 }
@@ -157,7 +175,9 @@ export interface FileRouteTypes {
     | '/try-on'
     | '/admin'
     | '/admin/bookings'
+    | '/admin/closures'
     | '/admin/login'
+    | '/admin/services'
     | '/admin/users'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -173,7 +193,9 @@ export interface FileRouteTypes {
     | '/try-on'
     | '/admin'
     | '/admin/bookings'
+    | '/admin/closures'
     | '/admin/login'
+    | '/admin/services'
     | '/admin/users'
   id:
     | '__root__'
@@ -188,7 +210,9 @@ export interface FileRouteTypes {
     | '/try-on'
     | '/admin/_layout'
     | '/admin/bookings'
+    | '/admin/closures'
     | '/admin/login'
+    | '/admin/services'
     | '/admin/users'
     | '/admin/'
   fileRoutesById: FileRoutesById
@@ -205,7 +229,9 @@ export interface RootRouteChildren {
   TryOnRoute: typeof TryOnRoute
   AdminLayoutRoute: typeof AdminLayoutRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
+  AdminClosuresRoute: typeof AdminClosuresRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminServicesRoute: typeof AdminServicesRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -296,11 +322,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBookingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/closures': {
+      id: '/admin/closures'
+      path: '/admin/closures'
+      fullPath: '/admin/closures'
+      preLoaderRoute: typeof AdminClosuresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/admin/login'
       fullPath: '/admin/login'
       preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/services': {
+      id: '/admin/services'
+      path: '/admin/services'
+      fullPath: '/admin/services'
+      preLoaderRoute: typeof AdminServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/users': {
@@ -325,7 +365,9 @@ const rootRouteChildren: RootRouteChildren = {
   TryOnRoute: TryOnRoute,
   AdminLayoutRoute: AdminLayoutRoute,
   AdminBookingsRoute: AdminBookingsRoute,
+  AdminClosuresRoute: AdminClosuresRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminServicesRoute: AdminServicesRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
