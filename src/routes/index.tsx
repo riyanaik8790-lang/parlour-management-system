@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CalendarCheck, Sparkles, ShieldCheck, Heart, Award, Clock, Star, ArrowRight, IndianRupee } from "lucide-react";
 import { SERVICE_CATEGORIES } from "@/lib/services-data";
@@ -89,6 +89,7 @@ const GALLERY_ITEMS = [
 
 function Index() {
   const featured = SERVICE_CATEGORIES.slice(0, 6);
+  const [isMarqueePaused, setIsMarqueePaused] = useState(false);
 
   // section refs
   const statsRef = useReveal();
@@ -225,15 +226,32 @@ function Index() {
               <p className="text-sm text-muted-foreground mt-2">A mood board for your next glow-up</p>
             </div>
 
-            {/* Marquee Outer Wrapper */}
-            <div className="relative w-full overflow-hidden marquee-container py-2 select-none">
-              <div className="animate-marquee flex items-center w-max">
-                {/* Track 1 */}
+            {/* Marquee Outer Wrapper with Pause on Click */}
+            <div
+              className="relative w-full overflow-hidden marquee-container py-2 select-none cursor-pointer"
+              onClick={() => setIsMarqueePaused((prev) => !prev)}
+              role="button"
+              tabIndex={0}
+              aria-label={isMarqueePaused ? "Resume gallery scroll" : "Pause gallery scroll"}
+              onKeyDown={(e) => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  setIsMarqueePaused((prev) => !prev);
+                }
+              }}
+            >
+              <div
+                className="animate-marquee flex items-center w-max"
+                style={{
+                  animationPlayState: isMarqueePaused ? "paused" : "running",
+                }}
+              >
+                {/* Track 1 - Duplicated 2x for full seamless breadth across any screen */}
                 <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8 pr-4 sm:pr-6 md:pr-8">
-                  {GALLERY_ITEMS.map((g, i) => (
+                  {[...GALLERY_ITEMS, ...GALLERY_ITEMS].map((g, i) => (
                     <div
                       key={`t1-${i}`}
-                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
                     >
                       <img
                         src={g.src}
@@ -253,10 +271,10 @@ function Index() {
 
                 {/* Track 2: Identical clone for seamless, mathematically gapless infinite looping */}
                 <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8 pr-4 sm:pr-6 md:pr-8" aria-hidden="true">
-                  {GALLERY_ITEMS.map((g, i) => (
+                  {[...GALLERY_ITEMS, ...GALLERY_ITEMS].map((g, i) => (
                     <div
                       key={`t2-${i}`}
-                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
                     >
                       <img
                         src={g.src}
@@ -274,6 +292,20 @@ function Index() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Interactive hint */}
+            <div className="text-center mt-3 sm:mt-4">
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all"
+                style={{
+                  background: isMarqueePaused ? "oklch(0.35 0.15 22 / 12%)" : "oklch(0.92 0.030 83 / 70%)",
+                  color: isMarqueePaused ? "oklch(0.35 0.15 22)" : "oklch(0.45 0.04 50)",
+                  border: isMarqueePaused ? "1px solid oklch(0.35 0.15 22 / 25%)" : "1px solid oklch(0.84 0.042 80 / 50%)",
+                }}
+              >
+                {isMarqueePaused ? "⏸️ Gallery paused — Click or tap to resume scrolling" : "💡 Click or tap any image to pause"}
+              </span>
             </div>
           </div>
         </section>

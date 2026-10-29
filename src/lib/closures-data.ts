@@ -10,6 +10,26 @@ export type SalonClosure = {
   createdAt: string;
 };
 
+/**
+ * Returns today's date string in "YYYY-MM-DD" format.
+ * Formats using device's local calendar and ensures alignment with IST (salon timezone),
+ * preventing UTC ISO-string offsets from erroneously allowing yesterday's date.
+ */
+export function getTodayDateString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const localDate = `${year}-${month}-${day}`;
+
+  try {
+    const istDate = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    return istDate > localDate ? istDate : localDate;
+  } catch {
+    return localDate;
+  }
+}
+
 export const CLOSURES_STORAGE_KEY = "salon_closures_v1";
 
 export const DEFAULT_CLOSURES: SalonClosure[] = [

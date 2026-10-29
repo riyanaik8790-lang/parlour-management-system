@@ -373,6 +373,21 @@ function AdminUsersPage() {
   const adminCount = users.filter((u) => u.role === "ADMIN").length;
   const userCount = users.filter((u) => u.role === "USER").length;
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleManualRefresh() {
+    setRefreshing(true);
+    try {
+      const data = await api.adminGetUsers();
+      setUsers(data.users);
+      toast.success("Users data refreshed successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to refresh users");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <>
       {/* Confirm modal */}
@@ -394,7 +409,7 @@ function AdminUsersPage() {
         />
       )}
 
-      <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-8 py-6 sm:py-8 max-w-[1400px] mx-auto">
+      <div className="space-y-4 sm:space-y-6 px-4 sm:px-6 lg:px-12 py-6 sm:py-8 max-w-[1400px] mx-auto">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
           <div>
@@ -411,9 +426,9 @@ function AdminUsersPage() {
             </p>
           </div>
           <button
-            onClick={loadUsers}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition disabled:opacity-40 min-h-[44px]"
+            onClick={handleManualRefresh}
+            disabled={loading || refreshing}
+            className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition disabled:opacity-40 min-h-[44px] cursor-pointer"
             style={{
               border: "1px solid oklch(0.84 0.042 80)",
               background: "oklch(0.998 0.004 85)",
@@ -421,16 +436,16 @@ function AdminUsersPage() {
               boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
             }}
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${loading || refreshing ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
 
-        {/* Summary chips */}
+        {/* Summary chips - horizontal scrollable */}
         {!loading && (
-          <div className="flex flex-wrap gap-3 animate-fade-up delay-100">
+          <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
             <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
+              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
               style={{
                 border: "1px solid oklch(0.84 0.042 80 / 70%)",
                 background: "oklch(0.998 0.004 85)",
@@ -445,7 +460,7 @@ function AdminUsersPage() {
               </span>
             </div>
             <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
+              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
               style={{
                 border: "1px solid oklch(0.35 0.15 22 / 20%)",
                 background:
@@ -459,7 +474,7 @@ function AdminUsersPage() {
               </span>
             </div>
             <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
+              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
               style={{
                 border: "1px solid oklch(0.84 0.042 80 / 70%)",
                 background: "oklch(0.998 0.004 85)",

@@ -595,7 +595,7 @@ function AdminDashboard() {
   ];
 
   return (
-    <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-4 sm:px-8 lg:px-12 py-8 overflow-hidden">
+    <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-5 sm:px-8 lg:px-12 py-6 sm:py-8 overflow-hidden">
       {/* ── Subtle, executive floral lattice background pattern ── */}
       <div
         className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
@@ -608,7 +608,7 @@ function AdminDashboard() {
         aria-hidden="true"
       />
 
-      <div className="space-y-10 max-w-[1400px] mx-auto">
+      <div className="space-y-8 sm:space-y-10 max-w-[1400px] mx-auto px-1 sm:px-0 relative z-0">
         {/* Walk-in modal */}
         <WalkinModal open={modalOpen} onClose={() => setModalOpen(false)} onSuccess={loadStats} />
 
@@ -624,322 +624,310 @@ function AdminDashboard() {
                 border: "1px solid oklch(0.35 0.15 22 / 18%)",
               }}
             >
-            <Sparkles className="h-3 w-3" style={{ color: GOLD }} />
-            Admin Overview
-          </span>
-          <h1
-            className="text-4xl font-bold leading-tight"
-            style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-          >
-            Dashboard
-          </h1>
-          <p className="mt-2 text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-            Welcome back! Here&apos;s what&apos;s happening at Hemangi Glam.
-          </p>
-        </div>
-
-        {/* ── Header Action Buttons ── */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Manage Services Link */}
-          <Link
-            to="/admin/services"
-            id="admin-manage-services-btn"
-            className="group inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
-            style={{
-              background: "oklch(0.998 0.004 85)",
-              color: BURGUNDY,
-              border: `1.5px solid ${GOLD}`,
-              boxShadow: "0 4px 16px oklch(0.68 0.13 68 / 18%)",
-            }}
-          >
-            <Layers className="h-4 w-4" style={{ color: GOLD }} />
-            Manage Services
-          </Link>
-
-          {/* Walk-in CTA button */}
-          <button
-            id="admin-add-walkin-btn"
-            onClick={() => setModalOpen(true)}
-            className="group inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
-            style={{
-              background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
-              boxShadow: `0 6px 24px oklch(0.35 0.15 22 / 30%)`,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                `0 10px 32px oklch(0.35 0.15 22 / 40%)`;
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                `0 6px 24px oklch(0.35 0.15 22 / 30%)`;
-            }}
-          >
-            <PlusCircle className="h-4 w-4 transition-transform group-hover:rotate-90 duration-200" />
-            Add Walk-in / Offline Booking
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div
-          className="rounded-2xl p-4 text-sm animate-fade-up"
-          style={{
-            background: "oklch(0.577 0.245 27.325 / 8%)",
-            border: "1px solid oklch(0.577 0.245 27.325 / 20%)",
-            color: "oklch(0.45 0.18 27)",
-          }}
-        >
-          ⚠️ Could not load live stats — ensure the backend is running. {error}
-        </div>
-      )}
-
-
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 animate-fade-up delay-100">
-        {STATS.map(({ label, value, icon: Icon, iconBg, glowColor, decorColor }) => (
-          <div
-            key={label}
-            className="group relative overflow-hidden rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1.5"
-            style={{
-              background: CARD_WHITE,
-              boxShadow: "0 4px 30px oklch(0.35 0.15 22 / 7%), 0 1px 4px oklch(0.35 0.15 22 / 4%)",
-              backdropFilter: "blur(8px)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.boxShadow =
-                `0 16px 48px ${glowColor}25, 0 4px 16px oklch(0.35 0.15 22 / 8%)`;
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.boxShadow =
-                "0 4px 30px oklch(0.35 0.15 22 / 7%), 0 1px 4px oklch(0.35 0.15 22 / 4%)";
-            }}
-          >
-            <div
-              className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl opacity-60 transition-opacity group-hover:opacity-100"
-              style={{ background: decorColor }}
-            />
-            <div
-              className="pointer-events-none absolute -bottom-4 -left-4 h-16 w-16 rounded-full blur-xl opacity-30"
-              style={{ background: decorColor }}
-            />
-            <div
-              className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl shadow-lg"
-              style={{ background: iconBg }}
+              <Sparkles className="h-3 w-3" style={{ color: GOLD }} />
+              Admin Overview
+            </span>
+            <h1
+              className="text-2xl sm:text-4xl font-bold leading-tight"
+              style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
             >
-              <Icon className="h-5 w-5 text-white" />
-            </div>
-            <p
-              className="text-4xl font-bold leading-none"
-              style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-            >
-              {value === "-" && !stats ? (
-                <span
-                  className="inline-block h-9 w-14 animate-pulse rounded-lg"
-                  style={{ background: "oklch(0.91 0.025 82)" }}
-                />
-              ) : (
-                value
-              )}
-            </p>
-            <p className="mt-2 text-sm font-medium" style={{ color: TEXT_MUTED }}>
-              {label}
+              Dashboard
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
+              Welcome back! Here&apos;s what&apos;s happening at Hemangi Glam.
             </p>
           </div>
-        ))}
-      </div>
 
-
-
-      {/* Quick Actions */}
-      <div className="animate-fade-up delay-400">
-        <h2
-          className="mb-5 text-xs font-semibold uppercase tracking-widest"
-          style={{ color: GOLD }}
-        >
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Manage Users */}
-          <Link
-            to="/admin/users"
-            className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300"
-            style={{
-              background: CARD_WHITE,
-              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
-              backdropFilter: "blur(8px)",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 12px 40px oklch(0.35 0.15 22 / 12%)";
-              el.style.transform = "translateY(-3px)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
-              el.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
-              style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-            >
-              <Users className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p
-                className="font-semibold"
-                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-              >
-                Manage Users
-              </p>
-              <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
-                {stats
-                  ? `${stats.total_users} registered customer${stats.total_users !== 1 ? "s" : ""}`
-                  : "View all registered customers"}
-              </p>
-            </div>
-            <ArrowRight
-              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
-              style={{ color: GOLD }}
-            />
-          </Link>
-
-          {/* Manage Bookings */}
-          <Link
-            to="/admin/bookings"
-            className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300"
-            style={{
-              background: CARD_WHITE,
-              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
-              backdropFilter: "blur(8px)",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 12px 40px oklch(0.68 0.13 68 / 16%)";
-              el.style.transform = "translateY(-3px)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
-              el.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
-              style={{ background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})` }}
-            >
-              <CalendarCheck className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p
-                className="font-semibold"
-                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-              >
-                Manage Bookings
-              </p>
-              <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
-                {stats
-                  ? `${stats.bookings_today} booking${stats.bookings_today !== 1 ? "s" : ""} today`
-                  : "View and manage appointments"}
-              </p>
-            </div>
-            <ArrowRight
-              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
-              style={{ color: GOLD }}
-            />
-          </Link>
-
-          {/* Manage Services */}
-          <Link
-            to="/admin/services"
-            className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300 text-left cursor-pointer"
-            style={{
-              background: CARD_WHITE,
-              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
-              backdropFilter: "blur(8px)",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 12px 40px oklch(0.35 0.15 22 / 12%)";
-              el.style.transform = "translateY(-3px)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
-              el.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
-              style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${GOLD})` }}
-            >
-              <Layers className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p
-                className="font-semibold"
-                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-              >
-                Manage Services
-              </p>
-              <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
-                {totalServicesCount} sub-service{totalServicesCount !== 1 ? "s" : ""} across {allCategories.length} categor{allCategories.length !== 1 ? "ies" : "y"}
-              </p>
-            </div>
-            <ArrowRight
-              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
-              style={{ color: GOLD }}
-            />
-          </Link>
-
-          {/* Closure Manager */}
-          <Link
-            to="/admin/closures"
-            className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300 text-left cursor-pointer"
-            style={{
-              background: CARD_WHITE,
-              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
-              backdropFilter: "blur(8px)",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 12px 40px oklch(0.45 0.20 27 / 14%)";
-              el.style.transform = "translateY(-3px)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
-              el.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+          {/* ── Header Action Buttons ── */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+            {/* Manage Services Link */}
+            <Link
+              to="/admin/services"
+              id="admin-manage-services-btn"
+              className="group inline-flex items-center justify-center gap-2 rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none"
               style={{
-                background: "linear-gradient(135deg, oklch(0.45 0.20 27), oklch(0.55 0.18 22))",
+                background: "oklch(0.998 0.004 85)",
+                color: BURGUNDY,
+                border: `1.5px solid ${GOLD}`,
+                boxShadow: "0 4px 16px oklch(0.68 0.13 68 / 18%)",
               }}
             >
-              <CalendarX className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1">
+              <Layers className="h-4 w-4" style={{ color: GOLD }} />
+              Manage Services
+            </Link>
+
+            {/* Walk-in CTA button */}
+            <button
+              id="admin-add-walkin-btn"
+              onClick={() => setModalOpen(true)}
+              className="group inline-flex items-center justify-center gap-2 rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-lg transition-all duration-200 flex-1 sm:flex-none cursor-pointer"
+              style={{
+                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                boxShadow: `0 6px 24px oklch(0.35 0.15 22 / 30%)`,
+              }}
+            >
+              <PlusCircle className="h-4 w-4 transition-transform group-hover:rotate-90 duration-200" />
+              <span>Add Walk-in Booking</span>
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div
+            className="rounded-2xl p-4 text-sm animate-fade-up"
+            style={{
+              background: "oklch(0.577 0.245 27.325 / 8%)",
+              border: "1px solid oklch(0.577 0.245 27.325 / 20%)",
+              color: "oklch(0.45 0.18 27)",
+            }}
+          >
+            ⚠️ Could not load live stats — ensure the backend is running. {error}
+          </div>
+        )}
+
+        {/* Stat cards - 2 columns on mobile */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-5 animate-fade-up delay-100">
+          {STATS.map(({ label, value, icon: Icon, iconBg, glowColor, decorColor }) => (
+            <div
+              key={label}
+              className="group relative overflow-hidden rounded-2xl p-4 sm:p-7 transition-all duration-300 hover:-translate-y-1.5"
+              style={{
+                background: CARD_WHITE,
+                boxShadow: "0 4px 30px oklch(0.35 0.15 22 / 7%), 0 1px 4px oklch(0.35 0.15 22 / 4%)",
+                backdropFilter: "blur(8px)",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow =
+                  `0 16px 48px ${glowColor}25, 0 4px 16px oklch(0.35 0.15 22 / 8%)`;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow =
+                  "0 4px 30px oklch(0.35 0.15 22 / 7%), 0 1px 4px oklch(0.35 0.15 22 / 4%)";
+              }}
+            >
+              <div
+                className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 sm:h-24 sm:w-24 rounded-full blur-2xl opacity-60 transition-opacity group-hover:opacity-100"
+                style={{ background: decorColor }}
+              />
+              <div
+                className="pointer-events-none absolute -bottom-4 -left-4 h-12 w-12 sm:h-16 sm:w-16 rounded-full blur-xl opacity-30"
+                style={{ background: decorColor }}
+              />
+              <div
+                className="mb-3 sm:mb-5 inline-flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-xl shadow-md"
+                style={{ background: iconBg }}
+              >
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              </div>
               <p
-                className="font-semibold"
+                className="text-2xl sm:text-4xl font-bold leading-none"
                 style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
               >
-                Closure Manager
+                {value === "-" && !stats ? (
+                  <span
+                    className="inline-block h-7 w-12 sm:h-9 sm:w-14 animate-pulse rounded-lg"
+                    style={{ background: "oklch(0.91 0.025 82)" }}
+                  />
+                ) : (
+                  value
+                )}
               </p>
-              <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
-                Block dates, holidays &amp; salon maintenance
+              <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm font-medium leading-snug" style={{ color: TEXT_MUTED }}>
+                {label}
               </p>
             </div>
-            <ArrowRight
-              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
-              style={{ color: GOLD }}
-            />
-          </Link>
+          ))}
+        </div>
+
+        {/* Quick Actions - 2 columns on mobile */}
+        <div className="animate-fade-up delay-400">
+          <h2
+            className="mb-3.5 sm:mb-5 text-xs font-semibold uppercase tracking-widest"
+            style={{ color: GOLD }}
+          >
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {/* Manage Users */}
+            <Link
+              to="/admin/users"
+              className="group flex flex-col sm:flex-row items-start sm:items-center gap-2.5 sm:gap-4 rounded-2xl p-3.5 sm:p-6 transition-all duration-300"
+              style={{
+                background: CARD_WHITE,
+                boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+                backdropFilter: "blur(8px)",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 12px 40px oklch(0.35 0.15 22 / 12%)";
+                el.style.transform = "translateY(-3px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
+                el.style.transform = "translateY(0)";
+              }}
+            >
+              <div
+                className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+                style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
+              >
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <p
+                  className="font-semibold text-xs sm:text-base leading-tight"
+                  style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+                >
+                  Manage Users
+                </p>
+                <p className="mt-1 text-[11px] sm:text-sm line-clamp-2" style={{ color: TEXT_MUTED }}>
+                  {stats
+                    ? `${stats.total_users} registered customer${stats.total_users !== 1 ? "s" : ""}`
+                    : "View all registered customers"}
+                </p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 hidden sm:block opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
+                style={{ color: GOLD }}
+              />
+            </Link>
+
+            {/* Manage Bookings */}
+            <Link
+              to="/admin/bookings"
+              className="group flex flex-col sm:flex-row items-start sm:items-center gap-2.5 sm:gap-4 rounded-2xl p-3.5 sm:p-6 transition-all duration-300"
+              style={{
+                background: CARD_WHITE,
+                boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+                backdropFilter: "blur(8px)",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 12px 40px oklch(0.68 0.13 68 / 16%)";
+                el.style.transform = "translateY(-3px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
+                el.style.transform = "translateY(0)";
+              }}
+            >
+              <div
+                className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+                style={{ background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})` }}
+              >
+                <CalendarCheck className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <p
+                  className="font-semibold text-xs sm:text-base leading-tight"
+                  style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+                >
+                  Manage Bookings
+                </p>
+                <p className="mt-1 text-[11px] sm:text-sm line-clamp-2" style={{ color: TEXT_MUTED }}>
+                  {stats
+                    ? `${stats.bookings_today} booking${stats.bookings_today !== 1 ? "s" : ""} today`
+                    : "View and manage appointments"}
+                </p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 hidden sm:block opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
+                style={{ color: GOLD }}
+              />
+            </Link>
+
+            {/* Manage Services */}
+            <Link
+              to="/admin/services"
+              className="group flex flex-col sm:flex-row items-start sm:items-center gap-2.5 sm:gap-4 rounded-2xl p-3.5 sm:p-6 transition-all duration-300 text-left cursor-pointer"
+              style={{
+                background: CARD_WHITE,
+                boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+                backdropFilter: "blur(8px)",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 12px 40px oklch(0.35 0.15 22 / 12%)";
+                el.style.transform = "translateY(-3px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
+                el.style.transform = "translateY(0)";
+              }}
+            >
+              <div
+                className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+                style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${GOLD})` }}
+              >
+                <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <p
+                  className="font-semibold text-xs sm:text-base leading-tight"
+                  style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+                >
+                  Manage Services
+                </p>
+                <p className="mt-1 text-[11px] sm:text-sm line-clamp-2" style={{ color: TEXT_MUTED }}>
+                  {totalServicesCount} sub-services across {allCategories.length} categories
+                </p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 hidden sm:block opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
+                style={{ color: GOLD }}
+              />
+            </Link>
+
+            {/* Closure Manager */}
+            <Link
+              to="/admin/closures"
+              className="group flex flex-col sm:flex-row items-start sm:items-center gap-2.5 sm:gap-4 rounded-2xl p-3.5 sm:p-6 transition-all duration-300 text-left cursor-pointer"
+              style={{
+                background: CARD_WHITE,
+                boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+                backdropFilter: "blur(8px)",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 12px 40px oklch(0.45 0.20 27 / 14%)";
+                el.style.transform = "translateY(-3px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLAnchorElement;
+                el.style.boxShadow = "0 4px 24px oklch(0.35 0.15 22 / 6%)";
+                el.style.transform = "translateY(0)";
+              }}
+            >
+              <div
+                className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl shadow-md"
+                style={{
+                  background: "linear-gradient(135deg, oklch(0.45 0.20 27), oklch(0.55 0.18 22))",
+                }}
+              >
+                <CalendarX className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <p
+                  className="font-semibold text-xs sm:text-base leading-tight"
+                  style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+                >
+                  Closure Manager
+                </p>
+                <p className="mt-1 text-[11px] sm:text-sm line-clamp-2" style={{ color: TEXT_MUTED }}>
+                  Block dates, holidays &amp; salon maintenance
+                </p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 hidden sm:block opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
+                style={{ color: GOLD }}
+              />
+            </Link>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 }

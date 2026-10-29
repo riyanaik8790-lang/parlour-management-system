@@ -232,8 +232,23 @@ function AdminBookingsPage() {
     "no-show": bookings.filter((b) => b.status === "no-show").length,
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleManualRefresh() {
+    setRefreshing(true);
+    try {
+      const data = await api.adminGetAllBookings();
+      setBookings(data.bookings);
+      toast.success("Bookings data refreshed successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to refresh bookings");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
-    <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-4 sm:px-6 lg:px-12 py-6 sm:py-8 overflow-hidden">
+    <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-5 sm:px-8 lg:px-12 py-6 sm:py-8 overflow-hidden">
       {/* ── Luxury floral/geometric background texture watermark ── */}
       <div
         className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
@@ -246,84 +261,84 @@ function AdminBookingsPage() {
         aria-hidden="true"
       />
 
-      <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto relative z-0">
+      <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto px-1 sm:px-0 relative z-0">
         {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
-        <div>
-          <h1
-            className="text-2xl sm:text-3xl font-bold"
-            style={{ color: "oklch(0.25 0.05 50)", fontFamily: "var(--font-serif)" }}
-          >
-            All Bookings
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
-            {loading
-              ? "Loading…"
-              : `${bookings.length} total · ${counts.confirmed} confirmed · ${counts.completed} completed · ${counts.cancelled} cancelled`}
-          </p>
-        </div>
-        <button
-          onClick={loadBookings}
-          disabled={loading}
-          className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition disabled:opacity-40 min-h-[44px]"
-          style={{
-            border: "1px solid oklch(0.84 0.042 80)",
-            background: "oklch(0.998 0.004 85)",
-            color: "oklch(0.45 0.04 50)",
-            boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
-          }}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Status filter chips */}
-      <div className="flex flex-wrap gap-2 animate-fade-up delay-100">
-        {STATUS_OPTIONS.map(({ value, label }) => {
-          const count = counts[value as keyof typeof counts] ?? 0;
-          const active = statusFilter === value;
-          return (
-            <button
-              key={value}
-              onClick={() => setStatusFilter(value)}
-              className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all min-h-[44px]"
-              style={
-                active
-                  ? {
-                      background:
-                        "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
-                      color: "oklch(0.35 0.15 22)",
-                      border: "1px solid oklch(0.35 0.15 22 / 20%)",
-                    }
-                  : {
-                      background: "oklch(0.998 0.004 85)",
-                      color: "oklch(0.55 0.04 50)",
-                      border: "1px solid oklch(0.84 0.042 80 / 70%)",
-                    }
-              }
+        <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
+          <div>
+            <h1
+              className="text-2xl sm:text-3xl font-bold"
+              style={{ color: "oklch(0.25 0.05 50)", fontFamily: "var(--font-serif)" }}
             >
-              {label}
-              <span
-                className="rounded-full px-1.5 text-[10px] font-bold"
+              All Bookings
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
+              {loading
+                ? "Loading…"
+                : `${bookings.length} total · ${counts.confirmed} confirmed · ${counts.completed} completed · ${counts.cancelled} cancelled`}
+            </p>
+          </div>
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading || refreshing}
+            className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition disabled:opacity-40 min-h-[44px] cursor-pointer"
+            style={{
+              border: "1px solid oklch(0.84 0.042 80)",
+              background: "oklch(0.998 0.004 85)",
+              color: "oklch(0.45 0.04 50)",
+              boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
+            }}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading || refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
+
+        {/* Status filter chips - Horizontal swipeable/scrollable bar */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1.5 pt-0.5 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
+          {STATUS_OPTIONS.map(({ value, label }) => {
+            const count = counts[value as keyof typeof counts] ?? 0;
+            const active = statusFilter === value;
+            return (
+              <button
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-all min-h-[38px] sm:min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer"
                 style={
                   active
                     ? {
-                        background: "oklch(0.35 0.15 22 / 12%)",
+                        background:
+                          "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
                         color: "oklch(0.35 0.15 22)",
+                        border: "1px solid oklch(0.35 0.15 22 / 20%)",
                       }
                     : {
-                        background: "oklch(0.90 0.030 83)",
+                        background: "oklch(0.998 0.004 85)",
                         color: "oklch(0.55 0.04 50)",
+                        border: "1px solid oklch(0.84 0.042 80 / 70%)",
                       }
                 }
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                {label}
+                <span
+                  className="rounded-full px-1.5 text-[10px] font-bold"
+                  style={
+                    active
+                      ? {
+                          background: "oklch(0.35 0.15 22 / 12%)",
+                          color: "oklch(0.35 0.15 22)",
+                        }
+                      : {
+                          background: "oklch(0.90 0.030 83)",
+                          color: "oklch(0.55 0.04 50)",
+                        }
+                  }
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
       {/* Search */}
       <div className="relative animate-fade-up delay-200">

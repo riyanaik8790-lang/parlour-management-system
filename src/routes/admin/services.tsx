@@ -324,7 +324,7 @@ function CategoryModal({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 sm:py-5 space-y-5 sm:space-y-6">
           {/* Main Category Heading */}
           <div className="space-y-1.5">
             <label
@@ -446,35 +446,35 @@ function CategoryModal({
               {rows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-100 bg-white/70 shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-xl border border-gray-100 bg-white/70 shadow-sm"
                 >
-                  <span className="text-xs font-semibold text-gray-400 w-5 text-center">
+                  <span className="text-xs font-semibold text-gray-400 w-4 sm:w-5 shrink-0 text-center">
                     {idx + 1}.
                   </span>
                   <Input
-                    placeholder="Sub-service name (e.g. Underarms)"
+                    placeholder="Sub-service name (e.g. Upper Lip)"
                     value={row.name}
                     onChange={(e) => handleRowChange(idx, "name", e.target.value)}
                     required
-                    className="h-9 text-xs flex-1"
+                    className="h-9 text-xs flex-1 min-w-[120px] sm:min-w-[150px] px-2.5"
                   />
-                  <div className="relative w-36">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">
+                  <div className="relative w-24 sm:w-28 shrink-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">
                       ₹
                     </span>
                     <Input
-                      placeholder="e.g. 60 or 200 - 300"
+                      placeholder="e.g. 60"
                       value={row.price}
                       onChange={(e) => handleRowChange(idx, "price", e.target.value)}
                       required
-                      className="h-9 text-xs pl-6"
+                      className="h-9 text-xs pl-6 pr-2 font-medium"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveRow(idx)}
                     disabled={rows.length <= 1}
-                    className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors shrink-0 cursor-pointer"
                     title="Delete row"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -622,6 +622,21 @@ function AdminServicesPage() {
     return matchCat || matchItems;
   });
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleManualRefresh = () => {
+    setRefreshing(true);
+    try {
+      const cats = getAllServiceCategories();
+      setCategories(cats);
+      toast.success("Services data refreshed successfully");
+    } catch {
+      toast.error("Failed to refresh services");
+    } finally {
+      setTimeout(() => setRefreshing(false), 400);
+    }
+  };
+
   return (
     <>
       {/* Category Add/Edit Modal */}
@@ -641,7 +656,7 @@ function AdminServicesPage() {
         onCancel={() => setDeleteConfirm((prev) => ({ ...prev, open: false }))}
       />
 
-      <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-8 py-6 sm:py-8 max-w-[1400px] mx-auto">
+      <div className="space-y-4 sm:space-y-6 px-4 sm:px-6 lg:px-12 py-6 sm:py-8 max-w-[1400px] mx-auto">
         {/* Header matching Admin Users layout */}
         <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
           <div>
@@ -658,7 +673,8 @@ function AdminServicesPage() {
           </div>
           <div className="flex items-center gap-2.5 sm:gap-3">
             <button
-              onClick={loadCategories}
+              onClick={handleManualRefresh}
+              disabled={refreshing}
               className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition min-h-[44px] cursor-pointer"
               style={{
                 border: "1px solid oklch(0.84 0.042 80)",
@@ -667,7 +683,7 @@ function AdminServicesPage() {
                 boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
               }}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </button>
             <button
@@ -683,10 +699,10 @@ function AdminServicesPage() {
           </div>
         </div>
 
-        {/* Summary chips */}
-        <div className="flex flex-wrap gap-3 animate-fade-up delay-100">
+        {/* Summary chips - horizontal scrollable */}
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
           <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
+            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
             style={{
               border: "1px solid oklch(0.84 0.042 80 / 70%)",
               background: CARD_WHITE,
@@ -701,7 +717,7 @@ function AdminServicesPage() {
             </span>
           </div>
           <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
+            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
             style={{
               border: "1px solid oklch(0.35 0.15 22 / 20%)",
               background:
@@ -711,18 +727,6 @@ function AdminServicesPage() {
             <Scissors className="h-3.5 w-3.5" style={{ color: GOLD }} />
             <span style={{ color: "oklch(0.45 0.08 40)" }}>
               <span className="font-semibold">{totalServicesCount}</span> sub-services
-            </span>
-          </div>
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
-            style={{
-              border: "1px solid oklch(0.84 0.042 80 / 70%)",
-              background: CARD_WHITE,
-            }}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            <span style={{ color: TEXT_MUTED }}>
-              <span className="font-semibold text-emerald-700">Live Sync</span> active
             </span>
           </div>
         </div>
@@ -847,7 +851,7 @@ function AdminServicesPage() {
                     </div>
 
                     {/* Action buttons with stable dimensions */}
-                    <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                    <div className="flex items-center gap-2 shrink-0 self-stretch sm:self-auto justify-end flex-wrap sm:flex-nowrap">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -856,18 +860,18 @@ function AdminServicesPage() {
                           toggleCategoryExpand(cat.name);
                         }}
                         aria-expanded={isExpanded}
-                        className={`h-9 min-w-[130px] px-3.5 text-xs font-medium rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 select-none ${
+                        className={`h-9 px-3.5 text-xs font-medium rounded-xl border transition-all duration-150 cursor-pointer inline-flex items-center justify-center gap-1.5 select-none shrink-0 whitespace-nowrap ${
                           isExpanded
                             ? "bg-neutral-100/90 border-neutral-300 text-neutral-900 shadow-inner"
                             : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900 shadow-xs"
                         }`}
                       >
                         <ChevronDown
-                          className={`w-3.5 h-3.5 text-neutral-500 transition-transform duration-200 ease-out ${
+                          className={`w-3.5 h-3.5 text-neutral-500 transition-transform duration-200 ease-out shrink-0 ${
                             isExpanded ? "rotate-180 text-neutral-800" : ""
                           }`}
                         />
-                        <span>{isExpanded ? "Hide Items" : `View Items (${cat.items.length})`}</span>
+                        <span className="whitespace-nowrap font-medium">{isExpanded ? "Hide Items" : `View Items (${cat.items.length})`}</span>
                       </button>
 
                       <button

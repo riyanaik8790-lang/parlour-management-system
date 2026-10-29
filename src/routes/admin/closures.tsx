@@ -22,6 +22,7 @@ import {
   getAllClosures,
   addClosure,
   deleteClosure,
+  getTodayDateString,
 } from "@/lib/closures-data";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -142,9 +143,22 @@ function AdminClosuresPage() {
   const [showAddForm, setShowAddForm] = useState(true);
 
   const [closureToDelete, setClosureToDelete] = useState<SalonClosure | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadClosures = () => {
     setClosures(getAllClosures());
+  };
+
+  const handleManualRefresh = () => {
+    setRefreshing(true);
+    try {
+      loadClosures();
+      toast.success("Closures data refreshed successfully");
+    } catch {
+      toast.error("Failed to refresh closures");
+    } finally {
+      setTimeout(() => setRefreshing(false), 400);
+    }
   };
 
   useEffect(() => {
@@ -158,8 +172,8 @@ function AdminClosuresPage() {
     };
   }, []);
 
-  // Today in YYYY-MM-DD (min selectable date)
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  // Today in YYYY-MM-DD (min selectable date) - uses local/IST calendar so past dates are strictly disabled
+  const todayStr = useMemo(() => getTodayDateString(), []);
 
   const handleAddClosure = (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,7 +270,7 @@ function AdminClosuresPage() {
         onCancel={() => setClosureToDelete(null)}
       />
 
-      <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-4 sm:px-6 lg:px-12 py-6 sm:py-8 overflow-hidden">
+      <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-5 sm:px-8 lg:px-12 py-6 sm:py-8 overflow-hidden">
         {/* ── Luxury floral/geometric background texture watermark ── */}
         <div
           className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
@@ -269,124 +283,111 @@ function AdminClosuresPage() {
           aria-hidden="true"
         />
 
-        <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto relative z-0">
+        <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto px-1 sm:px-0 relative z-0">
           {/* Header matching Admin layout */}
           <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
-          <div>
-            <h1
-              className="text-2xl sm:text-3xl font-bold"
-              style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-            >
-              Closure Manager
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm" style={{ color: TEXT_MUTED }}>
-              {activeAndUpcomingClosures.length} scheduled closure{activeAndUpcomingClosures.length !== 1 ? "s" : ""} · Blocked
-              dates automatically disable time slots on the booking engine
-            </p>
+            <div>
+              <h1
+                className="text-2xl sm:text-3xl font-bold"
+                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
+              >
+                Closure Manager
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm" style={{ color: TEXT_MUTED }}>
+                {activeAndUpcomingClosures.length} scheduled closure{activeAndUpcomingClosures.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition min-h-[44px] cursor-pointer"
+                style={{
+                  border: "1px solid oklch(0.84 0.042 80)",
+                  background: CARD_WHITE,
+                  color: "oklch(0.45 0.04 50)",
+                  boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
+                }}
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddForm((v) => !v)}
+                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-md transition min-h-[44px] cursor-pointer"
+                style={{
+                  background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                }}
+              >
+                <CalendarX className="h-4 w-4" />
+                {showAddForm ? "Hide Form" : "Block New Date"}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <button
-              type="button"
-              onClick={loadClosures}
-              className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition min-h-[44px] cursor-pointer"
+
+          {/* Summary chips - Horizontal scrollable */}
+          <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
+            <div
+              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
               style={{
-                border: "1px solid oklch(0.84 0.042 80)",
+                border: "1px solid oklch(0.84 0.042 80 / 70%)",
                 background: CARD_WHITE,
-                color: "oklch(0.45 0.04 50)",
-                boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
               }}
             >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAddForm((v) => !v)}
-              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-md transition min-h-[44px] cursor-pointer"
+              <CalendarX className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
+              <span style={{ color: TEXT_MUTED }}>
+                <span className="font-semibold" style={{ color: TEXT_DARK }}>
+                  {activeAndUpcomingClosures.length}
+                </span>{" "}
+                active &amp; upcoming closures
+              </span>
+            </div>
+
+            <div
+              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
               style={{
-                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                border: "1px solid oklch(0.35 0.15 22 / 20%)",
+                background:
+                  "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%), oklch(0.68 0.13 68 / 4%))",
               }}
             >
-              <CalendarX className="h-4 w-4" />
-              {showAddForm ? "Hide Form" : "Block New Date"}
-            </button>
-          </div>
-        </div>
-
-        {/* Summary chips */}
-        <div className="flex flex-wrap gap-3 animate-fade-up delay-100">
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
-            style={{
-              border: "1px solid oklch(0.84 0.042 80 / 70%)",
-              background: CARD_WHITE,
-            }}
-          >
-            <CalendarX className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
-            <span style={{ color: TEXT_MUTED }}>
-              <span className="font-semibold" style={{ color: TEXT_DARK }}>
-                {activeAndUpcomingClosures.length}
-              </span>{" "}
-              active &amp; upcoming closures
-            </span>
+              <Clock className="h-3.5 w-3.5" style={{ color: GOLD }} />
+              <span style={{ color: "oklch(0.45 0.08 40)" }}>
+                <span className="font-semibold">{upcomingCount}</span> upcoming ·{" "}
+                <span className="font-semibold">{activeTodayCount}</span> active today
+              </span>
+            </div>
           </div>
 
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
-            style={{
-              border: "1px solid oklch(0.35 0.15 22 / 20%)",
-              background:
-                "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%), oklch(0.68 0.13 68 / 4%))",
-            }}
-          >
-            <Clock className="h-3.5 w-3.5" style={{ color: GOLD }} />
-            <span style={{ color: "oklch(0.45 0.08 40)" }}>
-              <span className="font-semibold">{upcomingCount}</span> upcoming ·{" "}
-              <span className="font-semibold">{activeTodayCount}</span> active today
-            </span>
-          </div>
-
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm"
-            style={{
-              border: "1px solid oklch(0.84 0.042 80 / 70%)",
-              background: CARD_WHITE,
-            }}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            <span style={{ color: TEXT_MUTED }}>
-              <span className="font-semibold text-emerald-700">Real-Time Booking Sync</span> active
-            </span>
-          </div>
-        </div>
-
-        {/* Add Closure Card / Form */}
-        {showAddForm && (
-          <div
-            className="rounded-2xl p-5 sm:p-6 shadow-sm border transition-all animate-fade-up"
-            style={{
-              background: CARD_WHITE,
-              borderColor: "oklch(0.84 0.042 80 / 70%)",
-              boxShadow: "0 4px 20px oklch(0.35 0.15 22 / 5%)",
-            }}
-          >
-            <div className="flex items-center justify-between border-b pb-4 mb-5 border-neutral-100">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-xs"
-                  style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-                >
-                  <Lock className="w-4 h-4" />
+          {/* Add Closure Card / Form */}
+          {showAddForm && (
+            <div
+              className="rounded-2xl p-5 sm:p-6 shadow-sm border transition-all animate-fade-up"
+              style={{
+                background: CARD_WHITE,
+                borderColor: "oklch(0.84 0.042 80 / 70%)",
+                boxShadow: "0 4px 20px oklch(0.35 0.15 22 / 5%)",
+              }}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 mb-5 border-neutral-100">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-xl text-white shadow-xs"
+                    style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
+                  >
+                    <Lock className="w-4 h-4 shrink-0" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold font-serif" style={{ color: TEXT_DARK }}>
+                      Block Date or Schedule Holiday
+                    </h2>
+                    <p className="text-xs" style={{ color: TEXT_MUTED }}>
+                      Appointments will be blocked on the chosen dates.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-base font-bold font-serif" style={{ color: TEXT_DARK }}>
-                    Block Date or Schedule Holiday
-                  </h2>
-                  <p className="text-xs" style={{ color: TEXT_MUTED }}>
-                    Appointments will be blocked on the chosen dates.
-                  </p>
-                </div>
-              </div>
 
               {/* Toggle Single vs Range */}
               <div className="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-100 border border-neutral-200 text-xs">
