@@ -37,6 +37,14 @@ import {
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
+import { REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -124,6 +132,14 @@ function SettingsPage() {
   });
   const [historyNotifications, setHistoryNotifications] = useState<AppNotification[]>([]);
   const [loadingNotifHistory, setLoadingNotifHistory] = useState(false);
+  const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("salon_reminder_pref");
+      if (saved) return Number(saved);
+    }
+    return 30;
+  });
+  const [savingReminderPref, setSavingReminderPref] = useState(false);
 
   // Sync alert sound state when modified elsewhere
   useEffect(() => {
@@ -256,6 +272,10 @@ function SettingsPage() {
         setRole(p.role);
         setAvatarUrl(p.avatar_url ?? null);
         setPushEnabled(p.push_enabled ?? false);
+        if (p.default_reminder_minutes) {
+          setDefaultReminderMinutes(p.default_reminder_minutes);
+          localStorage.setItem("salon_reminder_pref", String(p.default_reminder_minutes));
+        }
       })
       .catch(() => {
         const u = getUser();
@@ -267,6 +287,20 @@ function SettingsPage() {
       })
       .finally(() => setLoadingProfile(false));
   }, []);
+
+  const handleReminderPrefChange = async (mins: number) => {
+    setDefaultReminderMinutes(mins);
+    localStorage.setItem("salon_reminder_pref", String(mins));
+    setSavingReminderPref(true);
+    try {
+      await api.updateProfile({ default_reminder_minutes: mins });
+      toast.success(`Default reminder set to ${formatReminderLabel(mins)}`);
+    } catch {
+      toast.success(`Reminder preference saved to ${formatReminderLabel(mins)}`);
+    } finally {
+      setSavingReminderPref(false);
+    }
+  };
 
   // ── Upload Avatar File helper ──────────────────────────────────────────────
   async function uploadAvatarFile(file: File) {
@@ -1165,6 +1199,48 @@ function SettingsPage() {
                             }`}
                           />
                         </button>
+                      </div>
+
+                      {/* Option: Default Appointment Reminder */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 border-t border-b border-border/50">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            style={{
+                              background: "oklch(0.68 0.13 68 / 15%)",
+                              color: GOLD,
+                            }}
+                          >
+                            <Clock className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 block">
+                              Default Appointment Reminder
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Choose how soon before your visit you wish to be notified
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="w-full sm:w-48 shrink-0">
+                          <Select
+                            value={String(defaultReminderMinutes)}
+                            onValueChange={(val) => handleReminderPrefChange(Number(val))}
+                            disabled={savingReminderPref}
+                          >
+                            <SelectTrigger className="w-full h-9 bg-background text-xs font-medium">
+                              <SelectValue placeholder="Select reminder" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {REMINDER_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {/* Option 3: Notification History */}

@@ -1,6 +1,4 @@
-// ── Salon Closures / Holiday Blocking Manager ────────────────────────────
-// Allows admin to block dates, public holidays, and maintenance days.
-// Synchronizes in real time with the booking engine (/book).
+import { useState, useEffect, useCallback } from "react";
 
 export type SalonClosure = {
   id: string;
@@ -31,6 +29,7 @@ export function getTodayDateString(): string {
 }
 
 export const CLOSURES_STORAGE_KEY = "salon_closures_v1";
+export const BROADCAST_CHANNEL_NAME = "salon_closures_broadcast_v1";
 
 export const DEFAULT_CLOSURES: SalonClosure[] = [
   {
@@ -48,6 +47,71 @@ export const DEFAULT_CLOSURES: SalonClosure[] = [
     createdAt: "2026-10-20T10:00:00Z",
   },
 ];
+
+// ── In-Memory Subscriber Store ────────────────────────────────────────────────
+const listeners = new Set<(closures: SalonClosure[]) => void>();
+
+function notifyListeners(closures: SalonClosure[]) {
+  listeners.forEach((listener) => {
+    try {
+      listener(closures);
+    } catch (e) {
+      console.error("Error in closure listener callback", e);
+    }
+  });
+}
+
+export function subscribeToClosures(listener: (closures: SalonClosure[]) => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+// ── BroadcastChannel for Real-Time Cross-Tab / Cross-Iframe Sync ───────────────
+let broadcastChannel: BroadcastChannel | null = null;
+if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+  try {
+    broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+    broadcastChannel.onmessage = (event) => {
+      if (event.data?.type === "SALON_CLOSURES_UPDATED" && Array.isArray(event.data?.payload)) {
+        notifyListeners(event.data.payload);
+      } else {
+        notifyListeners(getAllClosures());
+      }
+    };
+  } catch (e) {
+    console.warn("BroadcastChannel not available:", e);
+  }
+}
+
+// ── Cross-Frame window.postMessage sync (for preview iframes & viewports) ───────
+if (typeof window !== "undefined") {
+  window.addEventListener("message", (event) => {
+    if (event.data?.type === "SALON_CLOSURES_SYNC_REQUEST") {
+      const current = getAllClosures();
+      try {
+        (event.source as WindowProxy | null)?.postMessage(
+          { type: "SALON_CLOSURES_SYNC_RESPONSE", payload: current },
+          "*"
+        );
+      } catch {}
+    } else if (
+      (event.data?.type === "SALON_CLOSURES_UPDATED" ||
+        event.data?.type === "SALON_CLOSURES_SYNC_RESPONSE") &&
+      Array.isArray(event.data?.payload)
+    ) {
+      try {
+        const stored = localStorage.getItem(CLOSURES_STORAGE_KEY);
+        const incomingJson = JSON.stringify(event.data.payload);
+        if (stored !== incomingJson) {
+          localStorage.setItem(CLOSURES_STORAGE_KEY, incomingJson);
+        }
+      } catch {}
+      notifyListeners(event.data.payload);
+    }
+  });
+}
 
 export function getAllClosures(): SalonClosure[] {
   if (typeof window === "undefined") return DEFAULT_CLOSURES;
@@ -67,8 +131,38 @@ export function getAllClosures(): SalonClosure[] {
 
 export function saveAllClosures(closures: SalonClosure[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(closures));
-  window.dispatchEvent(new Event("salon-closures-updated"));
+
+  try {
+    localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(closures));
+  } catch (err) {
+    console.error("Failed to save closures to localStorage", err);
+  }
+
+  // 1. Notify in-memory subscribers in the active window
+  notifyListeners(closures);
+
+  // 2. Dispatch event for same-window listeners
+  try {
+    window.dispatchEvent(new CustomEvent("salon-closures-updated", { detail: closures }));
+  } catch {}
+
+  // 3. Broadcast to all other windows / tabs / viewports via BroadcastChannel
+  try {
+    broadcastChannel?.postMessage({
+      type: "SALON_CLOSURES_UPDATED",
+      payload: closures,
+    });
+  } catch {}
+
+  // 4. Post message to parent/top frames in case of preview simulators
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        { type: "SALON_CLOSURES_UPDATED", payload: closures },
+        "*"
+      );
+    }
+  } catch {}
 }
 
 export function addClosure(data: {
@@ -111,4 +205,69 @@ export function getClosureForDate(dateStr: string): SalonClosure | undefined {
   if (!dateStr) return undefined;
   const closures = getAllClosures();
   return closures.find((c) => dateStr >= c.startDate && dateStr <= c.endDate);
+}
+
+/**
+ * React hook for unified, real-time cross-view closure synchronization.
+ * Automatically stays synchronized across mobile/desktop viewports,
+ * resize events, storage changes, tab focus, and BroadcastChannel updates.
+ */
+export function useClosures() {
+  const [closures, setClosures] = useState<SalonClosure[]>(() => getAllClosures());
+
+  useEffect(() => {
+    // Initial sync
+    setClosures(getAllClosures());
+
+    const unsubscribe = subscribeToClosures((updated) => {
+      setClosures(updated);
+    });
+
+    const handleSync = () => {
+      setClosures(getAllClosures());
+    };
+
+    // Cross-tab / cross-window storage event
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === CLOSURES_STORAGE_KEY) {
+        handleSync();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("salon-closures-updated", handleSync);
+    window.addEventListener("resize", handleSync);
+    window.addEventListener("focus", handleSync);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        handleSync();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Request synchronization from parent/sibling preview frames if present
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "SALON_CLOSURES_SYNC_REQUEST" }, "*");
+      }
+    } catch {}
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("salon-closures-updated", handleSync);
+      window.removeEventListener("resize", handleSync);
+      window.removeEventListener("focus", handleSync);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  const refresh = useCallback(() => {
+    const latest = getAllClosures();
+    setClosures(latest);
+    return latest;
+  }, []);
+
+  return { closures, refresh };
 }

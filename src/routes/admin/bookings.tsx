@@ -211,7 +211,7 @@ function AdminBookingsPage() {
   }
 
   const filtered = bookings.filter((b) => {
-    if (statusFilter !== "all" && b.status !== statusFilter) return false;
+    if (statusFilter !== "all" && b.status?.toLowerCase() !== statusFilter.toLowerCase()) return false;
     const q = query.toLowerCase();
     if (!q) return true;
     return (
@@ -226,10 +226,10 @@ function AdminBookingsPage() {
   // Summary counts
   const counts = {
     all: bookings.length,
-    confirmed: bookings.filter((b) => b.status === "confirmed").length,
-    completed: bookings.filter((b) => b.status === "completed").length,
-    cancelled: bookings.filter((b) => b.status === "cancelled").length,
-    "no-show": bookings.filter((b) => b.status === "no-show").length,
+    confirmed: bookings.filter((b) => b.status?.toLowerCase() === "confirmed").length,
+    completed: bookings.filter((b) => b.status?.toLowerCase() === "completed").length,
+    cancelled: bookings.filter((b) => b.status?.toLowerCase() === "cancelled").length,
+    "no-show": bookings.filter((b) => b.status?.toLowerCase() === "no-show").length,
   };
 
   const [refreshing, setRefreshing] = useState(false);
@@ -294,42 +294,47 @@ function AdminBookingsPage() {
         </div>
 
         {/* Status filter chips - Horizontal swipeable/scrollable bar */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1.5 pt-0.5 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
+        <div
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1.5 pt-0.5 -mx-1 px-1 scroll-smooth animate-fade-up delay-100"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
           {STATUS_OPTIONS.map(({ value, label }) => {
             const count = counts[value as keyof typeof counts] ?? 0;
             const active = statusFilter === value;
             return (
               <button
                 key={value}
+                type="button"
                 onClick={() => setStatusFilter(value)}
-                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-all min-h-[38px] sm:min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer"
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all min-h-[38px] sm:min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer select-none"
                 style={
                   active
                     ? {
                         background:
-                          "linear-gradient(135deg, oklch(0.35 0.15 22 / 8%), oklch(0.68 0.13 68 / 6%))",
-                        color: "oklch(0.35 0.15 22)",
-                        border: "1px solid oklch(0.35 0.15 22 / 20%)",
+                          "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+                        color: "#ffffff",
+                        border: "1.5px solid oklch(0.35 0.15 22)",
+                        boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
                       }
                     : {
                         background: "oklch(0.998 0.004 85)",
-                        color: "oklch(0.55 0.04 50)",
-                        border: "1px solid oklch(0.84 0.042 80 / 70%)",
+                        color: "oklch(0.45 0.04 50)",
+                        border: "1px solid oklch(0.84 0.042 80 / 80%)",
                       }
                 }
               >
                 {label}
                 <span
-                  className="rounded-full px-1.5 text-[10px] font-bold"
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                   style={
                     active
                       ? {
-                          background: "oklch(0.35 0.15 22 / 12%)",
-                          color: "oklch(0.35 0.15 22)",
+                          background: "oklch(0.68 0.13 68 / 35%)",
+                          color: "#ffffff",
                         }
                       : {
-                          background: "oklch(0.90 0.030 83)",
-                          color: "oklch(0.55 0.04 50)",
+                          background: "oklch(0.92 0.030 83)",
+                          color: "oklch(0.50 0.04 50)",
                         }
                   }
                 >

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Layers,
   Search,
@@ -58,6 +58,7 @@ const TEXT_DARK = "oklch(0.25 0.05 50)";
 const TEXT_MUTED = "oklch(0.55 0.04 50)";
 
 type SubItemRow = {
+  id?: string;
   name: string;
   price: string;
   durationMins: number;
@@ -171,6 +172,7 @@ function CategoryModal({
         setRows(
           categoryToEdit.items && categoryToEdit.items.length > 0
             ? categoryToEdit.items.map((it) => ({
+                id: it.id,
                 name: it.name,
                 price: it.price,
                 durationMins: it.durationMins || 30,
@@ -249,11 +251,11 @@ function CategoryModal({
     try {
       const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const serviceItems: Service[] = validRows.map((r, index) => ({
-        id: `${slug}-${index}-${Date.now().toString(36)}`,
+        id: r.id || `${slug}-${index}-${Date.now().toString(36)}`,
         name: r.name.trim(),
         price: r.price.trim().replace(/^₹\s*/, ""),
         category: cleanName,
-        durationMins: Number(r.durationMins) || 30,
+        durationMins: Math.max(5, Number(r.durationMins) || 30),
       }));
 
       const newCategory: ServiceCategory = {
@@ -426,7 +428,7 @@ function CategoryModal({
                   Sub-Services List
                 </label>
                 <span className="text-[11px] text-gray-400">
-                  Enter sub-service names and pricing (e.g. Underarms: ₹60, Hand Wax: ₹200 - 300)
+                  Enter sub-service names, pricing, and duration in minutes
                 </span>
               </div>
               <Button
@@ -442,43 +444,81 @@ function CategoryModal({
               </Button>
             </div>
 
-            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+            {/* Desktop column headers */}
+            <div className="hidden sm:grid grid-cols-[1.5rem_1fr_6.5rem_6.5rem_2rem] gap-2 px-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+              <span className="text-center">#</span>
+              <span>Sub-Service</span>
+              <span>Price (₹)</span>
+              <span>Duration</span>
+              <span></span>
+            </div>
+
+            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-3 sm:pr-3.5 [scrollbar-gutter:stable]">
               {rows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-xl border border-gray-100 bg-white/70 shadow-sm"
+                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-xl border border-gray-100 bg-white/70 shadow-sm"
                 >
-                  <span className="text-xs font-semibold text-gray-400 w-4 sm:w-5 shrink-0 text-center">
-                    {idx + 1}.
-                  </span>
-                  <Input
-                    placeholder="Sub-service name (e.g. Upper Lip)"
-                    value={row.name}
-                    onChange={(e) => handleRowChange(idx, "name", e.target.value)}
-                    required
-                    className="h-9 text-xs flex-1 min-w-[120px] sm:min-w-[150px] px-2.5"
-                  />
-                  <div className="relative w-24 sm:w-28 shrink-0">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">
-                      ₹
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-gray-400 w-5 shrink-0 text-center">
+                      {idx + 1}.
                     </span>
                     <Input
-                      placeholder="e.g. 60"
-                      value={row.price}
-                      onChange={(e) => handleRowChange(idx, "price", e.target.value)}
+                      placeholder="Sub-service name (e.g. Upper Lip)"
+                      value={row.name}
+                      onChange={(e) => handleRowChange(idx, "name", e.target.value)}
                       required
-                      className="h-9 text-xs pl-6 pr-2 font-medium"
+                      className="h-9 text-xs flex-1 min-w-0 px-2.5"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRow(idx)}
-                    disabled={rows.length <= 1}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors shrink-0 cursor-pointer"
-                    title="Delete row"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5 sm:gap-2 pl-6 sm:pl-0">
+                    <div className="relative w-24 sm:w-26 shrink-0">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">
+                        ₹
+                      </span>
+                      <Input
+                        placeholder="e.g. 60"
+                        value={row.price}
+                        onChange={(e) => handleRowChange(idx, "price", e.target.value)}
+                        required
+                        className="h-9 text-xs pl-6 pr-2 font-medium"
+                        title="Price in Rupees"
+                      />
+                    </div>
+                    <div className="relative w-24 sm:w-26 shrink-0">
+                      <Clock className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <Input
+                        type="number"
+                        min={5}
+                        max={480}
+                        step={5}
+                        placeholder="30"
+                        value={row.durationMins ?? 30}
+                        onChange={(e) =>
+                          handleRowChange(
+                            idx,
+                            "durationMins",
+                            e.target.value === "" ? 0 : Number(e.target.value),
+                          )
+                        }
+                        required
+                        className="h-9 text-xs pl-7 pr-7 font-medium"
+                        title="Duration in minutes"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium pointer-events-none">
+                        min
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(idx)}
+                      disabled={rows.length <= 1}
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors shrink-0 cursor-pointer ml-auto sm:ml-0"
+                      title="Delete row"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -612,8 +652,29 @@ function AdminServicesPage() {
     loadCategories();
   };
 
-  // Filter categories and sub-services by search query
+  const [selectedTab, setSelectedTab] = useState<string>("all");
+
+  const availableTabs = useMemo(() => {
+    const defaultTabs = ["Skin", "Hair", "Waxing", "Nails", "Packages"];
+    const customTabs = categories
+      .map((c) => c.tab?.trim())
+      .filter((t): t is string => Boolean(t && !defaultTabs.some((dt) => dt.toLowerCase() === t.toLowerCase())));
+    const allUnique = [...defaultTabs, ...Array.from(new Set(customTabs))];
+    return [
+      { value: "all", label: "All Categories", count: categories.length },
+      ...allUnique.map((tab) => ({
+        value: tab,
+        label: tab,
+        count: categories.filter((c) => c.tab?.toLowerCase() === tab.toLowerCase()).length,
+      })),
+    ];
+  }, [categories]);
+
+  // Filter categories and sub-services by selected tab and search query
   const filteredCategories = categories.filter((cat) => {
+    if (selectedTab !== "all" && cat.tab?.toLowerCase() !== selectedTab.toLowerCase()) {
+      return false;
+    }
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     const matchCat =
@@ -699,36 +760,55 @@ function AdminServicesPage() {
           </div>
         </div>
 
-        {/* Summary chips - horizontal scrollable */}
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-            style={{
-              border: "1px solid oklch(0.84 0.042 80 / 70%)",
-              background: CARD_WHITE,
-            }}
-          >
-            <Layers className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
-            <span style={{ color: TEXT_MUTED }}>
-              <span className="font-semibold" style={{ color: TEXT_DARK }}>
-                {categories.length}
-              </span>{" "}
-              categories
-            </span>
-          </div>
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-            style={{
-              border: "1px solid oklch(0.35 0.15 22 / 20%)",
-              background:
-                "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%), oklch(0.68 0.13 68 / 4%))",
-            }}
-          >
-            <Scissors className="h-3.5 w-3.5" style={{ color: GOLD }} />
-            <span style={{ color: "oklch(0.45 0.08 40)" }}>
-              <span className="font-semibold">{totalServicesCount}</span> sub-services
-            </span>
-          </div>
+        {/* Category Tabs - Horizontal swipeable/scrollable filter bar */}
+        <div
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1.5 pt-0.5 -mx-1 px-1 scroll-smooth animate-fade-up delay-100"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {availableTabs.map(({ value, label, count }) => {
+            const active = selectedTab.toLowerCase() === value.toLowerCase();
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSelectedTab(value)}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all min-h-[38px] sm:min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer select-none"
+                style={
+                  active
+                    ? {
+                        background:
+                          "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+                        color: "#ffffff",
+                        border: "1.5px solid oklch(0.35 0.15 22)",
+                        boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
+                      }
+                    : {
+                        background: CARD_WHITE,
+                        color: "oklch(0.45 0.04 50)",
+                        border: "1px solid oklch(0.84 0.042 80 / 80%)",
+                      }
+                }
+              >
+                {label}
+                <span
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                  style={
+                    active
+                      ? {
+                          background: "oklch(0.68 0.13 68 / 35%)",
+                          color: "#ffffff",
+                        }
+                      : {
+                          background: "oklch(0.92 0.030 83)",
+                          color: "oklch(0.50 0.04 50)",
+                        }
+                  }
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Search */}

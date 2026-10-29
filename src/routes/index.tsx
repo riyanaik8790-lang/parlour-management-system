@@ -87,9 +87,134 @@ const GALLERY_ITEMS = [
   { src: pedicureImg, label: "Pedicure", position: "center" },
 ];
 
+const QUAD_GALLERY_ITEMS = [
+  ...GALLERY_ITEMS,
+  ...GALLERY_ITEMS,
+  ...GALLERY_ITEMS,
+  ...GALLERY_ITEMS,
+];
+
 function Index() {
   const featured = SERVICE_CATEGORIES.slice(0, 6);
-  const [isMarqueePaused, setIsMarqueePaused] = useState(false);
+
+  // Gallery touch/mouse drag & auto-scroll state
+  const galleryScrollRef = useRef<HTMLDivElement>(null);
+  const isDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftStartRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const isHoveredRef = useRef(false);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+
+  const wrapScroll = (container: HTMLDivElement) => {
+    const oneSetWidth = container.scrollWidth / 4;
+    if (oneSetWidth <= 0) return;
+    if (container.scrollLeft >= oneSetWidth * 2) {
+      container.scrollLeft -= oneSetWidth;
+    } else if (container.scrollLeft < oneSetWidth) {
+      container.scrollLeft += oneSetWidth;
+    }
+  };
+
+  useEffect(() => {
+    const container = galleryScrollRef.current;
+    if (!container) return;
+
+    // Start centered in the middle set so dragging left or right is immediately infinite
+    const initTimer = setTimeout(() => {
+      if (container) {
+        const oneSetWidth = container.scrollWidth / 4;
+        if (oneSetWidth > 0 && container.scrollLeft === 0) {
+          container.scrollLeft = oneSetWidth;
+        }
+      }
+    }, 60);
+
+    let lastTime = performance.now();
+    const step = (now: number) => {
+      const dt = now - lastTime;
+      lastTime = now;
+
+      if (!isDownRef.current && !isHoveredRef.current && container) {
+        const dx = Math.min(dt * 0.045, 3);
+        container.scrollLeft += dx;
+        wrapScroll(container);
+      }
+
+      rafIdRef.current = requestAnimationFrame(step);
+    };
+
+    rafIdRef.current = requestAnimationFrame(step);
+
+    return () => {
+      clearTimeout(initTimer);
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    };
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const container = galleryScrollRef.current;
+    if (!container) return;
+
+    isDownRef.current = true;
+    setIsDragging(true);
+    startXRef.current = e.clientX;
+    scrollLeftStartRef.current = container.scrollLeft;
+
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+
+    try {
+      container.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const container = galleryScrollRef.current;
+    if (!isDownRef.current || !container) return;
+
+    const dx = e.clientX - startXRef.current;
+    container.scrollLeft = scrollLeftStartRef.current - dx;
+    wrapScroll(container);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const container = galleryScrollRef.current;
+    if (!isDownRef.current) return;
+    isDownRef.current = false;
+    setIsDragging(false);
+
+    try {
+      container?.releasePointerCapture(e.pointerId);
+    } catch {}
+
+    // Grace period before auto-glide resumes
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    isHoveredRef.current = true;
+    resumeTimerRef.current = setTimeout(() => {
+      isHoveredRef.current = false;
+    }, 1200);
+  };
+
+  const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    onPointerUp(e);
+  };
+
+  const onMouseEnter = () => {
+    if (!isDownRef.current) {
+      isHoveredRef.current = true;
+    }
+  };
+
+  const onMouseLeave = () => {
+    if (!isDownRef.current) {
+      isHoveredRef.current = false;
+    }
+  };
 
   // section refs
   const statsRef = useReveal();
@@ -212,7 +337,7 @@ function Index() {
           }}
         />
 
-        {/* ── PHOTO GALLERY: INFINITE MARQUEE SLIDER ── */}
+        {/* ── PHOTO GALLERY: TOUCH & MOUSE PAN DRAGGABLE MARQUEE SLIDER ── */}
         <section id="glam-section" className="relative w-full py-14 sm:py-20 overflow-hidden">
           <div ref={galleryRef} className="reveal relative z-10">
             <div className="text-center mb-8 sm:mb-10 max-w-4xl mx-auto px-4">
@@ -226,86 +351,46 @@ function Index() {
               <p className="text-sm text-muted-foreground mt-2">A mood board for your next glow-up</p>
             </div>
 
-            {/* Marquee Outer Wrapper with Pause on Click */}
+            {/* Draggable & Touch-swipe Pan Gallery Container */}
             <div
-              className="relative w-full overflow-hidden marquee-container py-2 select-none cursor-pointer"
-              onClick={() => setIsMarqueePaused((prev) => !prev)}
-              role="button"
-              tabIndex={0}
-              aria-label={isMarqueePaused ? "Resume gallery scroll" : "Pause gallery scroll"}
-              onKeyDown={(e) => {
-                if (e.key === " " || e.key === "Enter") {
-                  e.preventDefault();
-                  setIsMarqueePaused((prev) => !prev);
-                }
+              ref={galleryScrollRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
+              onMouseEnter={onMouseEnter}
+              onMouseLeave={onMouseLeave}
+              className={`w-full overflow-x-auto no-scrollbar scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] touch-pan-y py-3 select-none ${
+                isDragging ? "cursor-grabbing" : "cursor-grab"
+              }`}
+              style={{
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                WebkitOverflowScrolling: "touch",
               }}
             >
-              <div
-                className="animate-marquee flex items-center w-max"
-                style={{
-                  animationPlayState: isMarqueePaused ? "paused" : "running",
-                }}
-              >
-                {/* Track 1 - Duplicated 2x for full seamless breadth across any screen */}
-                <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8 pr-4 sm:pr-6 md:pr-8">
-                  {[...GALLERY_ITEMS, ...GALLERY_ITEMS].map((g, i) => (
-                    <div
-                      key={`t1-${i}`}
-                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
-                    >
-                      <img
-                        src={g.src}
-                        alt={g.label}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        style={{ objectPosition: g.position || "center" }}
-                      />
-                      {/* Dark gradient overlay with label */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5">
-                        <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
-                          {g.label}
-                        </span>
-                      </div>
+              <div className="flex items-center gap-4 sm:gap-6 md:gap-8 w-max px-4">
+                {QUAD_GALLERY_ITEMS.map((g, i) => (
+                  <div
+                    key={`gallery-item-${i}`}
+                    className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] select-none"
+                  >
+                    <img
+                      src={g.src}
+                      alt={g.label}
+                      draggable={false}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 pointer-events-none select-none"
+                      style={{ objectPosition: g.position || "center" }}
+                    />
+                    {/* Dark gradient overlay with label */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5 pointer-events-none select-none">
+                      <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
+                        {g.label}
+                      </span>
                     </div>
-                  ))}
-                </div>
-
-                {/* Track 2: Identical clone for seamless, mathematically gapless infinite looping */}
-                <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8 pr-4 sm:pr-6 md:pr-8" aria-hidden="true">
-                  {[...GALLERY_ITEMS, ...GALLERY_ITEMS].map((g, i) => (
-                    <div
-                      key={`t2-${i}`}
-                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
-                    >
-                      <img
-                        src={g.src}
-                        alt={g.label}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        style={{ objectPosition: g.position || "center" }}
-                      />
-                      {/* Dark gradient overlay with label */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5">
-                        <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
-                          {g.label}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            </div>
-
-            {/* Interactive hint */}
-            <div className="text-center mt-3 sm:mt-4">
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all"
-                style={{
-                  background: isMarqueePaused ? "oklch(0.35 0.15 22 / 12%)" : "oklch(0.92 0.030 83 / 70%)",
-                  color: isMarqueePaused ? "oklch(0.35 0.15 22)" : "oklch(0.45 0.04 50)",
-                  border: isMarqueePaused ? "1px solid oklch(0.35 0.15 22 / 25%)" : "1px solid oklch(0.84 0.042 80 / 50%)",
-                }}
-              >
-                {isMarqueePaused ? "⏸️ Gallery paused — Click or tap to resume scrolling" : "💡 Click or tap any image to pause"}
-              </span>
             </div>
           </div>
         </section>

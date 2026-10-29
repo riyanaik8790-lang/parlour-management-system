@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import {
   type SalonClosure,
+  useClosures,
   getAllClosures,
   addClosure,
   deleteClosure,
@@ -133,7 +134,7 @@ function ConfirmReopenModal({
 
 // ── Admin Closures Page Component ─────────────────────────────────────────────
 function AdminClosuresPage() {
-  const [closures, setClosures] = useState<SalonClosure[]>(() => getAllClosures());
+  const { closures, refresh: refreshClosures } = useClosures();
   const [query, setQuery] = useState("");
   const [isRangeMode, setIsRangeMode] = useState(false);
   const [startDate, setStartDate] = useState("");
@@ -145,32 +146,17 @@ function AdminClosuresPage() {
   const [closureToDelete, setClosureToDelete] = useState<SalonClosure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadClosures = () => {
-    setClosures(getAllClosures());
-  };
-
   const handleManualRefresh = () => {
     setRefreshing(true);
     try {
-      loadClosures();
-      toast.success("Closures data refreshed successfully");
+      refreshClosures();
+      toast.success("Closures data refreshed and synchronized across views");
     } catch {
       toast.error("Failed to refresh closures");
     } finally {
       setTimeout(() => setRefreshing(false), 400);
     }
   };
-
-  useEffect(() => {
-    loadClosures();
-    const handleUpdate = () => loadClosures();
-    window.addEventListener("salon-closures-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
-    return () => {
-      window.removeEventListener("salon-closures-updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
-    };
-  }, []);
 
   // Today in YYYY-MM-DD (min selectable date) - uses local/IST calendar so past dates are strictly disabled
   const todayStr = useMemo(() => getTodayDateString(), []);
@@ -209,7 +195,7 @@ function AdminClosuresPage() {
       setStartDate("");
       setEndDate("");
       setReason("");
-      loadClosures();
+      refreshClosures();
     } catch {
       toast.error("Failed to add closure.");
     } finally {
@@ -222,8 +208,10 @@ function AdminClosuresPage() {
     deleteClosure(closureToDelete.id);
     toast.success("Closure removed. Date has been reopened for bookings.");
     setClosureToDelete(null);
-    loadClosures();
+    refreshClosures();
   };
+
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "upcoming">("all");
 
   // Automatic expiry filter: only keep closures that are active today or in the future (endDate >= todayStr)
   const activeAndUpcomingClosures = useMemo(() => {
@@ -233,9 +221,17 @@ function AdminClosuresPage() {
     });
   }, [closures, todayStr]);
 
-  // Filter active/upcoming closures by search query
+  // Filter active/upcoming closures by status filter & search query
   const filteredClosures = useMemo(() => {
     return activeAndUpcomingClosures.filter((c) => {
+      if (statusFilter === "active") {
+        const isActive = todayStr >= c.startDate && todayStr <= c.endDate;
+        if (!isActive) return false;
+      } else if (statusFilter === "upcoming") {
+        const isUpcoming = c.startDate > todayStr;
+        if (!isUpcoming) return false;
+      }
+
       if (!query.trim()) return true;
       const q = query.toLowerCase();
       return (
@@ -244,7 +240,7 @@ function AdminClosuresPage() {
         c.endDate.includes(q)
       );
     });
-  }, [activeAndUpcomingClosures, query]);
+  }, [activeAndUpcomingClosures, statusFilter, todayStr, query]);
 
   // Calculate upcoming / active counts from active & upcoming closures
   const activeTodayCount = useMemo(
@@ -259,6 +255,12 @@ function AdminClosuresPage() {
     () => activeAndUpcomingClosures.filter((c) => c.startDate > todayStr).length,
     [activeAndUpcomingClosures, todayStr],
   );
+
+  const CLOSURE_FILTER_OPTIONS: { value: "all" | "active" | "upcoming"; label: string; count: number; icon: typeof CalendarX }[] = [
+    { value: "all", label: "All Closures", count: activeAndUpcomingClosures.length, icon: CalendarX },
+    { value: "active", label: "Active Today", count: activeTodayCount, icon: CheckCircle2 },
+    { value: "upcoming", label: "Upcoming", count: upcomingCount, icon: Clock },
+  ];
 
   return (
     <>
@@ -327,38 +329,56 @@ function AdminClosuresPage() {
             </div>
           </div>
 
-          {/* Summary chips - Horizontal scrollable */}
-          <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
-            <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-              style={{
-                border: "1px solid oklch(0.84 0.042 80 / 70%)",
-                background: CARD_WHITE,
-              }}
-            >
-              <CalendarX className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
-              <span style={{ color: TEXT_MUTED }}>
-                <span className="font-semibold" style={{ color: TEXT_DARK }}>
-                  {activeAndUpcomingClosures.length}
-                </span>{" "}
-                active &amp; upcoming closures
-              </span>
-            </div>
-
-            <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-              style={{
-                border: "1px solid oklch(0.35 0.15 22 / 20%)",
-                background:
-                  "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%), oklch(0.68 0.13 68 / 4%))",
-              }}
-            >
-              <Clock className="h-3.5 w-3.5" style={{ color: GOLD }} />
-              <span style={{ color: "oklch(0.45 0.08 40)" }}>
-                <span className="font-semibold">{upcomingCount}</span> upcoming ·{" "}
-                <span className="font-semibold">{activeTodayCount}</span> active today
-              </span>
-            </div>
+          {/* Status filter buttons - Horizontal swipeable/scrollable bar */}
+          <div
+            className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1.5 pt-0.5 -mx-1 px-1 scroll-smooth animate-fade-up delay-100"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {CLOSURE_FILTER_OPTIONS.map(({ value, label, count, icon: Icon }) => {
+              const active = statusFilter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value)}
+                  className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all min-h-[38px] sm:min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer select-none"
+                  style={
+                    active
+                      ? {
+                          background:
+                            "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+                          color: "#ffffff",
+                          border: "1.5px solid oklch(0.35 0.15 22)",
+                          boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
+                        }
+                      : {
+                          background: CARD_WHITE,
+                          color: "oklch(0.45 0.04 50)",
+                          border: "1px solid oklch(0.84 0.042 80 / 80%)",
+                        }
+                  }
+                >
+                  <Icon className="h-3.5 w-3.5" style={{ color: active ? "#ffffff" : "oklch(0.65 0.04 50)" }} />
+                  {label}
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                    style={
+                      active
+                        ? {
+                            background: "oklch(0.68 0.13 68 / 35%)",
+                            color: "#ffffff",
+                          }
+                        : {
+                            background: "oklch(0.92 0.030 83)",
+                            color: "oklch(0.50 0.04 50)",
+                          }
+                    }
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Add Closure Card / Form */}
@@ -390,11 +410,11 @@ function AdminClosuresPage() {
                 </div>
 
               {/* Toggle Single vs Range */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-100 border border-neutral-200 text-xs">
+              <div className="inline-flex w-fit self-start sm:self-auto items-center gap-1 p-1 rounded-xl bg-neutral-100/90 border border-neutral-200 text-xs shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsRangeMode(false)}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer select-none text-center ${
                     !isRangeMode
                       ? "bg-white text-neutral-900 shadow-xs"
                       : "text-neutral-500 hover:text-neutral-900"
@@ -405,7 +425,7 @@ function AdminClosuresPage() {
                 <button
                   type="button"
                   onClick={() => setIsRangeMode(true)}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer select-none text-center ${
                     isRangeMode
                       ? "bg-white text-neutral-900 shadow-xs"
                       : "text-neutral-500 hover:text-neutral-900"
@@ -550,74 +570,45 @@ function AdminClosuresPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/90 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                    <th className="py-3.5 px-4 sm:px-6">Date / Range</th>
-                    <th className="py-3.5 px-4">Reason / Holiday</th>
-                    <th className="py-3.5 px-4">Duration</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {filteredClosures.map((item) => {
-                    const isSingle = item.startDate === item.endDate;
-                    const startParsed = parseISO(item.startDate);
-                    const endParsed = parseISO(item.endDate);
+            <>
+              {/* ── Mobile card layout (hidden on sm+) ── */}
+              <div className="sm:hidden divide-y divide-neutral-100">
+                {filteredClosures.map((item) => {
+                  const isSingle = item.startDate === item.endDate;
+                  const startParsed = parseISO(item.startDate);
+                  const endParsed = parseISO(item.endDate);
 
-                    const isActive = todayStr >= item.startDate && todayStr <= item.endDate;
-                    const isPast = item.endDate < todayStr;
-                    const isUpcoming = item.startDate > todayStr;
+                  const isActive = todayStr >= item.startDate && todayStr <= item.endDate;
+                  const isUpcoming = item.startDate > todayStr;
 
-                    // Calculate number of days
-                    const daysCount = isSingle
-                      ? 1
-                      : Math.round(
-                          (endParsed.getTime() - startParsed.getTime()) / (1000 * 3600 * 24),
-                        ) + 1;
+                  const daysCount = isSingle
+                    ? 1
+                    : Math.round(
+                        (endParsed.getTime() - startParsed.getTime()) / (1000 * 3600 * 24),
+                      ) + 1;
 
-                    return (
-                      <tr key={item.id} className="hover:bg-neutral-50/80 transition-colors">
-                        {/* Date column */}
-                        <td className="py-4 px-4 sm:px-6">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/80 flex-shrink-0">
-                              <CalendarX className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-neutral-900 text-xs sm:text-sm">
-                                {isSingle
-                                  ? format(startParsed, "dd MMM yyyy")
-                                  : `${format(startParsed, "dd MMM yyyy")} – ${format(endParsed, "dd MMM yyyy")}`}
-                              </p>
-                              <p className="text-[10px] text-neutral-400 mt-0.5">
-                                {isSingle ? format(startParsed, "EEEE") : `${daysCount} consecutive days`}
-                              </p>
-                            </div>
+                  return (
+                    <div key={item.id} className="p-4 space-y-3 hover:bg-neutral-50/50 transition-colors">
+                      {/* Top row: Date + Status badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/80 flex-shrink-0">
+                            <CalendarX className="w-4 h-4" />
                           </div>
-                        </td>
+                          <div>
+                            <p className="font-semibold text-neutral-900 text-sm">
+                              {isSingle
+                                ? format(startParsed, "dd MMM yyyy")
+                                : `${format(startParsed, "dd MMM yyyy")} – ${format(endParsed, "dd MMM yyyy")}`}
+                            </p>
+                            <p className="text-[11px] text-neutral-400 mt-0.5">
+                              {isSingle ? format(startParsed, "EEEE") : `${daysCount} consecutive days`}
+                            </p>
+                          </div>
+                        </div>
 
-                        {/* Reason */}
-                        <td className="py-4 px-4">
-                          <span
-                            className="font-medium text-xs text-neutral-800"
-                            style={{ fontFamily: "var(--font-serif)" }}
-                          >
-                            {item.reason}
-                          </span>
-                        </td>
-
-                        {/* Duration pill */}
-                        <td className="py-4 px-4">
-                          <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-600 border border-neutral-200">
-                            {daysCount} {daysCount === 1 ? "day" : "days"}
-                          </span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-4 px-4">
+                        {/* Status Badge */}
+                        <div className="shrink-0">
                           {isActive ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
@@ -632,26 +623,144 @@ function AdminClosuresPage() {
                               Past
                             </span>
                           )}
-                        </td>
+                        </div>
+                      </div>
 
-                        {/* Action: Reopen / Delete */}
-                        <td className="py-4 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setClosureToDelete(item)}
-                            title="Reopen Date"
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:text-red-600 hover:bg-red-50 border border-neutral-200 hover:border-red-200 transition cursor-pointer"
+                      {/* Middle row: Reason & duration */}
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-100/70">
+                        <div className="flex-1 min-w-0">
+                          <span
+                            className="font-medium text-xs text-neutral-800 block truncate"
+                            style={{ fontFamily: "var(--font-serif)" }}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Reopen Date</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            {item.reason}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-neutral-200 shrink-0">
+                          {daysCount} {daysCount === 1 ? "day" : "days"}
+                        </span>
+                      </div>
+
+                      {/* Bottom row: Reopen action button */}
+                      <div className="pt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setClosureToDelete(item)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:text-red-600 hover:bg-red-50 border border-neutral-200 hover:border-red-200 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Reopen Date</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ── Desktop table layout (hidden on mobile) ── */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/90 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+                      <th className="py-3.5 px-4 sm:px-6">Date / Range</th>
+                      <th className="py-3.5 px-4">Reason / Holiday</th>
+                      <th className="py-3.5 px-4">Duration</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {filteredClosures.map((item) => {
+                      const isSingle = item.startDate === item.endDate;
+                      const startParsed = parseISO(item.startDate);
+                      const endParsed = parseISO(item.endDate);
+
+                      const isActive = todayStr >= item.startDate && todayStr <= item.endDate;
+                      const isPast = item.endDate < todayStr;
+                      const isUpcoming = item.startDate > todayStr;
+
+                      // Calculate number of days
+                      const daysCount = isSingle
+                        ? 1
+                        : Math.round(
+                            (endParsed.getTime() - startParsed.getTime()) / (1000 * 3600 * 24),
+                          ) + 1;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-neutral-50/80 transition-colors">
+                          {/* Date column */}
+                          <td className="py-4 px-4 sm:px-6">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/80 flex-shrink-0">
+                                <CalendarX className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-neutral-900 text-xs sm:text-sm">
+                                  {isSingle
+                                    ? format(startParsed, "dd MMM yyyy")
+                                    : `${format(startParsed, "dd MMM yyyy")} – ${format(endParsed, "dd MMM yyyy")}`}
+                                </p>
+                                <p className="text-[10px] text-neutral-400 mt-0.5">
+                                  {isSingle ? format(startParsed, "EEEE") : `${daysCount} consecutive days`}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Reason */}
+                          <td className="py-4 px-4">
+                            <span
+                              className="font-medium text-xs text-neutral-800"
+                              style={{ fontFamily: "var(--font-serif)" }}
+                            >
+                              {item.reason}
+                            </span>
+                          </td>
+
+                          {/* Duration pill */}
+                          <td className="py-4 px-4">
+                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-600 border border-neutral-200">
+                              {daysCount} {daysCount === 1 ? "day" : "days"}
+                            </span>
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-4 px-4">
+                            {isActive ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                Active Today
+                              </span>
+                            ) : isUpcoming ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                Upcoming
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-500">
+                                Past
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Action: Reopen / Delete */}
+                          <td className="py-4 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setClosureToDelete(item)}
+                              title="Reopen Date"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:text-red-600 hover:bg-red-50 border border-neutral-200 hover:border-red-200 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Reopen Date</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
         </div>

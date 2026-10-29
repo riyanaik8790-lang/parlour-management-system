@@ -7,7 +7,7 @@ import {
   calculateCategoryStartingPrice,
   type ServiceCategory,
 } from "@/lib/services-data";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, Clock } from "lucide-react";
 
 import salonHeroBg from "@/assets/new_salon_hero_bg.jpg";
 import facialImg from "@/assets/facial_service.png";
@@ -178,7 +178,15 @@ function ServiceCard({
           {cat.items.map((s) => (
             <li key={s.id} className="svc-card-list-item">
               <div className="min-w-0 flex-1">
-                <div className="svc-item-name">{s.name}</div>
+                <div className="svc-item-name flex items-center gap-2 flex-wrap">
+                  <span>{s.name}</span>
+                  {s.durationMins ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-normal text-muted-foreground/80 bg-neutral-100 dark:bg-neutral-800/80 px-1.5 py-0.5 rounded-md">
+                      <Clock className="w-2.5 h-2.5 text-amber-600/80" />
+                      {s.durationMins} min
+                    </span>
+                  ) : null}
+                </div>
                 {s.description && (
                   <div className="svc-item-desc">{s.description}</div>
                 )}

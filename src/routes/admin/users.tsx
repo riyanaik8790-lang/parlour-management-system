@@ -363,15 +363,27 @@ function AdminUsersPage() {
     }
   }
 
-  const filtered = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(query.toLowerCase()) ||
-      u.email.toLowerCase().includes(query.toLowerCase()) ||
-      u.phone.includes(query),
-  );
+  const [roleFilter, setRoleFilter] = useState<"all" | "ADMIN" | "USER">("all");
+
+  const filtered = users.filter((u) => {
+    if (roleFilter !== "all" && u.role !== roleFilter) return false;
+    const q = query.toLowerCase();
+    if (!q) return true;
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.phone.includes(q)
+    );
+  });
 
   const adminCount = users.filter((u) => u.role === "ADMIN").length;
   const userCount = users.filter((u) => u.role === "USER").length;
+
+  const USER_FILTER_OPTIONS: { value: "all" | "ADMIN" | "USER"; label: string; count: number; icon: typeof Users }[] = [
+    { value: "all", label: "All Users", count: users.length, icon: Users },
+    { value: "ADMIN", label: "Admins", count: adminCount, icon: ShieldCheck },
+    { value: "USER", label: "Customers", count: userCount, icon: User },
+  ];
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -441,54 +453,57 @@ function AdminUsersPage() {
           </button>
         </div>
 
-        {/* Summary chips - horizontal scrollable */}
+        {/* Role filter buttons - Horizontal swipeable/scrollable bar */}
         {!loading && (
-          <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 scroll-smooth animate-fade-up delay-100">
-            <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-              style={{
-                border: "1px solid oklch(0.84 0.042 80 / 70%)",
-                background: "oklch(0.998 0.004 85)",
-              }}
-            >
-              <Users className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
-              <span style={{ color: "oklch(0.55 0.04 50)" }}>
-                <span className="font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>
-                  {users.length}
-                </span>{" "}
-                registered
-              </span>
-            </div>
-            <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-              style={{
-                border: "1px solid oklch(0.35 0.15 22 / 20%)",
-                background:
-                  "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%), oklch(0.68 0.13 68 / 4%))",
-              }}
-            >
-              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "oklch(0.68 0.13 68)" }} />
-              <span style={{ color: "oklch(0.45 0.08 40)" }}>
-                <span className="font-semibold">{adminCount}</span> admin
-                {adminCount !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <div
-              className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shrink-0 whitespace-nowrap"
-              style={{
-                border: "1px solid oklch(0.84 0.042 80 / 70%)",
-                background: "oklch(0.998 0.004 85)",
-              }}
-            >
-              <User className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
-              <span style={{ color: "oklch(0.55 0.04 50)" }}>
-                <span className="font-semibold" style={{ color: "oklch(0.25 0.05 50)" }}>
-                  {userCount}
-                </span>{" "}
-                customer
-                {userCount !== 1 ? "s" : ""}
-              </span>
-            </div>
+          <div
+            className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-1.5 pt-0.5 -mx-1 px-1 scroll-smooth animate-fade-up delay-100"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {USER_FILTER_OPTIONS.map(({ value, label, count, icon: Icon }) => {
+              const active = roleFilter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRoleFilter(value)}
+                  className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all min-h-[38px] sm:min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer select-none"
+                  style={
+                    active
+                      ? {
+                          background:
+                            "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+                          color: "#ffffff",
+                          border: "1.5px solid oklch(0.35 0.15 22)",
+                          boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
+                        }
+                      : {
+                          background: "oklch(0.998 0.004 85)",
+                          color: "oklch(0.45 0.04 50)",
+                          border: "1px solid oklch(0.84 0.042 80 / 80%)",
+                        }
+                  }
+                >
+                  <Icon className="h-3.5 w-3.5" style={{ color: active ? "#ffffff" : "oklch(0.65 0.04 50)" }} />
+                  {label}
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                    style={
+                      active
+                        ? {
+                            background: "oklch(0.68 0.13 68 / 35%)",
+                            color: "#ffffff",
+                          }
+                        : {
+                            background: "oklch(0.92 0.030 83)",
+                            color: "oklch(0.50 0.04 50)",
+                          }
+                    }
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 

@@ -6,9 +6,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api, getUser, clearSession } from "@/lib/api";
 import { toast } from "sonner";
-import { CalendarIcon, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
+import { CalendarIcon, Loader2, Pencil, Trash2, X, Check, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TIME_SLOTS, ALL_SERVICES } from "@/lib/services-data";
+import { TIME_SLOTS, ALL_SERVICES, REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
 import {
   Select,
   SelectContent,
@@ -32,7 +32,15 @@ const BURGUNDY = "oklch(0.35 0.15 22)";
 const GOLD = "oklch(0.68 0.13 68)";
 const BORDER = "oklch(0.88 0.030 82)";
 
-type B = { id: number; service_name: string; date: string; time: string; status: string };
+type B = {
+  id: number;
+  service_name: string;
+  date: string;
+  time: string;
+  status: string;
+  reminder_minutes?: number;
+  reminder_sent?: boolean;
+};
 
 // Skeleton card shown while bookings load
 function BookingSkeleton() {
@@ -95,6 +103,7 @@ function MyBookingsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState<Date | undefined>(undefined);
   const [editTime, setEditTime] = useState("");
+  const [editReminderMinutes, setEditReminderMinutes] = useState<number>(30);
   const [editServiceName, setEditServiceName] = useState("");
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
   const [editPreBridalFullyBooked, setEditPreBridalFullyBooked] = useState(false);
@@ -175,8 +184,22 @@ function MyBookingsPage() {
     const parsed = new Date(b.date + "T00:00:00");
     setEditDate(isNaN(parsed.getTime()) ? undefined : parsed);
     setEditTime(b.time);
+    setEditReminderMinutes(b.reminder_minutes ?? 30);
     setTakenSlots([]);
     setEditPreBridalFullyBooked(false);
+  };
+
+  const updateReminder = async (id: number, newMinutes: number) => {
+    setBusyId(id);
+    try {
+      await api.updateBooking(id, { reminder_minutes: newMinutes });
+      toast.success(`Reminder set to ${formatReminderLabel(newMinutes)}`);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update reminder");
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const saveEdit = async (id: number) => {
@@ -208,7 +231,11 @@ function MyBookingsPage() {
 
     setBusyId(id);
     try {
-      await api.updateBooking(id, { date: editIsoDate, time: editTime });
+      await api.updateBooking(id, {
+        date: editIsoDate,
+        time: editTime,
+        reminder_minutes: editReminderMinutes,
+      });
       toast.success("Booking updated!");
       setEditingId(null);
       load();
@@ -477,6 +504,28 @@ function MyBookingsPage() {
                       </Select>
                     )}
                   </div>
+
+                  {/* Reminder Timing Selector in Edit Panel */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Bell className="h-3.5 w-3.5 text-primary" /> Reminder Time
+                    </label>
+                    <Select
+                      value={String(editReminderMinutes)}
+                      onValueChange={(val) => setEditReminderMinutes(Number(val))}
+                    >
+                      <SelectTrigger className="w-full h-10 bg-background text-xs sm:text-sm">
+                        <SelectValue placeholder="Choose reminder timing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REMINDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)} className="text-xs sm:text-sm">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* Save + Discard buttons - full width on mobile */}
@@ -516,7 +565,7 @@ function MyBookingsPage() {
                   <div className="font-medium text-foreground truncate text-sm sm:text-base">
                     {b.service_name}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
                     <span className="text-xs sm:text-sm text-muted-foreground">
                       {b.date} &middot; {b.time}
                     </span>
@@ -539,6 +588,33 @@ function MyBookingsPage() {
                     >
                       {b.status}
                     </span>
+                  </div>
+
+                  {/* Reminder Pill & Quick-changer */}
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border/60">
+                      <Bell className="h-3 w-3 text-primary" />
+                      <span>{formatReminderLabel(b.reminder_minutes)}</span>
+                    </span>
+
+                    {b.status === "confirmed" && (
+                      <Select
+                        value={String(b.reminder_minutes ?? 30)}
+                        onValueChange={(val) => updateReminder(b.id, Number(val))}
+                        disabled={busyId === b.id}
+                      >
+                        <SelectTrigger className="h-6 text-[10px] px-2 py-0 bg-transparent border-dashed border-border/80 text-muted-foreground hover:text-foreground hover:border-primary/50 w-auto gap-1">
+                          <span className="text-[10px]">Change</span>
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {REMINDER_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 </div>
 

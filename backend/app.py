@@ -389,7 +389,7 @@ def get_profile():
     try:
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, name, email, phone, role, push_enabled, avatar_url FROM users WHERE id = %s",
+            "SELECT id, name, email, phone, role, push_enabled, avatar_url, COALESCE(default_reminder_minutes, 30) AS default_reminder_minutes FROM users WHERE id = %s",
             (user["id"],),
         )
         row = cur.fetchone()
@@ -479,6 +479,14 @@ def update_profile():
             val = data.get("avatar_url")
             updates.append("avatar_url = %s")
             values.append(str(val).strip() if val else None)
+        if "default_reminder_minutes" in data:
+            try:
+                drm = int(data.get("default_reminder_minutes"))
+                if drm in (15, 30, 60, 120, 1440):
+                    updates.append("default_reminder_minutes = %s")
+                    values.append(drm)
+            except (ValueError, TypeError):
+                pass
 
         # Handle multi-device push subscription if passed in profile payload
         push_sub = data.get("push_subscription") or data.get("push_subscriptions")
@@ -499,7 +507,7 @@ def update_profile():
 
         # Return updated user
         cur.execute(
-            "SELECT id, name, email, phone, role, push_enabled, avatar_url FROM users WHERE id = %s",
+            "SELECT id, name, email, phone, role, push_enabled, avatar_url, COALESCE(default_reminder_minutes, 30) AS default_reminder_minutes FROM users WHERE id = %s",
             (user["id"],),
         )
         updated = cur.fetchone()
@@ -587,6 +595,13 @@ def book():
 
     date_str = (data.get("date") or "").strip()
     time_str = (data.get("time") or "").strip()
+    reminder_minutes_raw = data.get("reminder_minutes")
+    try:
+        reminder_minutes = int(reminder_minutes_raw) if reminder_minutes_raw is not None else 30
+    except (ValueError, TypeError):
+        reminder_minutes = 30
+    if reminder_minutes not in (15, 30, 60, 120, 1440):
+        reminder_minutes = 30
 
     if not services_list or not date_str or not time_str:
         return jsonify({"error": "services (array), date, and time are required"}), 400
@@ -703,14 +718,19 @@ def book():
         services_json_str = _json.dumps(services_list)
         cur.execute(
             """
-            INSERT INTO appointments (user_id, service_id, date, time, status, services_json, total_duration)
-            VALUES (%s, %s, %s, %s, 'confirmed', %s, %s)
+            INSERT INTO appointments (user_id, service_id, date, time, status, services_json, total_duration, reminder_minutes)
+            VALUES (%s, %s, %s, %s, 'confirmed', %s, %s, %s)
             RETURNING id
             """,
             (g.current_user["id"], primary_service_id, slot_date, time_str,
-             services_json_str, int(total_duration)),
+             services_json_str, int(total_duration), reminder_minutes),
         )
         booking_id = cur.fetchone()["id"]
+        # Save user default reminder preference
+        cur.execute(
+            "UPDATE users SET default_reminder_minutes = %s WHERE id = %s",
+            (reminder_minutes, g.current_user["id"]),
+        )
         db.commit()
 
         # ── Notify all admins about the new booking ──────────────────────────
@@ -1108,46 +1128,64 @@ def push_unsubscribe():
 
 
 def _generate_reminders(db, user_id: int):
-    """Lazily create 24-hour reminder notifications for upcoming appointments.
-
-    Appointment times are stored in IST (Asia/Kolkata = UTC+5:30) so we
-    compare against current IST time, not UTC, to avoid a 5h30m drift.
-    """
+    """Lazily create reminder notifications for upcoming appointments respecting custom reminder preferences."""
     try:
         IST = timezone(timedelta(hours=5, minutes=30))
         now_ist = datetime.now(IST)
-        window_end_ist = now_ist + timedelta(hours=24)
         cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            """SELECT a.id, a.date, a.time, s.name AS service_name
+            """SELECT a.id, a.date, a.time, s.name AS service_name,
+                      COALESCE(a.reminder_minutes, 30) AS reminder_minutes,
+                      a.reminder_sent
                FROM appointments a
                JOIN services s ON s.id = a.service_id
                WHERE a.user_id = %s AND a.status = 'confirmed'
-                 AND (a.date::text || ' ' || a.time) >= %s
-                 AND (a.date::text || ' ' || a.time) <= %s""",
-            (user_id, now_ist.strftime("%Y-%m-%d %H:%M"), window_end_ist.strftime("%Y-%m-%d %H:%M")),
+                 AND a.date >= CURRENT_DATE""",
+            (user_id,),
         )
         upcoming = cur.fetchall()
         for appt in upcoming:
-            cur.execute(
-                "SELECT id FROM notifications WHERE user_id=%s AND type='appointment_reminder' AND booking_id=%s",
-                (user_id, appt["id"]),
-            )
-            if not cur.fetchone():
-                msg = f"Reminder: your {appt['service_name']} appointment is on {appt['date']} at {appt['time']}"
-                cur.execute(
-                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
-                    (user_id, msg, appt["id"]),
-                )
-                # Send push for new reminders only (additive — never crashes)
-                try:
-                    _send_push(db, user_id, "Appointment Reminder 🔔", msg, "/my-bookings")
-                except Exception:
-                    pass
+            try:
+                appt_time_str = str(appt["time"])[:5]
+                appt_date_str = appt["date"].isoformat() if hasattr(appt["date"], "isoformat") else str(appt["date"])
+                appt_dt = datetime.strptime(f"{appt_date_str} {appt_time_str}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+                remind_mins = int(appt.get("reminder_minutes") or 30)
+                remind_at = appt_dt - timedelta(minutes=remind_mins)
+
+                if now_ist >= appt_dt:
+                    continue
+
+                if now_ist >= remind_at:
+                    cur.execute(
+                        "SELECT id FROM notifications WHERE user_id=%s AND type='appointment_reminder' AND booking_id=%s",
+                        (user_id, appt["id"]),
+                    )
+                    if not cur.fetchone():
+                        if remind_mins == 1440:
+                            lead_str = "tomorrow"
+                        elif remind_mins >= 60:
+                            hrs = remind_mins // 60
+                            lead_str = f"in {hrs} hour" if hrs == 1 else f"in {hrs} hours"
+                        else:
+                            lead_str = f"in {remind_mins} minutes"
+
+                        msg = f"Reminder: your {appt['service_name']} appointment starts {lead_str} at {appt_time_str}!"
+                        cur.execute(
+                            "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
+                            (user_id, msg, appt["id"]),
+                        )
+                        cur.execute("UPDATE appointments SET reminder_sent = true WHERE id = %s", (appt["id"],))
+                        try:
+                            title = "Appointment Starting Soon ⏰" if remind_mins <= 60 else "Appointment Reminder 🔔"
+                            _send_push(db, user_id, title, msg, "/my-bookings")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
         db.commit()
         cur.close()
     except Exception:
-        pass  # never crash the notifications fetch
+        pass
 
 
 def _generate_reminders_all(db):
@@ -1295,7 +1333,9 @@ def my_bookings():
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """
-            SELECT a.id, s.name AS service_name, a.date, a.time, a.status
+            SELECT a.id, s.name AS service_name, a.date, a.time, a.status,
+                   COALESCE(a.reminder_minutes, 30) AS reminder_minutes,
+                   a.reminder_sent
             FROM appointments a
             JOIN services s ON s.id = a.service_id
             WHERE a.user_id = %s
@@ -1318,6 +1358,24 @@ def update_booking(booking_id: int):
     data = request.get_json(silent=True) or {}
     date_str = (data.get("date") or "").strip()
     time_str = (data.get("time") or "").strip()
+    reminder_minutes_raw = data.get("reminder_minutes")
+
+    # If only updating reminder_minutes without rescheduling date/time:
+    if reminder_minutes_raw is not None and not date_str and not time_str:
+        try:
+            rm_val = int(reminder_minutes_raw)
+            if rm_val in (15, 30, 60, 120, 1440):
+                db = get_db()
+                cur = db.cursor()
+                cur.execute(
+                    "UPDATE appointments SET reminder_minutes = %s, reminder_sent = false WHERE id = %s AND user_id = %s",
+                    (rm_val, booking_id, g.current_user["id"]),
+                )
+                db.commit()
+                cur.close()
+                return jsonify({"ok": True, "reminder_minutes": rm_val})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
 
     if not date_str or not time_str:
         return jsonify({"error": "date and time are required"}), 400
@@ -1354,8 +1412,6 @@ def update_booking(booking_id: int):
             return jsonify({"error": "That time slot is already booked"}), 409
 
         # ── Pre-Bridal Package: only one booking allowed per day ────────────────
-        # If the appointment being edited is a Pre-Bridal Package, check that the
-        # target date does not already have another Pre-Bridal booking.
         if existing["service_id"] == "pk-prebridal" or existing["service_name"] == "Pre-Bridal Package":
             cur.execute(
                 """
@@ -1375,12 +1431,31 @@ def update_booking(booking_id: int):
                 return jsonify({
                     "error": "The Pre-Bridal Package is already booked for this date. Please select another day."
                 }), 400
-        # ───────────────────────────────────────────────────────────────────────
 
-        cur.execute(
-            "UPDATE appointments SET date = %s, time = %s WHERE id = %s",
-            (slot_date, time_str, booking_id),
-        )
+        # Update date, time, and optional reminder_minutes (resetting reminder_sent flag)
+        if reminder_minutes_raw is not None:
+            try:
+                rm_val = int(reminder_minutes_raw)
+                if rm_val in (15, 30, 60, 120, 1440):
+                    cur.execute(
+                        "UPDATE appointments SET date = %s, time = %s, reminder_minutes = %s, reminder_sent = false WHERE id = %s",
+                        (slot_date, time_str, rm_val, booking_id),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE appointments SET date = %s, time = %s, reminder_sent = false WHERE id = %s",
+                        (slot_date, time_str, booking_id),
+                    )
+            except Exception:
+                cur.execute(
+                    "UPDATE appointments SET date = %s, time = %s, reminder_sent = false WHERE id = %s",
+                    (slot_date, time_str, booking_id),
+                )
+        else:
+            cur.execute(
+                "UPDATE appointments SET date = %s, time = %s, reminder_sent = false WHERE id = %s",
+                (slot_date, time_str, booking_id),
+            )
         db.commit()
         cur.close()
         return jsonify({"ok": True})
@@ -1777,9 +1852,17 @@ def admin_book_offline():
     Runs the exact same validation chain as /api/book so all business rules
     (slot conflict, 30-min buffer, Pre-Bridal one-per-day) are enforced.
     user_id is left NULL; offline_name / offline_phone are stored instead.
-    """
+    import json as _json
     data = request.get_json(silent=True) or {}
+    services_list = data.get("services")
     service_id    = (data.get("service_id")    or "").strip()
+    total_duration = data.get("total_duration", 0)
+
+    if not service_id and services_list and isinstance(services_list, list) and len(services_list) > 0:
+        service_id = str(services_list[0]).strip()
+    elif not services_list and service_id:
+        services_list = [service_id]
+
     date_str      = (data.get("date")          or "").strip()
     time_str      = (data.get("time")          or "").strip()
     offline_name  = (data.get("offline_name")  or "").strip()
@@ -1787,7 +1870,7 @@ def admin_book_offline():
 
     # ── Required field checks ────────────────────────────────────────────────
     if not service_id or not date_str or not time_str:
-        return jsonify({"error": "service_id, date, and time are required"}), 400
+        return jsonify({"error": "service_id or services, date, and time are required"}), 400
     if not offline_name:
         return jsonify({"error": "Customer name is required for offline bookings"}), 400
 
@@ -1857,14 +1940,15 @@ def admin_book_offline():
                 }), 400
 
         # ── Insert with user_id = NULL ────────────────────────────────────────
+        services_json_str = _json.dumps(services_list) if services_list else None
         cur.execute(
             """
             INSERT INTO appointments
-              (user_id, service_id, date, time, status, offline_name, offline_phone)
-            VALUES (NULL, %s, %s, %s, 'confirmed', %s, %s)
+              (user_id, service_id, date, time, status, offline_name, offline_phone, services_json, total_duration)
+            VALUES (NULL, %s, %s, %s, 'confirmed', %s, %s, %s, %s)
             RETURNING id
             """,
-            (service_id, slot_date, time_str, offline_name, offline_phone),
+            (service_id, slot_date, time_str, offline_name, offline_phone, services_json_str, total_duration),
         )
         booking_id = cur.fetchone()["id"]
         db.commit()
@@ -2755,64 +2839,81 @@ def health():
 
 if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     def check_30min_reminders():
-        """Check for appointments 30 minutes away and send Web Push reminders."""
+        """Check for upcoming appointments due for reminder according to their custom window (e.g. 15m, 30m, 1h, 2h, 24h)."""
         try:
             # We must create a fresh DB connection because this runs in a background thread, outside Flask's app context.
-            db_url = os.getenv("DATABASE_URL")
+            db_url = os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DATABASE_URL")
             if not db_url: return
 
             db = psycopg2.connect(db_url)
             IST = timezone(timedelta(hours=5, minutes=30))
             now_ist = datetime.now(IST)
 
-            # Look ahead exactly 30 minutes
-            target_ist = now_ist + timedelta(minutes=30)
-            target_date = target_ist.strftime("%Y-%m-%d")
-
-            # Since appointments are at strict 30-min intervals (e.g. 09:00, 09:30),
-            # we just format the target time to HH:MM.
-            target_time = target_ist.strftime("%H:%M")
-
             cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
             cur.execute(
-                """SELECT a.id, a.user_id
+                """SELECT a.id, a.user_id, a.date, a.time,
+                          COALESCE(a.reminder_minutes, 30) AS reminder_minutes,
+                          s.name AS service_name,
+                          u.name AS user_name,
+                          u.push_enabled
                    FROM appointments a
                    JOIN users u ON a.user_id = u.id
+                   LEFT JOIN services s ON a.service_id = s.id
                    WHERE a.status = 'confirmed'
                      AND a.reminder_sent = false
-                     AND a.date = %s
-                     AND a.time = %s
-                     AND u.push_enabled = true""",
-                (target_date, target_time)
+                     AND a.date >= CURRENT_DATE"""
             )
-            matches = cur.fetchall()
+            candidates = cur.fetchall()
 
-            if matches:
-                print(f"[scheduler] Found {len(matches)} appointments starting at {target_time}. Sending pushes...")
-
-            for appt in matches:
-                # 1. Update the flag first so we don't spam if something fails halfway
-                cur.execute("UPDATE appointments SET reminder_sent = true WHERE id = %s", (appt["id"],))
-
-                # 2. Add to in-app notifications
-                msg = "Your appointment starts in exactly 30 minutes!"
-                cur.execute(
-                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
-                    (appt["user_id"], msg, appt["id"]),
-                )
-
-                # 3. Send Web Push
+            for appt in candidates:
                 try:
-                    _send_push(db, appt["user_id"], "Appointment Starting Soon ⏰", msg, "/my-bookings")
-                except Exception as e:
-                    print(f"[scheduler] Push error for user {appt['user_id']}: {e}")
+                    appt_time_str = str(appt["time"])[:5]
+                    appt_date_str = appt["date"].isoformat() if hasattr(appt["date"], "isoformat") else str(appt["date"])
+                    appt_dt = datetime.strptime(f"{appt_date_str} {appt_time_str}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+
+                    remind_mins = int(appt.get("reminder_minutes") or 30)
+                    remind_at = appt_dt - timedelta(minutes=remind_mins)
+
+                    # Past appointment cleanup
+                    if now_ist >= appt_dt:
+                        cur.execute("UPDATE appointments SET reminder_sent = true WHERE id = %s", (appt["id"],))
+                        continue
+
+                    # If trigger time reached
+                    if now_ist >= remind_at:
+                        cur.execute("UPDATE appointments SET reminder_sent = true WHERE id = %s", (appt["id"],))
+
+                        if remind_mins == 1440:
+                            lead_str = "tomorrow"
+                        elif remind_mins >= 60:
+                            hrs = remind_mins // 60
+                            lead_str = f"in {hrs} hour" if hrs == 1 else f"in {hrs} hours"
+                        else:
+                            lead_str = f"in {remind_mins} minutes"
+
+                        svc_name = appt.get("service_name") or "salon service"
+                        msg = f"Reminder: your {svc_name} appointment starts {lead_str} at {appt_time_str}!"
+
+                        cur.execute(
+                            "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'appointment_reminder', %s, %s)",
+                            (appt["user_id"], msg, appt["id"]),
+                        )
+
+                        if appt.get("push_enabled"):
+                            try:
+                                title = "Appointment Starting Soon ⏰" if remind_mins <= 60 else "Appointment Reminder 🔔"
+                                _send_push(db, appt["user_id"], title, msg, "/my-bookings")
+                            except Exception as pe:
+                                print(f"[scheduler] Push error for user {appt['user_id']}: {pe}")
+                except Exception as ex:
+                    print(f"[scheduler] Error evaluating reminder for appointment {appt.get('id')}: {ex}")
 
             db.commit()
             cur.close()
             db.close()
         except Exception as e:
-            print(f"[scheduler] 30min reminder error: {e}")
+            print(f"[scheduler] Dynamic reminder error: {e}")
 
     # ---------------------------------------------------------------------------
     # Capacity-Based Self-Healing Archive Job

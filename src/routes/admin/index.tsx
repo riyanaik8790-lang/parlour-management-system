@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import {
   SERVICE_CATEGORIES,
   TIME_SLOTS,
+  BUFFER_MINS,
   getAllServiceCategories,
   saveCustomServiceCategory,
   deleteServiceCategory,
@@ -13,6 +14,7 @@ import {
   type ServiceCategory,
   type Service,
 } from "@/lib/services-data";
+import { isDateClosed } from "@/lib/closures-data";
 import {
   Users,
   CalendarCheck,
@@ -37,6 +39,8 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  ShoppingCart,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -100,13 +104,26 @@ function WalkinModal({
 }) {
   const [offlineName, setOfflineName] = useState("");
   const [offlinePhone, setOfflinePhone] = useState("");
-  const [serviceId, setServiceId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("");
   const [taken, setTaken] = useState<string[]>([]);
   const [preBridalBooked, setPreBridalBooked] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Live service categories (sync with service management)
+  const [categories, setCategories] = useState<ServiceCategory[]>(() => getAllServiceCategories());
+
+  useEffect(() => {
+    const handleSync = () => setCategories(getAllServiceCategories());
+    window.addEventListener("salon-services-updated", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("salon-services-updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, []);
 
   const isoDate = useMemo(() => (date ? format(date, "yyyy-MM-dd") : ""), [date]);
 
@@ -115,13 +132,53 @@ function WalkinModal({
     if (!open) {
       setOfflineName("");
       setOfflinePhone("");
-      setServiceId("");
+      setSelectedIds([]);
       setDate(undefined);
       setTime("");
       setTaken([]);
       setPreBridalBooked(false);
     }
   }, [open]);
+
+  const allServices = useMemo(() => categories.flatMap((c) => c.items), [categories]);
+  const selectedServices = useMemo(
+    () => allServices.filter((s) => selectedIds.includes(s.id)),
+    [allServices, selectedIds],
+  );
+  const totalDuration = useMemo(
+    () => selectedServices.reduce((sum, s) => sum + (s.durationMins || 30), 0),
+    [selectedServices],
+  );
+
+  function toggleService(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    setTime("");
+  }
+
+  function toMins(hhmm: string): number {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  function isBlockUnavailable(t: string): boolean {
+    if (totalDuration === 0) return false;
+
+    const takenMinutes = new Set<number>();
+    for (const tk of taken) {
+      const start = toMins(tk);
+      for (let m = start; m < start + 30; m++) takenMinutes.add(m);
+    }
+
+    const requiredEnd = toMins(t) + totalDuration + BUFFER_MINS;
+    if (requiredEnd > 17 * 60) return true;
+
+    for (let m = toMins(t); m < requiredEnd; m++) {
+      if (takenMinutes.has(m)) return true;
+    }
+    return false;
+  }
 
   // Fetch taken slots + pre-bridal flag whenever date changes
   useEffect(() => {
@@ -171,8 +228,8 @@ function WalkinModal({
       toast.error("Please enter a valid 10-digit mobile number.");
       return;
     }
-    if (!serviceId) {
-      toast.error("Please select a service.");
+    if (selectedIds.length === 0) {
+      toast.error("Please select at least one service.");
       return;
     }
     if (!isoDate) {
@@ -187,13 +244,17 @@ function WalkinModal({
     setSubmitting(true);
     try {
       await api.adminBookOffline({
-        service_id: serviceId,
+        service_id: selectedIds[0],
+        services: selectedIds,
+        total_duration: totalDuration,
         date: isoDate,
         time,
         offline_name: offlineName.trim(),
         offline_phone: trimPhone,
       });
-      toast.success(`Walk-in booking saved for ${offlineName.trim()}!`);
+      toast.success(
+        `Walk-in booking for ${selectedIds.length} service${selectedIds.length > 1 ? "s" : ""} saved for ${offlineName.trim()}!`,
+      );
       onSuccess();
       onClose();
     } catch (err) {
@@ -203,10 +264,9 @@ function WalkinModal({
     }
   }
 
-  const selectedService = SERVICE_CATEGORIES.flatMap((c) => c.items).find(
-    (s) => s.id === serviceId,
+  const isPreBridalSelected = selectedIds.some(
+    (id) => id === "pk-prebridal" || id === "pb-package",
   );
-  const isPreBridalSelected = serviceId === "pk-prebridal" || serviceId === "pb-package";
 
   return (
     <Dialog
@@ -291,38 +351,77 @@ function WalkinModal({
             />
           </div>
 
-          {/* Service */}
+          {/* Service multi-select (checkboxes) */}
           <div className="space-y-1.5">
-            <label
-              className="text-xs font-semibold uppercase tracking-wide"
-              style={{ color: TEXT_MUTED }}
-            >
-              Service <span style={{ color: BURGUNDY }}>*</span>
-            </label>
-            <Select
-              value={serviceId}
-              onValueChange={(v) => {
-                setServiceId(v);
-                setTime("");
+            <div className="flex items-center justify-between">
+              <label
+                className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+                style={{ color: TEXT_MUTED }}
+              >
+                <Scissors className="h-3.5 w-3.5" style={{ color: GOLD }} />
+                Services <span style={{ color: BURGUNDY }}>*</span>
+              </label>
+              {selectedIds.length > 0 && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                  style={{
+                    background: "oklch(0.35 0.15 22 / 10%)",
+                    color: BURGUNDY,
+                  }}
+                >
+                  {selectedIds.length} selected ({totalDuration}m)
+                </span>
+              )}
+            </div>
+
+            <div
+              className="space-y-3 max-h-60 overflow-y-auto pr-3 sm:pr-3.5 [scrollbar-gutter:stable] p-2.5 rounded-xl border"
+              style={{
+                borderColor: "oklch(0.88 0.030 82)",
+                background: "oklch(0.99 0.005 85)",
               }}
             >
-              <SelectTrigger id="offline-service" className="w-full h-10">
-                <SelectValue placeholder="Choose a service" />
-              </SelectTrigger>
-              <SelectContent>
-                {SERVICE_CATEGORIES.map((cat) => (
-                  <SelectGroup key={cat.name}>
-                    <SelectLabel>{cat.name}</SelectLabel>
-                    {cat.items.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                        {s.price !== "On request" ? ` — ₹${s.price}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+              {categories.map((cat) => (
+                <div key={cat.name}>
+                  <p
+                    className="mb-1 text-[11px] font-bold uppercase tracking-wider px-1 text-muted-foreground"
+                  >
+                    {cat.name}
+                  </p>
+                  <div className="space-y-1">
+                    {cat.items.map((svc) => {
+                      const checked = selectedIds.includes(svc.id);
+                      return (
+                        <label
+                          key={svc.id}
+                          htmlFor={`admin-svc-${svc.id}`}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-xs transition-colors",
+                            checked
+                              ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                              : "border-border bg-white hover:border-accent hover:bg-accent/5",
+                          )}
+                        >
+                          <input
+                            id={`admin-svc-${svc.id}`}
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary rounded cursor-pointer shrink-0"
+                            checked={checked}
+                            onChange={() => toggleService(svc.id)}
+                          />
+                          <span className="flex-1 truncate">{svc.name}</span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {svc.price !== "On request" ? `₹${svc.price}` : "On request"}
+                            {" · "}
+                            {svc.durationMins} min
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Date */}
@@ -358,7 +457,8 @@ function WalkinModal({
                   disabled={(d) => {
                     const today = getISTNow();
                     today.setHours(0, 0, 0, 0);
-                    return d < today || d.getDay() === 5;
+                    const dStr = format(d, "yyyy-MM-dd");
+                    return d < today || d.getDay() === 5 || isDateClosed(dStr);
                   }}
                   initialFocus
                   className={cn("p-3 pointer-events-auto")}
@@ -366,7 +466,7 @@ function WalkinModal({
               </PopoverContent>
             </Popover>
             <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-              Fridays are closed.
+              Fridays and closed holiday dates are unavailable.
             </p>
           </div>
 
@@ -398,10 +498,9 @@ function WalkinModal({
               </div>
             ) : (
               <div className="grid grid-cols-4 gap-1.5">
-                {TIME_SLOTS.map((t, index) => {
+                {TIME_SLOTS.map((t) => {
                   const isTaken = taken.includes(t);
-                  const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
-                  const isBuffer = prevSlot ? taken.includes(prevSlot) : false;
+                  const isBlockBusy = isBlockUnavailable(t);
                   const isSelected = time === t;
 
                   const istNow = getISTNow();
@@ -412,7 +511,7 @@ function WalkinModal({
                     isPast = h * 60 + m <= istNow.getHours() * 60 + istNow.getMinutes();
                   }
 
-                  const isDisabled = isTaken || isBuffer || isPast;
+                  const isDisabled = isTaken || isBlockBusy || isPast;
 
                   return (
                     <button
@@ -422,10 +521,10 @@ function WalkinModal({
                       onClick={() => setTime(t)}
                       className={cn(
                         "rounded-md border py-2 text-xs transition min-h-[36px]",
-                        (isTaken || isBuffer) &&
+                        (isTaken || isBlockBusy) &&
                           "cursor-not-allowed border-muted bg-muted text-muted-foreground line-through",
                         isPast &&
-                          !(isTaken || isBuffer) &&
+                          !(isTaken || isBlockBusy) &&
                           "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground/50",
                         !isDisabled &&
                           !isSelected &&
@@ -443,26 +542,34 @@ function WalkinModal({
           </div>
 
           {/* Summary strip */}
-          {serviceId && date && time && (
+          {selectedIds.length > 0 && date && time && (
             <div
-              className="rounded-xl px-4 py-3 text-xs space-y-1"
+              className="rounded-xl px-4 py-3 text-xs space-y-1.5"
               style={{
                 background:
                   "linear-gradient(135deg, oklch(0.35 0.15 22 / 5%), oklch(0.68 0.13 68 / 5%))",
                 border: "1px solid oklch(0.88 0.030 82)",
               }}
             >
-              <p className="font-semibold" style={{ color: BURGUNDY }}>
-                Booking Summary
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="font-semibold" style={{ color: BURGUNDY }}>
+                  Booking Summary
+                </p>
+                <span className="font-bold" style={{ color: BURGUNDY }}>
+                  {totalDuration} mins
+                </span>
+              </div>
               <p style={{ color: TEXT_MUTED }}>
                 <span className="font-medium" style={{ color: TEXT_DARK }}>
                   {offlineName || "—"}
                 </span>
                 {offlinePhone && <> · {offlinePhone}</>}
               </p>
+              <p className="font-medium" style={{ color: TEXT_DARK }}>
+                {selectedServices.map((s) => s.name).join(", ")}
+              </p>
               <p style={{ color: TEXT_MUTED }}>
-                {selectedService?.name} · {format(date, "d MMM yyyy")} · {time}
+                {format(date, "d MMM yyyy")} · {time}
               </p>
             </div>
           )}
@@ -473,8 +580,8 @@ function WalkinModal({
               type="submit"
               disabled={
                 submitting ||
-                !offlineName ||
-                !serviceId ||
+                !offlineName.trim() ||
+                selectedIds.length === 0 ||
                 !isoDate ||
                 !time ||
                 (isPreBridalSelected && preBridalBooked)

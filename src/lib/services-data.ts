@@ -217,3 +217,20 @@ export const TIME_SLOTS: string[] = (() => {
   }
   return slots;
 })();
+
+export const REMINDER_OPTIONS = [
+  { value: 15, label: "15 mins before", shortLabel: "15m before" },
+  { value: 30, label: "30 mins before", shortLabel: "30m before" },
+  { value: 60, label: "1 hour before", shortLabel: "1 hr before" },
+  { value: 120, label: "2 hours before", shortLabel: "2 hrs before" },
+  { value: 1440, label: "24 hours before", shortLabel: "24 hrs before" },
+] as const;
+
+export function formatReminderLabel(minutes?: number | null): string {
+  if (!minutes) return "30 mins before";
+  const opt = REMINDER_OPTIONS.find((o) => o.value === minutes);
+  if (opt) return opt.label;
+  if (minutes >= 1440) return `${Math.round(minutes / 1440)} day(s) before`;
+  if (minutes >= 60) return `${Math.round(minutes / 60)} hr(s) before`;
+  return `${minutes} mins before`;
+}

@@ -455,6 +455,7 @@ export const api = {
       role: string;
       push_enabled?: boolean;
       avatar_url?: string | null;
+      default_reminder_minutes?: number;
     }>("/api/profile"),
 
   updateProfile: (body: {
@@ -464,6 +465,7 @@ export const api = {
     new_password?: string;
     push_enabled?: boolean;
     avatar_url?: string | null;
+    default_reminder_minutes?: number;
   }) =>
     request<{
       ok: boolean;
@@ -476,6 +478,7 @@ export const api = {
         role: string;
         push_enabled?: boolean;
         avatar_url?: string | null;
+        default_reminder_minutes?: number;
       };
     }>("/api/profile", { method: "PUT", body: JSON.stringify(body) }),
 
@@ -550,7 +553,13 @@ export const api = {
       },
     ),
 
-  book: (body: { services: string[]; total_duration: number; date: string; time: string }) =>
+  book: (body: {
+    services: string[];
+    total_duration: number;
+    date: string;
+    time: string;
+    reminder_minutes?: number;
+  }) =>
     withMock(
       () =>
         request<{ id: number }>("/api/book", {
@@ -559,7 +568,14 @@ export const api = {
         }),
       () => {
         const list = readJSON<
-          { id: number; service_name: string; date: string; time: string; status: string }[]
+          {
+            id: number;
+            service_name: string;
+            date: string;
+            time: string;
+            status: string;
+            reminder_minutes?: number;
+          }[]
         >(MOCK_BOOKINGS_KEY, []);
         const id = Date.now();
         // Join all selected service names for the mock display
@@ -570,6 +586,7 @@ export const api = {
           date: body.date,
           time: body.time,
           status: "confirmed",
+          reminder_minutes: body.reminder_minutes ?? 30,
         });
         writeJSON(MOCK_BOOKINGS_KEY, list);
         return { id };
@@ -586,32 +603,55 @@ export const api = {
             date: string;
             time: string;
             status: string;
+            reminder_minutes?: number;
+            reminder_sent?: boolean;
           }[];
         }>("/api/my-bookings"),
       () => ({
         bookings: readJSON<
-          { id: number; service_name: string; date: string; time: string; status: string }[]
+          {
+            id: number;
+            service_name: string;
+            date: string;
+            time: string;
+            status: string;
+            reminder_minutes?: number;
+            reminder_sent?: boolean;
+          }[]
         >(MOCK_BOOKINGS_KEY, []),
       }),
     ),
 
-  updateBooking: (id: number, body: { date: string; time: string }) =>
+  updateBooking: (id: number, body: { date?: string; time?: string; reminder_minutes?: number }) =>
     withMock(
       () =>
-        request<{ ok: true }>(`/api/bookings/${id}`, {
+        request<{ ok: true; reminder_minutes?: number }>(`/api/bookings/${id}`, {
           method: "PUT",
           body: JSON.stringify(body),
         }),
       () => {
         const list = readJSON<
-          { id: number; service_name: string; date: string; time: string; status: string }[]
+          {
+            id: number;
+            service_name: string;
+            date: string;
+            time: string;
+            status: string;
+            reminder_minutes?: number;
+            reminder_sent?: boolean;
+          }[]
         >(MOCK_BOOKINGS_KEY, []);
         const idx = list.findIndex((b) => b.id === id);
         if (idx >= 0) {
-          list[idx] = { ...list[idx], date: body.date, time: body.time };
+          list[idx] = {
+            ...list[idx],
+            ...(body.date ? { date: body.date } : {}),
+            ...(body.time ? { time: body.time } : {}),
+            ...(body.reminder_minutes !== undefined ? { reminder_minutes: body.reminder_minutes } : {}),
+          };
           writeJSON(MOCK_BOOKINGS_KEY, list);
         }
-        return { ok: true as const };
+        return { ok: true as const, reminder_minutes: body.reminder_minutes };
       },
     ),
 
@@ -928,7 +968,9 @@ export const api = {
   },
 
   adminBookOffline: (body: {
-    service_id: string;
+    service_id?: string;
+    services?: string[];
+    total_duration?: number;
     date: string;
     time: string;
     offline_name: string;
@@ -936,13 +978,18 @@ export const api = {
   }) => {
     if (typeof window === "undefined") return Promise.reject(new Error("SSR"));
     const token = getAdminToken() ?? getToken();
+    const payload = {
+      ...body,
+      service_id: body.service_id || (body.services && body.services.length > 0 ? body.services[0] : ""),
+      services: body.services || (body.service_id ? [body.service_id] : []),
+    };
     return fetch(`${API_BASE}/api/admin/book-offline`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     }).then(async (res) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save offline booking");
@@ -958,6 +1005,7 @@ export interface UserProfile {
   phone: string;
   role: "USER" | "ADMIN";
   push_enabled?: boolean;
+  default_reminder_minutes?: number;
   created_at: string;
 }
 

@@ -14,8 +14,17 @@ import {
   ShieldCheck,
   Save,
   Camera,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
+import { REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -78,6 +87,13 @@ function ProfilePage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("salon_reminder_pref");
+      if (saved) return Number(saved);
+    }
+    return 30;
+  });
 
   // Password change state
   const [currentPw, setCurrentPw] = useState("");
@@ -111,6 +127,10 @@ function ProfilePage() {
         setEmail(p.email);
         setRole(p.role);
         setAvatarUrl(p.avatar_url ?? null);
+        if (p.default_reminder_minutes) {
+          setDefaultReminderMinutes(p.default_reminder_minutes);
+          localStorage.setItem("salon_reminder_pref", String(p.default_reminder_minutes));
+        }
       })
       .catch(() => {
         /* silent — use session data */
@@ -208,7 +228,12 @@ function ProfilePage() {
     setSavingInfo(true);
     setFieldErrors({});
     try {
-      const res = await api.updateProfile({ name: trimName, phone: trimPhone });
+      const res = await api.updateProfile({
+        name: trimName,
+        phone: trimPhone,
+        default_reminder_minutes: defaultReminderMinutes,
+      });
+      localStorage.setItem("salon_reminder_pref", String(defaultReminderMinutes));
       // Update the stored session name so navbar refreshes
       const stored = getUser();
       if (stored)
@@ -514,6 +539,35 @@ function ProfilePage() {
                     style={{ color: "oklch(0.25 0.05 50)" }}
                   />
                 </Field>
+
+                {/* Appointment Reminder Preference */}
+                <div className="space-y-1.5">
+                  <label
+                    className="block text-xs font-semibold uppercase tracking-widest flex items-center gap-1.5"
+                    style={{ color: "oklch(0.50 0.06 48)" }}
+                  >
+                    <Bell className="h-3.5 w-3.5" style={{ color: GOLD }} />
+                    Default Appointment Reminder
+                  </label>
+                  <Select
+                    value={String(defaultReminderMinutes)}
+                    onValueChange={(val) => setDefaultReminderMinutes(Number(val))}
+                  >
+                    <SelectTrigger className="w-full h-10 bg-transparent rounded-xl" style={{ border: "1px solid oklch(0.88 0.030 82)" }}>
+                      <SelectValue placeholder="Choose default reminder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REMINDER_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={String(opt.value)} className="text-xs sm:text-sm">
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    How soon before your appointments you want to receive notification reminders.
+                  </p>
+                </div>
 
                 <button
                   type="submit"

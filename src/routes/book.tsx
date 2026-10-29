@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { CalendarIcon, CheckCircle2, ShoppingCart, X, Ban, CalendarX } from "lucide-react";
+import { CalendarIcon, CheckCircle2, ShoppingCart, X, Ban, CalendarX, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
 import {
@@ -14,12 +14,14 @@ import {
   TIME_SLOTS,
   BUFFER_MINS,
   getAllServiceCategories,
+  REMINDER_OPTIONS,
+  formatReminderLabel,
   type ServiceCategory,
 } from "@/lib/services-data";
 import {
   isDateClosed,
   getClosureForDate,
-  getAllClosures,
+  useClosures,
   type SalonClosure,
 } from "@/lib/closures-data";
 
@@ -62,6 +64,14 @@ function BookPage() {
 
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState<string>("");
+  // User reminder preference (defaults to saved localStorage pref or 30 mins)
+  const [reminderMinutes, setReminderMinutes] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("salon_reminder_pref");
+      if (saved) return Number(saved);
+    }
+    return 30;
+  });
   // taken: array of "HH:MM" strings that are already booked for the chosen date
   const [taken, setTaken] = useState<string[]>([]);
   const [preBridalFullyBooked, setPreBridalFullyBooked] = useState(false);
@@ -69,6 +79,19 @@ function BookPage() {
   const [submitting, setSubmitting] = useState(false);
   // ready prevents a flash of the form before auth check completes
   const [ready, setReady] = useState(false);
+
+  // Sync reminder preference with user profile if authenticated
+  useEffect(() => {
+    const user = getUser();
+    if (user) {
+      api.getProfile().then((p) => {
+        if (p.default_reminder_minutes) {
+          setReminderMinutes(p.default_reminder_minutes);
+          localStorage.setItem("salon_reminder_pref", String(p.default_reminder_minutes));
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   const isoDate = useMemo(() => (date ? format(date, "yyyy-MM-dd") : ""), [date]);
 
@@ -85,18 +108,8 @@ function BookPage() {
     };
   }, []);
 
-  // Live salon closures
-  const [closures, setClosures] = useState<SalonClosure[]>(() => getAllClosures());
-
-  useEffect(() => {
-    const handleSync = () => setClosures(getAllClosures());
-    window.addEventListener("salon-closures-updated", handleSync);
-    window.addEventListener("storage", handleSync);
-    return () => {
-      window.removeEventListener("salon-closures-updated", handleSync);
-      window.removeEventListener("storage", handleSync);
-    };
-  }, []);
+  // Live salon closures (synchronized across all devices/viewports)
+  const { closures } = useClosures();
 
   const dateClosure = useMemo(
     () => (isoDate ? getClosureForDate(isoDate) : undefined),
@@ -269,6 +282,7 @@ function BookPage() {
         total_duration: totalDuration,
         date: isoDate,
         time,
+        reminder_minutes: reminderMinutes,
       });
       toast.success("Appointment booked!");
       navigate({ to: "/my-bookings" });
@@ -382,7 +396,7 @@ function BookPage() {
                 </span>
               )}
             </label>
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-3.5 max-h-64 overflow-y-auto pr-3 sm:pr-3.5 [scrollbar-gutter:stable]">
               {categories.map((cat) => (
                 <div key={cat.name}>
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -598,6 +612,41 @@ function BookPage() {
                 );
               })}
             </div>
+
+            {/* ── Custom Reminder Selector ── */}
+            <div className="space-y-2 pt-3 border-t border-border/60">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Bell className="h-3.5 w-3.5 text-primary" />
+                  Appointment Reminder
+                </label>
+                <span className="text-[11px] text-muted-foreground">Notification before visit</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {REMINDER_OPTIONS.map((opt) => {
+                  const isSelected = reminderMinutes === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setReminderMinutes(opt.value);
+                        localStorage.setItem("salon_reminder_pref", String(opt.value));
+                      }}
+                      className={cn(
+                        "rounded-xl border px-2.5 py-2 text-xs font-medium transition cursor-pointer select-none text-center flex flex-col items-center justify-center gap-0.5 min-h-[44px]",
+                        isSelected
+                          ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/40 shadow-xs"
+                          : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      )}
+                    >
+                      <span className="font-semibold text-xs leading-tight">{opt.label.replace(" before", "")}</span>
+                      <span className="text-[10px] opacity-75">before</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -655,6 +704,7 @@ function BookPage() {
             <dl className="mt-3 space-y-2 text-sm border-t border-border/60 pt-2">
               <Row label="Date" value={date ? format(date, "PPP") : "-"} />
               <Row label="Time" value={time || "-"} />
+              <Row label="Reminder" value={formatReminderLabel(reminderMinutes)} />
             </dl>
 
             <div className="mt-4 flex items-start gap-2 rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">
