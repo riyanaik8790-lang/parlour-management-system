@@ -618,7 +618,7 @@ export const api = {
             reminder_minutes?: number;
             reminder_sent?: boolean;
           }[]
-        >(MOCK_BOOKINGS_KEY, []),
+        >(MOCK_BOOKINGS_KEY, []).filter((b) => b.status !== "cancelled"),
       }),
     ),
 
@@ -662,11 +662,8 @@ export const api = {
         const list = readJSON<
           { id: number; service_name: string; date: string; time: string; status: string }[]
         >(MOCK_BOOKINGS_KEY, []);
-        const idx = list.findIndex((b) => b.id === id);
-        if (idx >= 0) {
-          list[idx].status = "cancelled";
-          writeJSON(MOCK_BOOKINGS_KEY, list);
-        }
+        const next = list.filter((b) => b.id !== id);
+        writeJSON(MOCK_BOOKINGS_KEY, next);
         return { ok: true as const };
       },
     ),
@@ -895,6 +892,7 @@ export const api = {
         total_services: number;
         bookings_mtd: number;
         total_bookings: number;
+        total_appointments?: number;
       };
     });
   },

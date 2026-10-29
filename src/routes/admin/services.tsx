@@ -27,6 +27,7 @@ import {
   deleteServiceCategory,
   deleteSubService,
   calculateCategoryStartingPrice,
+  getCategoryTab,
 } from "@/lib/services-data";
 import {
   Dialog,
@@ -168,7 +169,7 @@ function CategoryModal({
       if (categoryToEdit) {
         setCategoryName(categoryToEdit.name);
         setImageUrl(categoryToEdit.image || "");
-        setTab(categoryToEdit.tab || "Skin");
+        setTab(categoryToEdit.tab || getCategoryTab(categoryToEdit) || "Skin");
         setRows(
           categoryToEdit.items && categoryToEdit.items.length > 0
             ? categoryToEdit.items.map((it) => ({
@@ -657,28 +658,38 @@ function AdminServicesPage() {
   const availableTabs = useMemo(() => {
     const defaultTabs = ["Skin", "Hair", "Waxing", "Nails", "Packages"];
     const customTabs = categories
-      .map((c) => c.tab?.trim())
+      .map((c) => (c.tab || getCategoryTab(c)).trim())
       .filter((t): t is string => Boolean(t && !defaultTabs.some((dt) => dt.toLowerCase() === t.toLowerCase())));
     const allUnique = [...defaultTabs, ...Array.from(new Set(customTabs))];
+
+    const totalSubServicesCount = categories.reduce((sum, c) => sum + (c.items?.length || 0), 0);
+
     return [
-      { value: "all", label: "All Categories", count: categories.length },
-      ...allUnique.map((tab) => ({
-        value: tab,
-        label: tab,
-        count: categories.filter((c) => c.tab?.toLowerCase() === tab.toLowerCase()).length,
-      })),
+      { value: "all", label: "All Categories", count: totalSubServicesCount },
+      ...allUnique.map((tab) => {
+        const matchingCats = categories.filter(
+          (c) => (c.tab || getCategoryTab(c)).toLowerCase() === tab.toLowerCase()
+        );
+        const subServiceCount = matchingCats.reduce((sum, c) => sum + (c.items?.length || 0), 0);
+        return {
+          value: tab,
+          label: tab,
+          count: subServiceCount,
+        };
+      }),
     ];
   }, [categories]);
 
   // Filter categories and sub-services by selected tab and search query
   const filteredCategories = categories.filter((cat) => {
-    if (selectedTab !== "all" && cat.tab?.toLowerCase() !== selectedTab.toLowerCase()) {
+    const catTab = (cat.tab || getCategoryTab(cat)).toLowerCase();
+    if (selectedTab !== "all" && catTab !== selectedTab.toLowerCase()) {
       return false;
     }
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     const matchCat =
-      cat.name.toLowerCase().includes(q) || (cat.tab || "").toLowerCase().includes(q);
+      cat.name.toLowerCase().includes(q) || catTab.includes(q);
     const matchItems = cat.items.some((i) => i.name.toLowerCase().includes(q));
     return matchCat || matchItems;
   });

@@ -38,6 +38,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -138,6 +140,23 @@ function SettingsPage() {
       if (saved) return Number(saved);
     }
     return 30;
+  });
+  const isInitialPreset = REMINDER_OPTIONS.some((o) => o.value === defaultReminderMinutes);
+  const [isCustomReminder, setIsCustomReminder] = useState<boolean>(!isInitialPreset);
+  const [customReminderVal, setCustomReminderVal] = useState<number>(() => {
+    if (!isInitialPreset) {
+      if (defaultReminderMinutes >= 1440 && defaultReminderMinutes % 1440 === 0) return defaultReminderMinutes / 1440;
+      if (defaultReminderMinutes >= 60 && defaultReminderMinutes % 60 === 0) return defaultReminderMinutes / 60;
+      return defaultReminderMinutes;
+    }
+    return 45;
+  });
+  const [customReminderUnit, setCustomReminderUnit] = useState<"mins" | "hours" | "days">(() => {
+    if (!isInitialPreset) {
+      if (defaultReminderMinutes >= 1440 && defaultReminderMinutes % 1440 === 0) return "days";
+      if (defaultReminderMinutes >= 60 && defaultReminderMinutes % 60 === 0) return "hours";
+    }
+    return "mins";
   });
   const [savingReminderPref, setSavingReminderPref] = useState(false);
 
@@ -273,8 +292,25 @@ function SettingsPage() {
         setAvatarUrl(p.avatar_url ?? null);
         setPushEnabled(p.push_enabled ?? false);
         if (p.default_reminder_minutes) {
-          setDefaultReminderMinutes(p.default_reminder_minutes);
-          localStorage.setItem("salon_reminder_pref", String(p.default_reminder_minutes));
+          const m = p.default_reminder_minutes;
+          setDefaultReminderMinutes(m);
+          localStorage.setItem("salon_reminder_pref", String(m));
+          const preset = REMINDER_OPTIONS.some((o) => o.value === m);
+          if (!preset) {
+            setIsCustomReminder(true);
+            if (m >= 1440 && m % 1440 === 0) {
+              setCustomReminderVal(m / 1440);
+              setCustomReminderUnit("days");
+            } else if (m >= 60 && m % 60 === 0) {
+              setCustomReminderVal(m / 60);
+              setCustomReminderUnit("hours");
+            } else {
+              setCustomReminderVal(m);
+              setCustomReminderUnit("mins");
+            }
+          } else {
+            setIsCustomReminder(false);
+          }
         }
       })
       .catch(() => {
@@ -294,12 +330,41 @@ function SettingsPage() {
     setSavingReminderPref(true);
     try {
       await api.updateProfile({ default_reminder_minutes: mins });
-      toast.success(`Default reminder set to ${formatReminderLabel(mins)}`);
+      toast.success(`Notification reminder set to ${formatReminderLabel(mins)}`);
     } catch {
       toast.success(`Reminder preference saved to ${formatReminderLabel(mins)}`);
     } finally {
       setSavingReminderPref(false);
     }
+  };
+
+  const handleReminderSelect = (val: string) => {
+    if (val === "custom") {
+      setIsCustomReminder(true);
+      const m =
+        customReminderUnit === "days"
+          ? customReminderVal * 1440
+          : customReminderUnit === "hours"
+            ? customReminderVal * 60
+            : customReminderVal;
+      handleReminderPrefChange(m);
+    } else {
+      setIsCustomReminder(false);
+      handleReminderPrefChange(Number(val));
+    }
+  };
+
+  const handleCustomReminderUpdate = (val: number, unit: "mins" | "hours" | "days") => {
+    const safeVal = Math.max(1, val);
+    setCustomReminderVal(safeVal);
+    setCustomReminderUnit(unit);
+    const m =
+      unit === "days"
+        ? safeVal * 1440
+        : unit === "hours"
+          ? safeVal * 60
+          : safeVal;
+    handleReminderPrefChange(m);
   };
 
   // ── Upload Avatar File helper ──────────────────────────────────────────────
@@ -670,8 +735,7 @@ function SettingsPage() {
                         {/* Circle Avatar (clickable to toggle menu) */}
                         <div
                           onClick={() => !isUploading && setIsAvatarMenuOpen((prev) => !prev)}
-                          className="h-24 w-24 rounded-full overflow-hidden shadow-md ring-4 cursor-pointer transition-transform hover:opacity-95"
-                          style={{ ringColor: "oklch(0.88 0.030 82)" }}
+                          className="h-24 w-24 rounded-full overflow-hidden shadow-md ring-4 ring-[oklch(0.88_0.030_82)] cursor-pointer transition-transform hover:opacity-95"
                           title="Click to manage profile photo"
                         >
                           {avatarUrl ? (
@@ -775,7 +839,7 @@ function SettingsPage() {
                                 onClick={() => {
                                   setIsAvatarMenuOpen(false);
                                   // If browser supports getUserMedia (desktop webcam or modern mobile), open live camera modal
-                                  if (navigator.mediaDevices?.getUserMedia) {
+                                  if (typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function") {
                                     setIsWebcamOpen(true);
                                   } else {
                                     cameraRef.current?.click();
@@ -1052,9 +1116,9 @@ function SettingsPage() {
                     <div className="divide-y" style={{ borderColor: BORDER }}>
                       {/* Option 1: Notification Sounds */}
                       <div className="flex items-center justify-between py-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
                           <div
-                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-xl"
                             style={{
                               background: alertSoundEnabled
                                 ? "oklch(0.42 0.18 150 / 12%)"
@@ -1063,16 +1127,16 @@ function SettingsPage() {
                             }}
                           >
                             {alertSoundEnabled ? (
-                              <Volume2 className="h-4 w-4" />
+                              <Volume2 className="h-5 w-5" />
                             ) : (
-                              <VolumeX className="h-4 w-4" />
+                              <VolumeX className="h-5 w-5" />
                             )}
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900 block">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm font-medium text-gray-900 block truncate">
                               Notification Sounds
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground block truncate">
                               {alertSoundEnabled ? "Sounds are turned on" : "Sounds are muted"}
                             </span>
                           </div>
@@ -1082,7 +1146,7 @@ function SettingsPage() {
                           type="button"
                           id="alert-sound-toggle-btn"
                           onClick={toggleAlertSounds}
-                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ml-2"
                           style={{
                             backgroundColor: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
                             boxShadow: alertSoundEnabled
@@ -1104,9 +1168,9 @@ function SettingsPage() {
 
                       {/* Option 2: Allow Notifications */}
                       <div className="flex items-center justify-between py-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
                           <div
-                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-xl"
                             style={{
                               background: pushEnabled
                                 ? "oklch(0.42 0.18 150 / 12%)"
@@ -1114,13 +1178,13 @@ function SettingsPage() {
                               color: pushEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
                             }}
                           >
-                            <Bell className="h-4 w-4" />
+                            <Bell className="h-5 w-5" />
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900 block">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm font-medium text-gray-900 block truncate">
                               Allow Notifications
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground block truncate">
                               {pushEnabled ? "Device notifications enabled" : "Device notifications disabled"}
                             </span>
                           </div>
@@ -1181,7 +1245,7 @@ function SettingsPage() {
                               setSavingPush(false);
                             }
                           }}
-                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ml-2"
                           style={{
                             backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
                             boxShadow: pushEnabled
@@ -1201,46 +1265,90 @@ function SettingsPage() {
                         </button>
                       </div>
 
-                      {/* Option: Default Appointment Reminder */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 border-t border-b border-border/50">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-9 w-9 items-center justify-center rounded-xl"
-                            style={{
-                              background: "oklch(0.68 0.13 68 / 15%)",
-                              color: GOLD,
-                            }}
-                          >
-                            <Clock className="h-4 w-4" />
+                      {/* Option: Notification Reminder */}
+                      <div className="flex flex-col gap-3 py-4 border-t border-b border-border/50">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div
+                              className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-xl"
+                              style={{
+                                background: "oklch(0.68 0.13 68 / 15%)",
+                                color: GOLD,
+                              }}
+                            >
+                              <Clock className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-sm font-medium text-gray-900 block truncate">
+                                Notification Reminder
+                              </span>
+                              <span className="text-xs text-muted-foreground block">
+                                Choose how soon before your visit you wish to be notified
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900 block">
-                              Default Appointment Reminder
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              Choose how soon before your visit you wish to be notified
-                            </span>
+
+                          <div className="w-full sm:w-56 shrink-0">
+                            <Select
+                              value={isCustomReminder ? "custom" : String(defaultReminderMinutes)}
+                              onValueChange={handleReminderSelect}
+                              disabled={savingReminderPref}
+                            >
+                              <SelectTrigger className="w-full h-10 bg-background text-xs font-medium">
+                                <SelectValue placeholder="Select reminder">
+                                  {isCustomReminder
+                                    ? `Custom: ${customReminderVal} ${customReminderUnit} before`
+                                    : formatReminderLabel(defaultReminderMinutes)}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {REMINDER_OPTIONS.map((opt) => (
+                                  <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value="custom" className="text-xs font-semibold text-primary">
+                                  ⏱️ Custom time...
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
-                        <div className="w-full sm:w-48 shrink-0">
-                          <Select
-                            value={String(defaultReminderMinutes)}
-                            onValueChange={(val) => handleReminderPrefChange(Number(val))}
-                            disabled={savingReminderPref}
-                          >
-                            <SelectTrigger className="w-full h-9 bg-background text-xs font-medium">
-                              <SelectValue placeholder="Select reminder" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {REMINDER_OPTIONS.map((opt) => (
-                                <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
-                                  {opt.label}
-                                </SelectItem>
+                        {/* Inline Custom Reminder Controls */}
+                        {isCustomReminder && (
+                          <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in sm:ml-13.5">
+                            <span className="font-medium text-foreground shrink-0 text-xs">Remind me:</span>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
+                              value={customReminderVal}
+                              onChange={(e) =>
+                                handleCustomReminderUpdate(Number(e.target.value) || 1, customReminderUnit)
+                              }
+                              className="h-8 w-16 text-center text-xs font-semibold bg-background border-border"
+                            />
+                            <div className="flex rounded-lg border border-border bg-background p-0.5">
+                              {(["mins", "hours", "days"] as const).map((unit) => (
+                                <button
+                                  key={unit}
+                                  type="button"
+                                  onClick={() => handleCustomReminderUpdate(customReminderVal, unit)}
+                                  className={cn(
+                                    "px-2 py-1 text-[11px] font-medium rounded-md capitalize transition cursor-pointer",
+                                    customReminderUnit === unit
+                                      ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  {unit}
+                                </button>
                               ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground ml-auto">before appointment</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Option 3: Notification History */}
@@ -1252,27 +1360,27 @@ function SettingsPage() {
                         }}
                         className="w-full flex items-center justify-between py-4 text-left transition-colors hover:bg-black/[0.02] rounded-xl px-1"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
                           <div
-                            className="flex h-9 w-9 items-center justify-center rounded-xl"
+                            className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-xl"
                             style={{
                               background: "oklch(0.35 0.15 22 / 8%)",
                               color: BURGUNDY,
                             }}
                           >
-                            <History className="h-4 w-4" />
+                            <History className="h-5 w-5" />
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-900 block">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm font-medium text-gray-900 block truncate">
                               Notification History
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground block truncate">
                               View all past alerts and appointment updates
                             </span>
                           </div>
                         </div>
 
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                        <ChevronRight className="h-4 w-4 text-gray-400 shrink-0 ml-2" />
                       </button>
                     </div>
                   </div>

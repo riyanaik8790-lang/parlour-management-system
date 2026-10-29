@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { supabase } from "./supabase";
 
 export type SalonClosure = {
   id: string;
@@ -113,13 +114,56 @@ if (typeof window !== "undefined") {
   });
 }
 
+/**
+ * Asynchronously fetch closures from the centralized Supabase database.
+ * Syncs the remote records into local storage, notifies in-memory subscribers,
+ * and ensures all mobile and desktop viewports are perfectly aligned.
+ */
+export async function fetchRemoteClosures(): Promise<SalonClosure[]> {
+  try {
+    const { data, error } = await supabase
+      .from("salon_closures")
+      .select("*")
+      .order("start_date", { ascending: true });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const mapped: SalonClosure[] = data.map((r: {
+        id: string;
+        start_date: string;
+        end_date: string;
+        reason: string;
+        created_at?: string;
+      }) => ({
+        id: r.id,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        reason: r.reason,
+        createdAt: r.created_at || new Date().toISOString(),
+      }));
+
+      // Update local storage cache
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(mapped));
+        } catch {}
+      }
+
+      notifyListeners(mapped);
+      return mapped;
+    }
+  } catch (err) {
+    console.warn("[closures] Remote fetch failed, using local cache:", err);
+  }
+  return getAllClosures();
+}
+
 export function getAllClosures(): SalonClosure[] {
   if (typeof window === "undefined") return DEFAULT_CLOSURES;
   try {
     const raw = localStorage.getItem(CLOSURES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
     // Seed initial defaults into localStorage
     localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(DEFAULT_CLOSURES));
@@ -182,10 +226,26 @@ export function addClosure(data: {
     createdAt: new Date().toISOString(),
   };
 
-  const updated = [newClosure, ...current].sort((a, b) =>
+  const updated = [newClosure, ...current.filter((c) => c.id !== newClosure.id)].sort((a, b) =>
     a.startDate.localeCompare(b.startDate),
   );
   saveAllClosures(updated);
+
+  // Sync to remote Supabase database immediately
+  (async () => {
+    try {
+      const { error } = await supabase.from("salon_closures").upsert({
+        id: newClosure.id,
+        start_date: newClosure.startDate,
+        end_date: newClosure.endDate,
+        reason: newClosure.reason,
+      });
+      if (error) console.warn("[closures] Remote upsert failed:", error.message);
+    } catch (err) {
+      console.warn("[closures] Remote upsert error:", err);
+    }
+  })();
+
   return newClosure;
 }
 
@@ -193,6 +253,19 @@ export function deleteClosure(id: string): void {
   const current = getAllClosures();
   const updated = current.filter((c) => c.id !== id);
   saveAllClosures(updated);
+
+  // Sync delete to remote Supabase database immediately
+  (async () => {
+    try {
+      const { error } = await supabase
+        .from("salon_closures")
+        .delete()
+        .eq("id", id);
+      if (error) console.warn("[closures] Remote delete failed:", error.message);
+    } catch (err) {
+      console.warn("[closures] Remote delete error:", err);
+    }
+  })();
 }
 
 export function isDateClosed(dateStr: string): boolean {
@@ -210,14 +283,26 @@ export function getClosureForDate(dateStr: string): SalonClosure | undefined {
 /**
  * React hook for unified, real-time cross-view closure synchronization.
  * Automatically stays synchronized across mobile/desktop viewports,
- * resize events, storage changes, tab focus, and BroadcastChannel updates.
+ * resize events, storage changes, tab focus, BroadcastChannel updates,
+ * and Supabase centralized database changes.
  */
 export function useClosures() {
   const [closures, setClosures] = useState<SalonClosure[]>(() => getAllClosures());
 
+  const refresh = useCallback(async () => {
+    // 1. Immediately return local state
+    const local = getAllClosures();
+    setClosures(local);
+    // 2. Immediately fetch from centralized store
+    const remote = await fetchRemoteClosures();
+    setClosures(remote);
+    return remote;
+  }, []);
+
   useEffect(() => {
-    // Initial sync
+    // Initial sync from local storage and remote centralized store
     setClosures(getAllClosures());
+    fetchRemoteClosures();
 
     const unsubscribe = subscribeToClosures((updated) => {
       setClosures(updated);
@@ -225,12 +310,13 @@ export function useClosures() {
 
     const handleSync = () => {
       setClosures(getAllClosures());
+      fetchRemoteClosures();
     };
 
     // Cross-tab / cross-window storage event
     const handleStorage = (e: StorageEvent) => {
       if (!e.key || e.key === CLOSURES_STORAGE_KEY) {
-        handleSync();
+        setClosures(getAllClosures());
       }
     };
 
@@ -246,6 +332,23 @@ export function useClosures() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // Supabase Realtime Channel: Instantly syncs across devices when a closure is added or removed
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel("salon_closures_realtime_sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "salon_closures" },
+          () => {
+            fetchRemoteClosures();
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("[closures] Realtime channel subscription failed:", e);
+    }
+
     // Request synchronization from parent/sibling preview frames if present
     try {
       if (window.parent && window.parent !== window) {
@@ -260,13 +363,10 @@ export function useClosures() {
       window.removeEventListener("resize", handleSync);
       window.removeEventListener("focus", handleSync);
       document.removeEventListener("visibilitychange", handleVisibility);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, []);
-
-  const refresh = useCallback(() => {
-    const latest = getAllClosures();
-    setClosures(latest);
-    return latest;
   }, []);
 
   return { closures, refresh };

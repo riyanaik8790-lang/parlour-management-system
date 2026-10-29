@@ -116,7 +116,10 @@ function MyBookingsPage() {
   const load = () => {
     api
       .myBookings()
-      .then((r) => setBookings(r.bookings))
+      .then((r) => {
+        const active = (r.bookings || []).filter((b) => b.status !== "cancelled");
+        setBookings(active);
+      })
       .catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : "Failed to load";
         const isSessionError =
@@ -247,14 +250,22 @@ function MyBookingsPage() {
   };
 
   const cancelBooking = async (id: number) => {
-    if (!confirm("Cancel this booking?")) return;
+    if (!confirm("Cancel and delete this booking?")) return;
+
+    // 1. Instant UI Removal: immediately remove appointment card from local state
+    const previousBookings = bookings;
+    setBookings((prev) => (prev ? prev.filter((b) => b.id !== id) : []));
+    if (editingId === id) setEditingId(null);
     setBusyId(id);
+
     try {
+      // 2. Persist deletion/cancellation to backend
       await api.cancelBooking(id);
-      toast.success("Booking cancelled");
-      load();
+      toast.success("Booking removed");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Cancel failed");
+      // Rollback optimistic removal on network failure
+      setBookings(previousBookings);
+      toast.error(e instanceof Error ? e.message : "Failed to cancel booking");
     } finally {
       setBusyId(null);
     }

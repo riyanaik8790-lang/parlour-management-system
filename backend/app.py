@@ -571,8 +571,101 @@ def slots():
         pre_bridal_row = cur.fetchone()
         pre_bridal_booked = bool(pre_bridal_row and pre_bridal_row["cnt"] > 0)
 
+        # Check if the date falls inside any scheduled salon closure / holiday
+        cur.execute(
+            "SELECT reason FROM public.salon_closures WHERE %s >= start_date AND %s <= end_date LIMIT 1",
+            (date_str, date_str),
+        )
+        cl_row = cur.fetchone()
+        if cl_row:
+            cur.close()
+            return jsonify({
+                "taken": [],
+                "closed": True,
+                "message": f"Salon is closed on this date ({cl_row['reason']}).",
+            })
+
         cur.close()
         return jsonify({"taken": taken, "pre_bridal_booked": pre_bridal_booked})
+    except PGError as err:
+        return db_error(err)
+
+
+# ---------------------------------------------------------------------------
+# Salon Closures endpoints (Centralized Storage)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/closures")
+def get_salon_closures():
+    try:
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, start_date, end_date, reason, created_at FROM public.salon_closures ORDER BY start_date ASC")
+        rows = cur.fetchall()
+        cur.close()
+        closures = [
+            {
+                "id": r["id"],
+                "startDate": r["start_date"],
+                "endDate": r["end_date"],
+                "reason": r["reason"],
+                "createdAt": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
+            }
+            for r in rows
+        ]
+        return jsonify({"closures": closures})
+    except PGError as err:
+        return db_error(err)
+
+
+@app.post("/api/closures")
+def create_salon_closure():
+    data = request.get_json(silent=True) or {}
+    start_date = (data.get("startDate") or "").strip()
+    end_date = (data.get("endDate") or start_date).strip()
+    reason = (data.get("reason") or "Salon Holiday / Closure").strip()
+    closure_id = (data.get("id") or f"closure-{secrets.token_hex(6)}").strip()
+
+    if not start_date:
+        return jsonify({"error": "startDate is required"}), 400
+
+    try:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute(
+            """
+            INSERT INTO public.salon_closures (id, start_date, end_date, reason)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET
+                start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date,
+                reason = EXCLUDED.reason
+            """,
+            (closure_id, start_date, end_date, reason),
+        )
+        db.commit()
+        cur.close()
+        return jsonify({
+            "ok": True,
+            "closure": {
+                "id": closure_id,
+                "startDate": start_date,
+                "endDate": end_date,
+                "reason": reason,
+            }
+        })
+    except PGError as err:
+        return db_error(err)
+
+
+@app.delete("/api/closures/<string:closure_id>")
+def delete_salon_closure(closure_id: str):
+    try:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("DELETE FROM public.salon_closures WHERE id = %s", (closure_id,))
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True, "deleted": closure_id})
     except PGError as err:
         return db_error(err)
 
@@ -1339,6 +1432,7 @@ def my_bookings():
             FROM appointments a
             JOIN services s ON s.id = a.service_id
             WHERE a.user_id = %s
+              AND a.status != 'cancelled'
             ORDER BY a.date DESC, a.time DESC
             """,
             (g.current_user["id"],),
@@ -1852,6 +1946,7 @@ def admin_book_offline():
     Runs the exact same validation chain as /api/book so all business rules
     (slot conflict, 30-min buffer, Pre-Bridal one-per-day) are enforced.
     user_id is left NULL; offline_name / offline_phone are stored instead.
+    """
     import json as _json
     data = request.get_json(silent=True) or {}
     services_list = data.get("services")
@@ -2094,6 +2189,9 @@ def admin_stats():
         )
         total_bookings = cur.fetchone()["total"]
 
+        cur.execute("SELECT COUNT(*) AS total FROM appointments")
+        total_appointments = cur.fetchone()["total"]
+
         cur.close()
 
         return jsonify({
@@ -2102,6 +2200,7 @@ def admin_stats():
             "total_services": total_services,
             "bookings_mtd": bookings_mtd,
             "total_bookings": total_bookings,
+            "total_appointments": total_appointments,
         })
     except Exception as err:
         return db_error(err)

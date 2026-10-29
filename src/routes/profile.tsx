@@ -328,8 +328,7 @@ function ProfilePage() {
           <div className="relative mb-4">
             {/* Circle avatar */}
             <div
-              className="h-24 w-24 rounded-full overflow-hidden shadow-lg ring-4"
-              style={{ ringColor: "oklch(0.88 0.030 82)" }}
+              className="h-24 w-24 rounded-full overflow-hidden shadow-lg ring-4 ring-[oklch(0.88_0.030_82)]"
             >
               {avatarUrl ? (
                 <img
@@ -540,21 +539,23 @@ function ProfilePage() {
                   />
                 </Field>
 
-                {/* Appointment Reminder Preference */}
+                {/* Notification Reminder Preference */}
                 <div className="space-y-1.5">
                   <label
                     className="block text-xs font-semibold uppercase tracking-widest flex items-center gap-1.5"
                     style={{ color: "oklch(0.50 0.06 48)" }}
                   >
                     <Bell className="h-3.5 w-3.5" style={{ color: GOLD }} />
-                    Default Appointment Reminder
+                    Notification Reminder
                   </label>
                   <Select
                     value={String(defaultReminderMinutes)}
                     onValueChange={(val) => setDefaultReminderMinutes(Number(val))}
                   >
                     <SelectTrigger className="w-full h-10 bg-transparent rounded-xl" style={{ border: "1px solid oklch(0.88 0.030 82)" }}>
-                      <SelectValue placeholder="Choose default reminder" />
+                      <SelectValue placeholder="Choose notification reminder">
+                        {formatReminderLabel(defaultReminderMinutes)}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {REMINDER_OPTIONS.map((opt) => (
@@ -565,7 +566,7 @@ function ProfilePage() {
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-muted-foreground">
-                    How soon before your appointments you want to receive notification reminders.
+                    How soon before your appointments you wish to be notified.
                   </p>
                 </div>
 

@@ -146,10 +146,10 @@ function AdminClosuresPage() {
   const [closureToDelete, setClosureToDelete] = useState<SalonClosure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleManualRefresh = () => {
+  const handleManualRefresh = async () => {
     setRefreshing(true);
     try {
-      refreshClosures();
+      await refreshClosures();
       toast.success("Closures data refreshed and synchronized across views");
     } catch {
       toast.error("Failed to refresh closures");
@@ -157,6 +157,10 @@ function AdminClosuresPage() {
       setTimeout(() => setRefreshing(false), 400);
     }
   };
+
+  useEffect(() => {
+    refreshClosures();
+  }, [refreshClosures]);
 
   // Today in YYYY-MM-DD (min selectable date) - uses local/IST calendar so past dates are strictly disabled
   const todayStr = useMemo(() => getTodayDateString(), []);

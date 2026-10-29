@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -80,16 +81,86 @@ function BookPage() {
   // ready prevents a flash of the form before auth check completes
   const [ready, setReady] = useState(false);
 
+  const isPresetReminder = REMINDER_OPTIONS.some((o) => o.value === reminderMinutes);
+  const [isCustomReminder, setIsCustomReminder] = useState<boolean>(!isPresetReminder);
+  const [customReminderVal, setCustomReminderVal] = useState<number>(() => {
+    if (!isPresetReminder) {
+      if (reminderMinutes >= 1440 && reminderMinutes % 1440 === 0) return reminderMinutes / 1440;
+      if (reminderMinutes >= 60 && reminderMinutes % 60 === 0) return reminderMinutes / 60;
+      return reminderMinutes;
+    }
+    return 45;
+  });
+  const [customReminderUnit, setCustomReminderUnit] = useState<"mins" | "hours" | "days">(() => {
+    if (!isPresetReminder) {
+      if (reminderMinutes >= 1440 && reminderMinutes % 1440 === 0) return "days";
+      if (reminderMinutes >= 60 && reminderMinutes % 60 === 0) return "hours";
+    }
+    return "mins";
+  });
+
+  const handleSelectPresetReminder = (mins: number) => {
+    setIsCustomReminder(false);
+    setReminderMinutes(mins);
+    localStorage.setItem("salon_reminder_pref", String(mins));
+  };
+
+  const handleSelectCustomReminder = () => {
+    setIsCustomReminder(true);
+    const m =
+      customReminderUnit === "days"
+        ? customReminderVal * 1440
+        : customReminderUnit === "hours"
+          ? customReminderVal * 60
+          : customReminderVal;
+    setReminderMinutes(m);
+    localStorage.setItem("salon_reminder_pref", String(m));
+  };
+
+  const handleUpdateCustomReminder = (val: number, unit: "mins" | "hours" | "days") => {
+    const safeVal = Math.max(1, val);
+    setCustomReminderVal(safeVal);
+    setCustomReminderUnit(unit);
+    const m =
+      unit === "days"
+        ? safeVal * 1440
+        : unit === "hours"
+          ? safeVal * 60
+          : safeVal;
+    setReminderMinutes(m);
+    localStorage.setItem("salon_reminder_pref", String(m));
+  };
+
   // Sync reminder preference with user profile if authenticated
   useEffect(() => {
     const user = getUser();
     if (user) {
-      api.getProfile().then((p) => {
-        if (p.default_reminder_minutes) {
-          setReminderMinutes(p.default_reminder_minutes);
-          localStorage.setItem("salon_reminder_pref", String(p.default_reminder_minutes));
-        }
-      }).catch(() => {});
+      api
+        .getProfile()
+        .then((p) => {
+          if (p.default_reminder_minutes) {
+            const m = p.default_reminder_minutes;
+            setReminderMinutes(m);
+            localStorage.setItem("salon_reminder_pref", String(m));
+            const preset = REMINDER_OPTIONS.some((o) => o.value === m);
+            if (!preset) {
+              setIsCustomReminder(true);
+              if (m >= 1440 && m % 1440 === 0) {
+                setCustomReminderVal(m / 1440);
+                setCustomReminderUnit("days");
+              } else if (m >= 60 && m % 60 === 0) {
+                setCustomReminderVal(m / 60);
+                setCustomReminderUnit("hours");
+              } else {
+                setCustomReminderVal(m);
+                setCustomReminderUnit("mins");
+              }
+            } else {
+              setIsCustomReminder(false);
+            }
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -614,38 +685,92 @@ function BookPage() {
             </div>
 
             {/* ── Custom Reminder Selector ── */}
-            <div className="space-y-2 pt-3 border-t border-border/60">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-2.5 pt-3 border-t border-border/60">
+              <div className="flex items-center">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                   <Bell className="h-3.5 w-3.5 text-primary" />
                   Appointment Reminder
                 </label>
-                <span className="text-[11px] text-muted-foreground">Notification before visit</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 {REMINDER_OPTIONS.map((opt) => {
-                  const isSelected = reminderMinutes === opt.value;
+                  const isSelected = !isCustomReminder && reminderMinutes === opt.value;
                   return (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => {
-                        setReminderMinutes(opt.value);
-                        localStorage.setItem("salon_reminder_pref", String(opt.value));
-                      }}
+                      onClick={() => handleSelectPresetReminder(opt.value)}
                       className={cn(
-                        "rounded-xl border px-2.5 py-2 text-xs font-medium transition cursor-pointer select-none text-center flex flex-col items-center justify-center gap-0.5 min-h-[44px]",
+                        "rounded-xl border px-2 py-2 text-xs font-medium transition cursor-pointer select-none text-center flex flex-col items-center justify-center gap-0.5 min-h-[44px]",
                         isSelected
                           ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/40 shadow-xs"
-                          : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                          : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground",
                       )}
                     >
-                      <span className="font-semibold text-xs leading-tight">{opt.label.replace(" before", "")}</span>
+                      <span className="font-semibold text-xs leading-tight">
+                        {opt.label.replace(" before", "")}
+                      </span>
                       <span className="text-[10px] opacity-75">before</span>
                     </button>
                   );
                 })}
+
+                {/* Custom Time Option Pill */}
+                <button
+                  type="button"
+                  onClick={handleSelectCustomReminder}
+                  className={cn(
+                    "rounded-xl border px-2 py-2 text-xs font-medium transition cursor-pointer select-none text-center flex flex-col items-center justify-center gap-0.5 min-h-[44px]",
+                    isCustomReminder
+                      ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/40 shadow-xs"
+                      : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  <span className="font-semibold text-xs leading-tight">
+                    {isCustomReminder
+                      ? `${customReminderVal} ${customReminderUnit === "days" ? "d" : customReminderUnit === "hours" ? "hr" : "m"}`
+                      : "Custom"}
+                  </span>
+                  <span className="text-[10px] opacity-75">
+                    {isCustomReminder ? "before" : "time"}
+                  </span>
+                </button>
               </div>
+
+              {/* Inline Custom Time Entry (displayed when Custom is selected) */}
+              {isCustomReminder && (
+                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in">
+                  <span className="font-medium text-foreground shrink-0">Remind me:</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
+                    value={customReminderVal}
+                    onChange={(e) =>
+                      handleUpdateCustomReminder(Number(e.target.value) || 1, customReminderUnit)
+                    }
+                    className="h-8 w-16 text-center text-xs font-semibold bg-background border-border"
+                  />
+                  <div className="flex rounded-lg border border-border bg-background p-0.5">
+                    {(["mins", "hours", "days"] as const).map((unit) => (
+                      <button
+                        key={unit}
+                        type="button"
+                        onClick={() => handleUpdateCustomReminder(customReminderVal, unit)}
+                        className={cn(
+                          "px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer select-none",
+                          customReminderUnit === unit
+                            ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {unit === "mins" ? "Mins" : unit === "hours" ? "Hours" : "Days"}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-muted-foreground shrink-0">before appointment</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

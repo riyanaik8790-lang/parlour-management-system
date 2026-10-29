@@ -18,6 +18,7 @@ import { isDateClosed } from "@/lib/closures-data";
 import {
   Users,
   CalendarCheck,
+  BookmarkCheck,
   TrendingUp,
   Scissors,
   ArrowRight,
@@ -85,6 +86,7 @@ type Stats = {
   total_services: number;
   bookings_mtd: number;
   total_bookings: number;
+  total_appointments?: number;
 };
 
 // ── Walk-in Booking Modal ─────────────────────────────────────────────────────
@@ -693,11 +695,19 @@ function AdminDashboard() {
     },
     {
       label: "Total Appointments",
-      value: stats ? String(stats.total_bookings) : "-",
+      value: stats ? String(stats.total_appointments ?? stats.total_bookings) : "-",
       icon: CalendarCheck,
       iconBg: `linear-gradient(135deg, ${BURGUNDY}, ${GOLD})`,
       glowColor: GOLD,
       decorColor: "oklch(0.68 0.13 68 / 12%)",
+    },
+    {
+      label: "Total Bookings",
+      value: stats ? String(stats.total_bookings) : "-",
+      icon: BookmarkCheck,
+      iconBg: `linear-gradient(135deg, oklch(0.38 0.16 25), oklch(0.52 0.15 45))`,
+      glowColor: "oklch(0.52 0.15 45)",
+      decorColor: "oklch(0.38 0.16 25 / 12%)",
     },
   ];
 
@@ -793,7 +803,7 @@ function AdminDashboard() {
         )}
 
         {/* Stat cards - 2 columns on mobile */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-5 animate-fade-up delay-100">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-6 animate-fade-up delay-100">
           {STATS.map(({ label, value, icon: Icon, iconBg, glowColor, decorColor }) => (
             <div
               key={label}

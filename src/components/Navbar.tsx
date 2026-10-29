@@ -181,8 +181,7 @@ export function Navbar() {
                   <button
                     type="button"
                     onClick={() => setAvatarDropdownOpen((prev) => !prev)}
-                    className="relative flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-sm ring-2 transition-transform hover:scale-105 focus:outline-none"
-                    style={{ ringColor: "oklch(0.88 0.030 82)" }}
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-sm ring-2 ring-[oklch(0.88_0.030_82)] transition-transform hover:scale-105 focus:outline-none"
                     aria-label="User menu"
                     aria-expanded={avatarDropdownOpen}
                   >
@@ -335,7 +334,7 @@ export function Navbar() {
                 style={{ background: "oklch(0.99 0.01 85)", borderColor: "oklch(0.91 0.025 82)" }}
               >
                 {/* Avatar: real photo or initials fallback */}
-                <div className="relative h-12 w-12 shrink-0 rounded-full overflow-hidden shadow ring-2" style={{ ringColor: "oklch(0.88 0.030 82)" }}>
+                <div className="relative h-12 w-12 shrink-0 rounded-full overflow-hidden shadow ring-2 ring-[oklch(0.88_0.030_82)]">
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}

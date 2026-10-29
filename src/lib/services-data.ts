@@ -24,9 +24,40 @@ export type ServiceCategory = {
   items: Service[];
 };
 
+export const CATEGORY_TAB_MAP: Record<string, string> = {
+  Facial: "Skin",
+  Cleanup: "Skin",
+  Bleach: "Skin",
+  "D-Tan": "Skin",
+  "Threading & Face": "Skin",
+  "Hair Care": "Hair",
+  "Hair Cuts": "Hair",
+  "Hair Treatments": "Hair",
+  "Hair Colour": "Hair",
+  Waxing: "Waxing",
+  "Manicure & Pedicure": "Nails",
+  Nails: "Nails",
+  Packages: "Packages",
+  Massage: "Skin",
+};
+
+export function getCategoryTab(cat: { name: string; tab?: string }): string {
+  if (cat.tab?.trim()) return cat.tab.trim();
+  for (const [key, tab] of Object.entries(CATEGORY_TAB_MAP)) {
+    if (
+      cat.name.toLowerCase().includes(key.toLowerCase()) ||
+      key.toLowerCase().includes(cat.name.toLowerCase())
+    ) {
+      return tab;
+    }
+  }
+  return "Skin";
+}
+
 export const DEFAULT_SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     name: "Threading & Face",
+    tab: "Skin",
     items: [
       { id: "th-eye", name: "Eyebrow", price: "50", category: "Threading & Face", durationMins: 15 },
       { id: "th-lip", name: "Upper Lip", price: "20", category: "Threading & Face", durationMins: 10 },
@@ -35,6 +66,7 @@ export const DEFAULT_SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     name: "Waxing",
+    tab: "Waxing",
     items: [
       { id: "wx-arms", name: "Underarms", price: "60", category: "Waxing", durationMins: 20 },
       { id: "wx-hand", name: "Hand Wax", price: "200 - 300", category: "Waxing", durationMins: 30 },
@@ -44,6 +76,7 @@ export const DEFAULT_SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     name: "Manicure & Pedicure",
+    tab: "Nails",
     items: [
       { id: "mp-mani", name: "Manicure", price: "500", category: "Manicure & Pedicure", durationMins: 45 },
       { id: "mp-pedi", name: "Pedicure", price: "599", category: "Manicure & Pedicure", durationMins: 60 },
@@ -51,6 +84,7 @@ export const DEFAULT_SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     name: "Hair Care",
+    tab: "Hair",
     items: [
       { id: "hs-loreal", name: "L'Oreal Hair Spa", price: "600", category: "Hair Care", durationMins: 60 },
       { id: "hs-protein", name: "Protein Spa", price: "1500", category: "Hair Care", durationMins: 90 },
@@ -65,6 +99,7 @@ export const DEFAULT_SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     name: "Facial",
+    tab: "Skin",
     items: [
       { id: "fc-fruit", name: "Fruit Facial", price: "500", category: "Facial", durationMins: 60 },
       { id: "fc-dtan", name: "D-Tan Facial", price: "599", category: "Facial", durationMins: 60 },
@@ -74,6 +109,7 @@ export const DEFAULT_SERVICE_CATEGORIES: ServiceCategory[] = [
   },
   {
     name: "Packages",
+    tab: "Packages",
     items: [
       { id: "pk-prebridal", name: "Pre-Bridal Package", price: "5000", category: "Packages", durationMins: 180 },
     ],
@@ -103,14 +139,22 @@ export function getAllServiceCategories(): ServiceCategory[] {
     if (raw) {
       const parsed: ServiceCategory[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter((c) => !deletedDefaults.has(c.name.toLowerCase()));
+        return parsed
+          .filter((c) => !deletedDefaults.has(c.name.toLowerCase()))
+          .map((c) => ({
+            ...c,
+            tab: c.tab?.trim() || getCategoryTab(c),
+          }));
       }
     }
 
     // Default initialization: clone defaults and filter deleted
     return DEFAULT_SERVICE_CATEGORIES.filter(
       (c) => !deletedDefaults.has(c.name.toLowerCase())
-    );
+    ).map((c) => ({
+      ...c,
+      tab: c.tab?.trim() || getCategoryTab(c),
+    }));
   } catch {
     return DEFAULT_SERVICE_CATEGORIES;
   }
@@ -230,7 +274,18 @@ export function formatReminderLabel(minutes?: number | null): string {
   if (!minutes) return "30 mins before";
   const opt = REMINDER_OPTIONS.find((o) => o.value === minutes);
   if (opt) return opt.label;
-  if (minutes >= 1440) return `${Math.round(minutes / 1440)} day(s) before`;
-  if (minutes >= 60) return `${Math.round(minutes / 60)} hr(s) before`;
+  if (minutes >= 1440 && minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return `${days} day${days > 1 ? "s" : ""} before`;
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const hrs = minutes / 60;
+    return `${hrs} hour${hrs > 1 ? "s" : ""} before`;
+  }
+  if (minutes >= 60) {
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hrs} hr ${mins} min before`;
+  }
   return `${minutes} mins before`;
 }
