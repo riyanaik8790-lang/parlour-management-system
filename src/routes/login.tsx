@@ -165,14 +165,14 @@ function LoginPage() {
 
           {/* Form Card */}
           <div
-            className="overflow-hidden rounded-3xl shadow-xl auth-stagger-2"
+            className="rounded-3xl shadow-xl auth-stagger-2 overflow-visible"
             style={{
               background: "oklch(0.998 0.004 85)",
               border: "1px solid oklch(0.88 0.030 82)",
               boxShadow: "0 8px 48px oklch(0.35 0.15 22 / 10%)",
             }}
           >
-            <form onSubmit={submit} noValidate className="space-y-5 p-7 sm:p-8">
+            <form onSubmit={submit} noValidate className="space-y-6 p-7 sm:p-8">
               {/* Server-level error banner */}
               {serverError && (
                 <div
@@ -189,7 +189,7 @@ function LoginPage() {
               )}
 
               {/* ── Email ── */}
-              <div className="relative auth-stagger-3">
+              <div className="auth-field-email auth-stagger-3">
                 <FieldWrapper
                   id="login-email"
                   label="Email Address"
@@ -200,7 +200,7 @@ function LoginPage() {
                     id="login-email"
                     name="email"
                     type="email"
-                    autoComplete="new-password"
+                    autoComplete="email"
                     placeholder="you@example.com"
                     readOnly={readOnly}
                     value={email}
@@ -216,7 +216,7 @@ function LoginPage() {
                     onChange={(e) => handleEmailChange(e.target.value)}
                     onBlur={() => {
                       setEmailTouched(true);
-                      setTimeout(() => setShowSuggestion(false), 150);
+                      setTimeout(() => setShowSuggestion(false), 200);
                     }}
                     disabled={busy}
                     className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none min-h-[44px]"
@@ -228,21 +228,28 @@ function LoginPage() {
                 {showSuggestion && savedCreds && (
                   <button
                     type="button"
-                    onMouseDown={applySavedCreds}
-                    className="absolute left-0 right-0 z-20 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-all duration-150"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      applySavedCreds();
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      applySavedCreds();
+                    }}
+                    className="absolute left-0 right-0 z-50 flex items-center gap-3 rounded-2xl p-3 text-sm transition-all duration-150 active:scale-[0.99]"
                     style={{
-                      top: "calc(100% + 4px)",
-                      background: "oklch(0.998 0.004 85)",
-                      border: `1px solid ${GOLD}60`,
-                      boxShadow: `0 4px 20px oklch(0.35 0.15 22 / 12%)`,
+                      top: "calc(100% + 8px)",
+                      background: "#FFFFFF",
+                      border: `1.5px solid ${GOLD}`,
+                      boxShadow: `0 12px 32px -4px oklch(0.35 0.15 22 / 20%), 0 4px 12px oklch(0.35 0.15 22 / 10%)`,
                       color: "oklch(0.25 0.05 50)",
                     }}
                   >
-                    <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: SUCCESS_COLOR }} />
-                    <div className="flex flex-col items-start text-left">
-                      <span className="font-medium">{savedCreds.email}</span>
-                      <span className="text-xs" style={{ color: "oklch(0.58 0.04 55)" }}>
-                        Saved account
+                    <UserCheck className="h-5 w-5 flex-shrink-0" style={{ color: SUCCESS_COLOR }} />
+                    <div className="flex flex-col items-start text-left min-w-0">
+                      <span className="font-semibold text-sm truncate max-w-[240px] sm:max-w-xs">{savedCreds.email}</span>
+                      <span className="text-xs font-medium" style={{ color: "oklch(0.55 0.04 50)" }}>
+                        Saved account &bull; Tap to autofill
                       </span>
                     </div>
                   </button>
@@ -250,7 +257,7 @@ function LoginPage() {
               </div>
 
               {/* ── Password with Eye Toggle ── */}
-              <div className="auth-stagger-3">
+              <div className="auth-field-password auth-stagger-3">
                 <FieldWrapper
                   id="login-password"
                   label="Password"

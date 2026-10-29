@@ -286,7 +286,7 @@ function RegisterPage() {
 
           {/* Form Card */}
           <div
-            className="overflow-hidden rounded-3xl shadow-xl auth-stagger-2"
+            className="rounded-3xl shadow-xl auth-stagger-2 overflow-visible"
             style={{
               background: "oklch(0.998 0.004 85)",
               border: "1px solid oklch(0.88 0.030 82)",

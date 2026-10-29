@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api, clearSession, getUser, setSession, getToken, getAdminToken } from "@/lib/api";
+import { api, clearSession, getUser, setSession, getToken, getAdminToken, type AppNotification } from "@/lib/api";
 import { supabase, AVATAR_BUCKET, AVATAR_MAX_BYTES } from "@/lib/supabase";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import {
@@ -26,6 +26,14 @@ import {
   ExternalLink,
   Image as ImageIcon,
   X,
+  Volume2,
+  VolumeX,
+  History,
+  Calendar,
+  Clock,
+  Info,
+  Sparkles,
+  FileText,
 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
@@ -103,6 +111,80 @@ function SettingsPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [savingPush, setSavingPush] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+
+  // Notification settings state
+  const [notifSubTab, setNotifSubTab] = useState<"preferences" | "history">("preferences");
+  const [alertSoundEnabled, setAlertSoundEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("salon_audio_unlocked") === "true";
+    }
+    return false;
+  });
+  const [historyNotifications, setHistoryNotifications] = useState<AppNotification[]>([]);
+  const [loadingNotifHistory, setLoadingNotifHistory] = useState(false);
+
+  // Sync alert sound state when modified elsewhere
+  useEffect(() => {
+    const handleSync = () => {
+      setAlertSoundEnabled(localStorage.getItem("salon_audio_unlocked") === "true");
+    };
+    window.addEventListener("salon-audio-toggle", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("salon-audio-toggle", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, []);
+
+  const loadNotifHistory = useCallback(async () => {
+    setLoadingNotifHistory(true);
+    try {
+      const res = await api.getNotifications();
+      setHistoryNotifications(res.notifications);
+    } catch (e) {
+      console.error("Failed to load notification history:", e);
+    } finally {
+      setLoadingNotifHistory(false);
+    }
+  }, []);
+
+  const toggleAlertSounds = async () => {
+    const next = !alertSoundEnabled;
+    setAlertSoundEnabled(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("salon_audio_unlocked", next ? "true" : "false");
+      window.dispatchEvent(new Event("salon-audio-toggle"));
+    }
+    if (next) {
+      try {
+        const audio = new Audio("/notification-ding.mp3");
+        audio.volume = 1;
+        await audio.play();
+      } catch {
+        /* ignore autoplay restriction */
+      }
+      toast.success("Alert sounds turned ON");
+    } else {
+      toast.info("Alert sounds turned OFF");
+    }
+  };
+
+  // Support deep-linking from Notification bell dropdown (e.g. ?section=notifications&view=history)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const section = params.get("section");
+      const view = params.get("view");
+      if (section === "notifications") {
+        setActiveSection("notifications");
+      }
+      if (view === "history") {
+        setActiveSection("notifications");
+        setNotifSubTab("history");
+        loadNotifHistory();
+      }
+    }
+  }, [loadNotifHistory]);
 
   // Close avatar dropdown when clicking outside
   useEffect(() => {
@@ -791,100 +873,303 @@ function SettingsPage() {
             {/* ── Notifications ── */}
             {activeSection === "notifications" && (
               <Card gradient={`linear-gradient(90deg, ${BURGUNDY}, ${GOLD})`}>
-                <h2
-                  className="mb-5 text-base font-semibold"
-                  style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-                >
-                  Notification Preferences
-                </h2>
-
-                <div
-                  className="flex items-center justify-between rounded-xl p-4"
-                  style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}
-                >
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Appointment Reminders</h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Receive a notification on your device 30 minutes before your appointment
-                      starts.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={savingPush}
-                    onClick={async () => {
-                      if (savingPush) return;
-                      const previousState = pushEnabled;
-
-                      // ── Optimistic UI: flip the toggle instantly ──────────
-                      setPushEnabled(!previousState);
-                      setSavingPush(true);
-
-                      try {
-                        if (!previousState) {
-                          // Turning ON
-                          // requestPermission must be called from a user gesture — we're
-                          // still inside the synchronous click handler at this point.
-                          const permission = await Notification.requestPermission();
-
-                          if (permission === "denied") {
-                            setPushEnabled(false); // revert — user blocked it
-                            toast.error("Notifications blocked. Please allow them in your browser settings.");
-                            return;
-                          }
-
-                          if (permission !== "granted") {
-                            setPushEnabled(false); // revert — user dismissed
-                            return;
-                          }
-
-                          // subscribeToPush handles SW registration + backend POST
-                          const result = await subscribeToPush();
-                          if (result === "granted" || result === "already") {
-                            await api.updateProfile({ push_enabled: true });
-                            queryClient.invalidateQueries({ queryKey: ["profile"] });
-                            toast.success("Push notifications enabled!");
-                          } else {
-                            setPushEnabled(false); // revert — subscribe failed
-                            toast.error("Failed to subscribe. Please try again.");
-                          }
-                        } else {
-                          // Turning OFF
-                          await unsubscribeFromPush();
-                          await api.updateProfile({ push_enabled: false });
-                          queryClient.invalidateQueries({ queryKey: ["profile"] });
-                          toast.success("Push notifications disabled.");
-                        }
-                      } catch (e) {
-                        // Revert on any unexpected error
-                        setPushEnabled(previousState);
-                        console.error("[push toggle]", e);
-                        toast.error(
-                          e instanceof Error ? e.message : "An unexpected error occurred.",
-                        );
-                      } finally {
-                        setSavingPush(false);
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50`}
-                    style={{
-                      backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
-                      boxShadow: pushEnabled
-                        ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
-                        : "none",
-                    }}
-                    role="switch"
-                    aria-checked={pushEnabled}
+                <div className="flex items-center justify-between mb-5">
+                  <h2
+                    className="text-base font-semibold"
+                    style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        pushEnabled ? "translate-x-5" : "translate-x-0"
+                    Notification Preferences
+                  </h2>
+                  <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setNotifSubTab("preferences")}
+                      className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                        notifSubTab === "preferences"
+                          ? "bg-white text-primary shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
-                    />
-                  </button>
+                    >
+                      Preferences
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifSubTab("history");
+                        loadNotifHistory();
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                        notifSubTab === "history"
+                          ? "bg-white text-primary shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      <span>Notification History</span>
+                    </button>
+                  </div>
                 </div>
+
+                {notifSubTab === "preferences" ? (
+                  <div className="space-y-4">
+                    {/* Alert Sounds On/Off Toggle */}
+                    <div
+                      className="flex items-center justify-between rounded-xl p-4"
+                      style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg"
+                          style={{
+                            background: alertSoundEnabled
+                              ? "oklch(0.42 0.18 150 / 12%)"
+                              : "oklch(0.50 0.04 50 / 10%)",
+                            color: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
+                          }}
+                        >
+                          {alertSoundEnabled ? (
+                            <Volume2 className="h-4 w-4" />
+                          ) : (
+                            <VolumeX className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                            <span>Alert Sounds</span>
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                alertSoundEnabled
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-gray-200 text-gray-600"
+                              }`}
+                            >
+                              {alertSoundEnabled ? "ON" : "OFF"}
+                            </span>
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Play audio chimes and vibrate device when new bookings or appointment alerts arrive.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        id="alert-sound-toggle-btn"
+                        onClick={toggleAlertSounds}
+                        className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                        style={{
+                          backgroundColor: alertSoundEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
+                          boxShadow: alertSoundEnabled
+                            ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
+                            : "none",
+                        }}
+                        role="switch"
+                        aria-checked={alertSoundEnabled}
+                        aria-label="Toggle Alert Sounds"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            alertSoundEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Appointment Reminders Push Toggle */}
+                    <div
+                      className="flex items-center justify-between rounded-xl p-4"
+                      style={{ background: "oklch(0.98 0.01 85)", border: `1px solid ${BORDER}` }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg"
+                          style={{
+                            background: pushEnabled
+                              ? "oklch(0.42 0.18 150 / 12%)"
+                              : "oklch(0.50 0.04 50 / 10%)",
+                            color: pushEnabled ? SUCCESS_COLOR : "oklch(0.50 0.04 50)",
+                          }}
+                        >
+                          <Bell className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900">Push Notifications</h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Receive notifications on your device 30 minutes before your appointments and for status updates.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={savingPush}
+                        onClick={async () => {
+                          if (savingPush) return;
+                          const previousState = pushEnabled;
+                          setPushEnabled(!previousState);
+                          setSavingPush(true);
+
+                          try {
+                            if (!previousState) {
+                              const permission = await Notification.requestPermission();
+                              if (permission === "denied") {
+                                setPushEnabled(false);
+                                toast.error("Notifications blocked. Please allow them in your browser settings.");
+                                return;
+                              }
+                              if (permission !== "granted") {
+                                setPushEnabled(false);
+                                return;
+                              }
+                              const result = await subscribeToPush();
+                              if (result === "granted" || result === "already") {
+                                await api.updateProfile({ push_enabled: true });
+                                queryClient.invalidateQueries({ queryKey: ["profile"] });
+                                toast.success("Push notifications enabled!");
+                              } else {
+                                setPushEnabled(false);
+                                toast.error("Failed to subscribe. Please try again.");
+                              }
+                            } else {
+                              await unsubscribeFromPush();
+                              await api.updateProfile({ push_enabled: false });
+                              queryClient.invalidateQueries({ queryKey: ["profile"] });
+                              toast.success("Push notifications disabled.");
+                            }
+                          } catch (e) {
+                            setPushEnabled(previousState);
+                            console.error("[push toggle]", e);
+                            toast.error(
+                              e instanceof Error ? e.message : "An unexpected error occurred.",
+                            );
+                          } finally {
+                            setSavingPush(false);
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50`}
+                        style={{
+                          backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
+                          boxShadow: pushEnabled
+                            ? `0 0 0 2px oklch(0.998 0.004 85), 0 0 0 4px ${SUCCESS_COLOR}`
+                            : "none",
+                        }}
+                        role="switch"
+                        aria-checked={pushEnabled}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            pushEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Notification History View ── */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-2">
+                      <p className="text-xs text-muted-foreground">
+                        All previous alerts and notifications received on your account.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={loadNotifHistory}
+                        className="text-xs font-semibold hover:underline"
+                        style={{ color: BURGUNDY }}
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {loadingNotifHistory ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                        <Loader2 className="h-6 w-6 animate-spin" style={{ color: BURGUNDY }} />
+                        <span className="text-xs">Loading notification history…</span>
+                      </div>
+                    ) : historyNotifications.length === 0 ? (
+                      <div
+                        className="flex flex-col items-center justify-center gap-2 py-12 rounded-xl border border-dashed text-center"
+                        style={{ borderColor: BORDER, background: "oklch(0.99 0.005 85)" }}
+                      >
+                        <History className="h-8 w-8 opacity-30" style={{ color: BURGUNDY }} />
+                        <p className="text-sm font-medium text-gray-700">No notification history</p>
+                        <p className="text-xs text-muted-foreground">
+                          Older notifications and alerts will appear here.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                        {historyNotifications.map((n) => {
+                          const dateObj = new Date(
+                            n.created_at.replace(" ", "T") +
+                              (n.created_at.includes("Z") || n.created_at.includes("+") ? "" : "Z")
+                          );
+                          const formattedDate = dateObj.toLocaleString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                            timeZone: "Asia/Kolkata",
+                          });
+
+                          return (
+                            <div
+                              key={n.id}
+                              className="flex items-start gap-3 rounded-xl p-3.5 transition-all"
+                              style={{
+                                background: n.is_read ? "oklch(0.99 0.005 85)" : "oklch(0.97 0.02 85)",
+                                border: `1px solid ${n.is_read ? BORDER : `${BURGUNDY}30`}`,
+                              }}
+                            >
+                              <div
+                                className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                                style={{
+                                  background:
+                                    n.type === "new_booking"
+                                      ? "oklch(0.35 0.15 22 / 10%)"
+                                      : "oklch(0.68 0.13 68 / 10%)",
+                                  color: n.type === "new_booking" ? BURGUNDY : GOLD,
+                                }}
+                              >
+                                {n.type === "new_booking" ? (
+                                  <Calendar className="h-4 w-4" />
+                                ) : n.type === "appointment_reminder" ? (
+                                  <Clock className="h-4 w-4" />
+                                ) : n.type === "booking_status_update" ? (
+                                  <Info className="h-4 w-4" />
+                                ) : (
+                                  <Sparkles className="h-4 w-4" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-800 leading-relaxed">
+                                  {n.message}
+                                </p>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-500">{formattedDate}</span>
+                                  {n.is_read ? (
+                                    <span className="text-[10px] text-gray-400">&bull; Read</span>
+                                  ) : (
+                                    <span
+                                      className="text-[10px] font-semibold"
+                                      style={{ color: BURGUNDY }}
+                                    >
+                                      &bull; New
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </Card>
             )}
 

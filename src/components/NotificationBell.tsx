@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X, Info, Volume2, VolumeX } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Bell, CheckCheck, Calendar, Sparkles, Clock, BellRing, X, Info, History } from "lucide-react";
 import { api, type AppNotification, getToken } from "@/lib/api";
 import { isPushSupported, getPushPermission, subscribeToPush, isSubscribed } from "@/lib/push";
 import { toast } from "sonner";
@@ -10,8 +11,26 @@ const GOLD = "oklch(0.68 0.13 68)";
 // ── Local storage key to remember "user dismissed the push prompt" ────────────
 const PUSH_PROMPT_DISMISSED_KEY = "push_prompt_dismissed_v1";
 
+function parseNotifDate(raw: string): Date {
+  return new Date(raw.replace(" ", "T") + (raw.includes("Z") || raw.includes("+") ? "" : "Z"));
+}
+
+function isToday(raw: string): boolean {
+  try {
+    const d = parseNotifDate(raw);
+    const now = new Date();
+    return (
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear()
+    );
+  } catch {
+    return false;
+  }
+}
+
 function fmtTime(raw: string) {
-  const d = new Date(raw.replace(" ", "T") + (raw.includes("Z") || raw.includes("+") ? "" : "Z"));
+  const d = parseNotifDate(raw);
   return d.toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -85,6 +104,9 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
   const [marking, setMarking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Today's notifications only for main dropdown
+  const todayItems = items.filter((n) => isToday(n.created_at));
+
   // ── Audio Alert Setup & Autoplay Unlock ─────────────────────────────────────
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevUnreadRef = useRef<number | null>(null);
@@ -96,6 +118,26 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     }
     return false;
   });
+
+  // Keep alert sound state synchronized with settings changes
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "salon_audio_unlocked") {
+        setIsAudioUnlocked(e.newValue === "true");
+      }
+    };
+    const handleCustomChange = () => {
+      if (typeof window !== "undefined") {
+        setIsAudioUnlocked(localStorage.getItem("salon_audio_unlocked") === "true");
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("salon-audio-toggle", handleCustomChange);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("salon-audio-toggle", handleCustomChange);
+    };
+  }, []);
 
   useEffect(() => {
     // Create HTML5 Audio instance for notification sound
@@ -333,176 +375,158 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
         </div>
       )}
 
-      {/* Notifications dropdown */}
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-2 z-[9999] origin-top-right overflow-hidden rounded-xl shadow-2xl ring-1 ring-black/5 w-[300px] max-w-[85vw] sm:w-80 md:w-96"
-          style={{
-            border: "1px solid oklch(0.88 0.030 82)",
-            background: "oklch(0.998 0.004 85)",
-            boxShadow: "0 16px 48px oklch(0.35 0.15 22 / 18%)",
-          }}
-        >
-          {/* Header */}
-          <div
-            className="flex items-center justify-between border-b px-4 py-3"
-            style={{ borderColor: "oklch(0.91 0.025 82)", background: "oklch(0.995 0.006 84)" }}
-          >
-            <span
-              className="text-sm font-semibold"
-              style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-            >
-              Notifications{" "}
-              {unread > 0 && (
-                <span className="ml-1 text-xs font-normal" style={{ color: GOLD }}>
-                  ({unread} new)
-                </span>
-              )}
-            </span>
-            {unread > 0 && (
-              <button
-                onClick={markAll}
-                disabled={marking}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-opacity hover:opacity-70 disabled:opacity-40"
-                style={{ color: BURGUNDY, background: "oklch(0.35 0.15 22 / 6%)" }}
-              >
-                <CheckCheck className="h-3 w-3" />
-                Mark all read
-              </button>
-            )}
-          </div>
-
-          {/* Sound Alert Toggle Bar (Foreground AudioContext Unlock) */}
-          <div
-            className="flex items-center justify-between border-b px-4 py-2"
-            style={{
-              borderColor: "oklch(0.91 0.025 82)",
-              background: isAudioUnlocked ? "oklch(0.985 0.008 85)" : "oklch(0.96 0.018 85)",
-            }}
-          >
-            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "oklch(0.40 0.05 45)" }}>
-              {isAudioUnlocked ? (
-                <Volume2 className="h-3.5 w-3.5" style={{ color: "oklch(0.42 0.18 150)" }} />
-              ) : (
-                <VolumeX className="h-3.5 w-3.5" style={{ color: "oklch(0.60 0.04 50)" }} />
-              )}
-              <span>Alert Sounds</span>
-            </div>
-            <button
-              id="enable-alert-sounds-btn"
-              onClick={toggleAudioUnlock}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all active:scale-95"
-              style={{
-                background: isAudioUnlocked
-                  ? "oklch(0.42 0.18 150 / 12%)"
-                  : `linear-gradient(135deg, ${BURGUNDY}, oklch(0.45 0.15 25))`,
-                color: isAudioUnlocked ? "oklch(0.38 0.15 150)" : "white",
-                border: isAudioUnlocked ? "1px solid oklch(0.42 0.18 150 / 30%)" : "none",
-              }}
-              title={isAudioUnlocked ? "Click to mute alert sounds" : "Click to enable and unlock alert sounds"}
-            >
-              {isAudioUnlocked ? (
-                <>
-                  <Volume2 className="h-3 w-3" />
-                  <span>Enabled</span>
-                </>
-              ) : (
-                <>
-                  <Volume2 className="h-3 w-3" />
-                  <span>Enable Alert Sounds</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Push enable row — inside dropdown when open */}
-          {showPushPrompt && (
+          {/* Notifications dropdown */}
+          {open && (
             <div
-              className="flex items-center gap-2 border-b px-4 py-2.5"
+              className="absolute right-0 top-full mt-2 z-[9999] origin-top-right overflow-hidden rounded-xl shadow-2xl ring-1 ring-black/5 w-[300px] max-w-[85vw] sm:w-80 md:w-96"
               style={{
-                borderColor: "oklch(0.91 0.025 82)",
-                background: "oklch(0.35 0.15 22 / 3%)",
+                border: "1px solid oklch(0.88 0.030 82)",
+                background: "oklch(0.998 0.004 85)",
+                boxShadow: "0 16px 48px oklch(0.35 0.15 22 / 18%)",
               }}
             >
-              <BellRing className="h-3.5 w-3.5 shrink-0" style={{ color: BURGUNDY }} />
-              <span className="flex-1 text-xs" style={{ color: "oklch(0.40 0.05 50)" }}>
-                Enable push notifications?
-              </span>
-              <button
-                id="push-enable-dropdown-btn"
-                onClick={handleEnablePush}
-                disabled={pushEnabling}
-                className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white disabled:opacity-50"
-                style={{ background: BURGUNDY }}
-              >
-                {pushEnabling ? "…" : "Enable"}
-              </button>
-              <button
-                onClick={handleDismissPush}
-                aria-label="Dismiss"
-                className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-muted"
-                style={{ color: "oklch(0.65 0.03 55)" }}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-
-          {/* List */}
-          <div className="max-h-80 overflow-y-auto">
-            {items.length === 0 ? (
+              {/* Header */}
               <div
-                className="flex flex-col items-center justify-center gap-2 py-10"
-                style={{ color: "oklch(0.68 0.04 55)" }}
+                className="flex items-center justify-between border-b px-4 py-3"
+                style={{ borderColor: "oklch(0.91 0.025 82)", background: "oklch(0.995 0.006 84)" }}
               >
-                <Bell className="h-8 w-8 opacity-30" />
-                <p className="text-sm">No notifications yet</p>
-              </div>
-            ) : (
-              items.map((n) => (
-                <div
-                  key={n.id}
-                  className="flex gap-3 border-b px-4 py-3 transition-colors duration-100"
-                  style={{
-                    borderColor: "oklch(0.93 0.020 83)",
-                    background: n.is_read ? "transparent" : "oklch(0.35 0.15 22 / 4%)",
-                  }}
-                >
-                  {/* Icon dot */}
-                  <div
-                    className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
-                    style={{
-                      background:
-                        n.type === "new_booking"
-                          ? "oklch(0.35 0.15 22 / 10%)"
-                          : "oklch(0.68 0.13 68 / 10%)",
-                    }}
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
                   >
-                    <NotifIcon type={n.type} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-xs leading-snug"
-                      style={{ color: n.is_read ? "oklch(0.50 0.04 50)" : "oklch(0.25 0.05 50)" }}
-                    >
-                      {n.message}
-                    </p>
-                    <p className="mt-0.5 text-[10px]" style={{ color: "oklch(0.70 0.04 50)" }}>
-                      {fmtTime(n.created_at)}
-                    </p>
-                  </div>
-                  {!n.is_read && (
-                    <div
-                      className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full"
-                      style={{ background: BURGUNDY }}
-                    />
+                    Today's Notifications
+                  </span>
+                  {unread > 0 && (
+                    <span className="text-xs font-normal" style={{ color: GOLD }}>
+                      ({unread} new)
+                    </span>
                   )}
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+                {unread > 0 && (
+                  <button
+                    onClick={markAll}
+                    disabled={marking}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-opacity hover:opacity-70 disabled:opacity-40"
+                    style={{ color: BURGUNDY, background: "oklch(0.35 0.15 22 / 6%)" }}
+                  >
+                    <CheckCheck className="h-3 w-3" />
+                    Mark read
+                  </button>
+                )}
+              </div>
+
+              {/* Push enable row — inside dropdown when open */}
+              {showPushPrompt && (
+                <div
+                  className="flex items-center gap-2 border-b px-4 py-2.5"
+                  style={{
+                    borderColor: "oklch(0.91 0.025 82)",
+                    background: "oklch(0.35 0.15 22 / 3%)",
+                  }}
+                >
+                  <BellRing className="h-3.5 w-3.5 shrink-0" style={{ color: BURGUNDY }} />
+                  <span className="flex-1 text-xs" style={{ color: "oklch(0.40 0.05 50)" }}>
+                    Enable push notifications?
+                  </span>
+                  <button
+                    id="push-enable-dropdown-btn"
+                    onClick={handleEnablePush}
+                    disabled={pushEnabling}
+                    className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white disabled:opacity-50"
+                    style={{ background: BURGUNDY }}
+                  >
+                    {pushEnabling ? "…" : "Enable"}
+                  </button>
+                  <button
+                    onClick={handleDismissPush}
+                    aria-label="Dismiss"
+                    className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                    style={{ color: "oklch(0.65 0.03 55)" }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* List: Today's notifications only */}
+              <div className="max-h-80 overflow-y-auto">
+                {todayItems.length === 0 ? (
+                  <div
+                    className="flex flex-col items-center justify-center gap-2 py-8 px-4 text-center"
+                    style={{ color: "oklch(0.68 0.04 55)" }}
+                  >
+                    <Bell className="h-7 w-7 opacity-30" />
+                    <p className="text-xs font-medium">No alerts for today</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Check your Notification History for earlier alerts.
+                    </p>
+                  </div>
+                ) : (
+                  todayItems.map((n) => (
+                    <div
+                      key={n.id}
+                      className="flex gap-3 border-b px-4 py-3 transition-colors duration-100"
+                      style={{
+                        borderColor: "oklch(0.93 0.020 83)",
+                        background: n.is_read ? "transparent" : "oklch(0.35 0.15 22 / 4%)",
+                      }}
+                    >
+                      {/* Icon dot */}
+                      <div
+                        className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
+                        style={{
+                          background:
+                            n.type === "new_booking"
+                              ? "oklch(0.35 0.15 22 / 10%)"
+                              : "oklch(0.68 0.13 68 / 10%)",
+                        }}
+                      >
+                        <NotifIcon type={n.type} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-xs leading-snug"
+                          style={{ color: n.is_read ? "oklch(0.50 0.04 50)" : "oklch(0.25 0.05 50)" }}
+                        >
+                          {n.message}
+                        </p>
+                        <p className="mt-0.5 text-[10px]" style={{ color: "oklch(0.70 0.04 50)" }}>
+                          {fmtTime(n.created_at)}
+                        </p>
+                      </div>
+                      {!n.is_read && (
+                        <div
+                          className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full"
+                          style={{ background: BURGUNDY }}
+                        />
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer: Notification History Link */}
+              <div
+                className="border-t px-4 py-2.5 flex items-center justify-between"
+                style={{
+                  borderColor: "oklch(0.91 0.025 82)",
+                  background: "oklch(0.985 0.008 85)",
+                }}
+              >
+                <Link
+                  to="/settings"
+                  search={{ section: "notifications", view: "history" }}
+                  onClick={() => setOpen(false)}
+                  className="w-full flex items-center justify-center gap-1.5 py-1 text-xs font-semibold rounded-lg transition-colors hover:bg-black/5"
+                  style={{ color: BURGUNDY }}
+                >
+                  <History className="h-3.5 w-3.5" />
+                  <span>View Notification History &rarr;</span>
+                </Link>
+              </div>
+            </div>
+          )}
     </div>
   );
 }
