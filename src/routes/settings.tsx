@@ -150,22 +150,25 @@ function SettingsPage() {
     }
   }, []);
 
-  const toggleAlertSounds = async () => {
+  const toggleAlertSounds = () => {
     const next = !alertSoundEnabled;
     setAlertSoundEnabled(next);
     if (typeof window !== "undefined") {
-      localStorage.setItem("salon_audio_unlocked", next ? "true" : "false");
-      window.dispatchEvent(new Event("salon-audio-toggle"));
+      try {
+        localStorage.setItem("salon_audio_unlocked", next ? "true" : "false");
+        window.dispatchEvent(new Event("salon-audio-toggle"));
+      } catch (err) {
+        console.error("Failed to save audio preference:", err);
+      }
     }
     if (next) {
-      try {
-        const audio = new Audio("/notification-ding.mp3");
-        audio.volume = 1;
-        await audio.play();
-      } catch {
-        /* ignore autoplay restriction */
-      }
       toast.success("Alert sounds turned ON");
+      // Fire audio preview asynchronously in background without delaying UI transition
+      const audio = new Audio("/notification-ding.mp3");
+      audio.volume = 1;
+      audio.play().catch(() => {
+        /* silent catch */
+      });
     } else {
       toast.info("Alert sounds turned OFF");
     }
@@ -1055,7 +1058,7 @@ function SettingsPage() {
                         >
                           <span
                             aria-hidden="true"
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform duration-200 ease-in-out ${
                               alertSoundEnabled ? "translate-x-5" : "translate-x-0"
                             }`}
                           />
@@ -1088,15 +1091,15 @@ function SettingsPage() {
 
                         <button
                           type="button"
-                          disabled={savingPush}
                           onClick={async () => {
                             if (savingPush) return;
-                            const previousState = pushEnabled;
-                            setPushEnabled(!previousState);
+                            const nextState = !pushEnabled;
+                            // Optimistically flip the switch immediately
+                            setPushEnabled(nextState);
                             setSavingPush(true);
 
                             try {
-                              if (!previousState) {
+                              if (nextState) {
                                 const permission = await Notification.requestPermission();
                                 if (permission === "denied") {
                                   setPushEnabled(false);
@@ -1123,7 +1126,7 @@ function SettingsPage() {
                                 toast.success("Notifications turned off.");
                               }
                             } catch (e) {
-                              setPushEnabled(previousState);
+                              setPushEnabled(!nextState);
                               console.error("[push toggle]", e);
                               toast.error(
                                 e instanceof Error ? e.message : "An unexpected error occurred.",
@@ -1132,7 +1135,7 @@ function SettingsPage() {
                               setSavingPush(false);
                             }
                           }}
-                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50"
+                          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
                           style={{
                             backgroundColor: pushEnabled ? SUCCESS_COLOR : "oklch(0.85 0.02 85)",
                             boxShadow: pushEnabled
@@ -1145,7 +1148,7 @@ function SettingsPage() {
                         >
                           <span
                             aria-hidden="true"
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform duration-200 ease-in-out ${
                               pushEnabled ? "translate-x-5" : "translate-x-0"
                             }`}
                           />
@@ -1526,7 +1529,7 @@ function SettingsPage() {
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
-function Card({ children, gradient }: { children: React.ReactNode; gradient: string }) {
+function Card({ children, gradient }: { children: React.ReactNode; gradient?: string }) {
   return (
     <div
       className="overflow-hidden rounded-3xl shadow-xl"
@@ -1536,7 +1539,6 @@ function Card({ children, gradient }: { children: React.ReactNode; gradient: str
         boxShadow: "0 8px 40px oklch(0.35 0.15 22 / 10%)",
       }}
     >
-      <div className="h-1.5 w-full" style={{ background: gradient }} />
       <div className="p-8">{children}</div>
     </div>
   );

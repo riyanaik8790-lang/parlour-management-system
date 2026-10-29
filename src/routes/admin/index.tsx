@@ -933,6 +933,9 @@ function AdminDashboard() {
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
+  // View state: "dashboard" shows overview, "services" shows full service management
+  const [activeView, setActiveView] = useState<"dashboard" | "services">("dashboard");
+
   const toggleCategoryExpand = (catName: string) => {
     setExpandedCategories((prev) => ({
       ...prev,
@@ -1043,6 +1046,14 @@ function AdminDashboard() {
       iconBg: "linear-gradient(135deg, oklch(0.60 0.10 55), oklch(0.72 0.14 65))",
       glowColor: "oklch(0.60 0.10 55)",
       decorColor: "oklch(0.60 0.10 55 / 9%)",
+    },
+    {
+      label: "Total Appointments",
+      value: stats ? String(stats.total_bookings) : "-",
+      icon: CalendarCheck,
+      iconBg: `linear-gradient(135deg, ${BURGUNDY}, ${GOLD})`,
+      glowColor: GOLD,
+      decorColor: "oklch(0.68 0.13 68 / 12%)",
     },
   ];
 
@@ -1193,11 +1204,10 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* Gold divider */}
-      <div className="gold-divider animate-fade-up delay-100" />
+
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4 animate-fade-up delay-200">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 animate-fade-up delay-100">
         {STATS.map(({ label, value, icon: Icon, iconBg, glowColor, decorColor }) => (
           <div
             key={label}
@@ -1250,61 +1260,7 @@ function AdminDashboard() {
         ))}
       </div>
 
-      {/* Premium total bookings banner */}
-      {stats && (
-        <div
-          className="relative overflow-hidden rounded-2xl animate-fade-up delay-300"
-          style={{
-            background:
-              "linear-gradient(135deg, oklch(0.35 0.15 22 / 6%) 0%, oklch(0.68 0.13 68 / 8%) 50%, oklch(0.35 0.15 22 / 4%) 100%)",
-            boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
-            border: "1px solid oklch(0.35 0.15 22 / 10%)",
-          }}
-        >
-          <div
-            className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-20"
-            style={{ background: GOLD }}
-          />
-          <div
-            className="pointer-events-none absolute -left-8 -bottom-8 h-32 w-32 rounded-full blur-3xl opacity-15"
-            style={{ background: BURGUNDY }}
-          />
-          <div className="relative flex items-center gap-5 px-6 py-5">
-            <div
-              className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-            >
-              <span
-                className="text-2xl font-bold leading-none text-white"
-                style={{ fontFamily: "var(--font-serif)" }}
-              >
-                {stats.total_bookings}
-              </span>
-            </div>
-            <div className="flex-1">
-              <p
-                className="text-base font-semibold"
-                style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
-              >
-                Total Appointments
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-                Across all time — confirmed, completed &amp; active bookings
-              </p>
-            </div>
-            <span
-              className="hidden sm:inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold"
-              style={{
-                background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`,
-                color: "white",
-                boxShadow: `0 4px 14px oklch(0.68 0.13 68 / 35%)`,
-              }}
-            >
-              All Time
-            </span>
-          </div>
-        </div>
-      )}
+
 
       {/* Quick Actions */}
       <div className="animate-fade-up delay-400">
@@ -1405,20 +1361,19 @@ function AdminDashboard() {
             />
           </Link>
 
-          {/* Add New Service Category */}
+          {/* Manage Services */}
           <button
             type="button"
-            onClick={() => setCategoryModalOpen(true)}
+            onClick={() => setActiveView("services")}
             className="group flex items-center gap-4 rounded-2xl p-6 transition-all duration-300 text-left cursor-pointer"
             style={{
               background: CARD_WHITE,
               boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
               backdropFilter: "blur(8px)",
-              border: "1px dashed oklch(0.68 0.13 68 / 40%)",
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLButtonElement;
-              el.style.boxShadow = "0 12px 40px oklch(0.68 0.13 68 / 20%)";
+              el.style.boxShadow = "0 12px 40px oklch(0.35 0.15 22 / 12%)";
               el.style.transform = "translateY(-3px)";
             }}
             onMouseLeave={(e) => {
@@ -1438,31 +1393,45 @@ function AdminDashboard() {
                 className="font-semibold"
                 style={{ color: TEXT_DARK, fontFamily: "var(--font-serif)" }}
               >
-                Add Service Category
+                Manage Services
               </p>
               <p className="mt-0.5 text-sm" style={{ color: TEXT_MUTED }}>
-                Create a new category card with custom image &amp; sub-services
+                {totalServicesCount} sub-service{totalServicesCount !== 1 ? "s" : ""} across {allCategories.length} categor{allCategories.length !== 1 ? "ies" : "y"}
               </p>
             </div>
-            <Plus
-              className="h-5 w-5 transition-transform duration-200 group-hover:rotate-90"
+            <ArrowRight
+              className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1"
               style={{ color: GOLD }}
             />
           </button>
         </div>
-        {/* Services Management Section */}
-        <div className="animate-fade-up delay-500">
+        {/* Services Management — shown only in services view */}
+        {activeView === "services" && (
+        <div className="animate-fade-up delay-300">
+          {/* Back button header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <h2
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: GOLD }}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveView("dashboard")}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-neutral-100"
+                style={{ color: BURGUNDY }}
               >
-                Services Management
-              </h2>
-              <p className="mt-1 text-sm font-medium" style={{ color: TEXT_DARK }}>
-                Manage live categories, sub-services, and pricing. Edits and deletions sync immediately across the website and booking engine.
-              </p>
+                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                Back to Dashboard
+              </button>
+              <div className="hidden sm:block w-px h-4 bg-neutral-200" />
+              <div>
+                <h2
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: GOLD }}
+                >
+                  Services Management
+                </h2>
+                <p className="mt-0.5 text-[11px]" style={{ color: TEXT_MUTED }}>
+                  Edits sync immediately across the site and booking engine.
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative min-w-[220px]">
@@ -1697,6 +1666,7 @@ function AdminDashboard() {
               })}
           </div>
         </div>
+        )}
       </div>
     </div>
   </div>

@@ -213,18 +213,18 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     }
   };
 
-  // Play audio alert and vibrate when a new booking arrives (unread count increases)
+  // Play audio alert and vibrate when a new booking arrives today (today's unread count increases)
   useEffect(() => {
-    if (prevUnreadRef.current !== null && unread > prevUnreadRef.current) {
-      console.log(`[NotifBell] New booking arrived! Unread count rose ${prevUnreadRef.current} → ${unread}.`);
+    if (prevUnreadRef.current !== null && todayUnread > prevUnreadRef.current) {
+      console.log(`[NotifBell] New booking arrived! Today's unread count rose ${prevUnreadRef.current} → ${todayUnread}.`);
       if (isAudioUnlocked) {
         playAlertSoundAndVibrate();
       } else {
         console.warn("[NotifBell] Alert sounds are locked or muted. Click 'Enable Alert Sounds' to unlock.");
       }
     }
-    prevUnreadRef.current = unread;
-  }, [unread, isAudioUnlocked, playAlertSoundAndVibrate]);
+    prevUnreadRef.current = todayUnread;
+  }, [todayUnread, isAudioUnlocked, playAlertSoundAndVibrate]);
 
   // Listen for Service Worker push messages when the app tab is open in foreground
   useEffect(() => {
@@ -354,12 +354,12 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
         }}
       >
         <Bell className="h-5 w-5" style={{ color: BURGUNDY }} />
-        {unread > 0 && (
+        {todayUnread > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
             style={{ background: BURGUNDY, boxShadow: `0 2px 6px oklch(0.35 0.15 22 / 50%)` }}
           >
-            {unread > 9 ? "9+" : unread}
+            {todayUnread > 9 ? "9+" : todayUnread}
           </span>
         )}
       </button>
