@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -341,30 +342,22 @@ function SettingsPage() {
   const handleReminderSelect = (val: string) => {
     if (val === "custom") {
       setIsCustomReminder(true);
-      const m =
-        customReminderUnit === "days"
-          ? customReminderVal * 1440
-          : customReminderUnit === "hours"
-            ? customReminderVal * 60
-            : customReminderVal;
-      handleReminderPrefChange(m);
     } else {
       setIsCustomReminder(false);
       handleReminderPrefChange(Number(val));
     }
   };
 
-  const handleCustomReminderUpdate = (val: number, unit: "mins" | "hours" | "days") => {
-    const safeVal = Math.max(1, val);
+  const handleSaveCustomReminder = async () => {
+    const safeVal = Math.max(1, customReminderVal);
     setCustomReminderVal(safeVal);
-    setCustomReminderUnit(unit);
     const m =
-      unit === "days"
+      customReminderUnit === "days"
         ? safeVal * 1440
-        : unit === "hours"
+        : customReminderUnit === "hours"
           ? safeVal * 60
           : safeVal;
-    handleReminderPrefChange(m);
+    await handleReminderPrefChange(m);
   };
 
   // ── Upload Avatar File helper ──────────────────────────────────────────────
@@ -1315,38 +1308,69 @@ function SettingsPage() {
                           </div>
                         </div>
 
-                        {/* Inline Custom Reminder Controls */}
+                        {/* Inline Custom Reminder Controls with explicit Save Button */}
                         {isCustomReminder && (
-                          <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in sm:ml-13.5">
-                            <span className="font-medium text-foreground shrink-0 text-xs">Remind me:</span>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
-                              value={customReminderVal}
-                              onChange={(e) =>
-                                handleCustomReminderUpdate(Number(e.target.value) || 1, customReminderUnit)
-                              }
-                              className="h-8 w-16 text-center text-xs font-semibold bg-background border-border"
-                            />
-                            <div className="flex rounded-lg border border-border bg-background p-0.5">
-                              {(["mins", "hours", "days"] as const).map((unit) => (
-                                <button
-                                  key={unit}
-                                  type="button"
-                                  onClick={() => handleCustomReminderUpdate(customReminderVal, unit)}
-                                  className={cn(
-                                    "px-2 py-1 text-[11px] font-medium rounded-md capitalize transition cursor-pointer",
-                                    customReminderUnit === unit
-                                      ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                                      : "text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  {unit}
-                                </button>
-                              ))}
+                          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl border border-primary/20 bg-primary/5 text-xs animate-fade-in sm:ml-13.5">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <span className="font-semibold text-foreground shrink-0 text-xs">Remind me:</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
+                                value={customReminderVal}
+                                onChange={(e) => setCustomReminderVal(Math.max(1, Number(e.target.value) || 1))}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleSaveCustomReminder();
+                                  }
+                                }}
+                                className="h-8.5 w-18 text-center text-xs font-semibold bg-background border-border rounded-lg"
+                              />
+                              <div className="flex rounded-lg border border-border bg-background p-0.5">
+                                {(["mins", "hours", "days"] as const).map((unit) => (
+                                  <button
+                                    key={unit}
+                                    type="button"
+                                    onClick={() => setCustomReminderUnit(unit)}
+                                    className={cn(
+                                      "px-2.5 py-1 text-[11px] font-medium rounded-md capitalize transition cursor-pointer",
+                                      customReminderUnit === unit
+                                        ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                  >
+                                    {unit}
+                                  </button>
+                                ))}
+                              </div>
+                              <span className="text-[11px] text-muted-foreground">before appointment</span>
                             </div>
-                            <span className="text-[11px] text-muted-foreground ml-auto">before appointment</span>
+
+                            {/* Explicit Save Button */}
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleSaveCustomReminder}
+                              disabled={savingReminderPref}
+                              className="h-8.5 px-4 text-xs font-semibold rounded-xl shrink-0 gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer ml-auto"
+                              style={{
+                                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                                color: "white",
+                              }}
+                            >
+                              {savingReminderPref ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  <span>Saving…</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="h-3.5 w-3.5" />
+                                  <span>Save</span>
+                                </>
+                              )}
+                            </Button>
                           </div>
                         )}
                       </div>
