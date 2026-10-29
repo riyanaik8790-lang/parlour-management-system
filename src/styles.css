@@ -924,29 +924,26 @@
    INFINITE MARQUEE SLIDER & TOUCH CAROUSEL
    ============================================================ */
 @keyframes marqueeScroll {
-  from {
-    transform: translateX(0);
+  0% {
+    transform: translate3d(0, 0, 0);
   }
-  to {
-    transform: translateX(-50%);
+  100% {
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
 .marquee-container {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  touch-action: pan-x pan-y;
-}
-.marquee-container::-webkit-scrollbar {
-  display: none;
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .animate-marquee {
   display: flex;
   width: max-content;
-  animation: marqueeScroll 45s linear infinite;
+  animation: marqueeScroll 40s linear infinite;
   will-change: transform;
 }
 

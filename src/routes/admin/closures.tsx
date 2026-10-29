@@ -158,8 +158,8 @@ function AdminClosuresPage() {
     };
   }, []);
 
-  // Today in YYYY-MM-DD
-  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  // Today in YYYY-MM-DD (min selectable date)
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const handleAddClosure = (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,9 +167,17 @@ function AdminClosuresPage() {
       toast.error("Please pick a start date.");
       return;
     }
+    if (startDate < todayStr) {
+      toast.error("Cannot select past dates. Please pick today or a future date.");
+      return;
+    }
     const finalEnd = isRangeMode && endDate ? endDate : startDate;
     if (isRangeMode && endDate && endDate < startDate) {
       toast.error("End date cannot be earlier than start date.");
+      return;
+    }
+    if (finalEnd < todayStr) {
+      toast.error("Cannot select past dates. Please pick today or a future date.");
       return;
     }
 
@@ -203,23 +211,40 @@ function AdminClosuresPage() {
     loadClosures();
   };
 
-  // Filter closures by query
-  const filteredClosures = closures.filter((c) => {
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
-    return (
-      c.reason.toLowerCase().includes(q) ||
-      c.startDate.includes(q) ||
-      c.endDate.includes(q)
-    );
-  });
+  // Automatic expiry filter: only keep closures that are active today or in the future (endDate >= todayStr)
+  const activeAndUpcomingClosures = useMemo(() => {
+    return closures.filter((c) => {
+      const closureEnd = c.endDate || c.startDate;
+      return closureEnd >= todayStr;
+    });
+  }, [closures, todayStr]);
 
-  // Calculate upcoming / active counts
-  const activeTodayCount = closures.filter(
-    (c) => todayStr >= c.startDate && todayStr <= c.endDate,
-  ).length;
+  // Filter active/upcoming closures by search query
+  const filteredClosures = useMemo(() => {
+    return activeAndUpcomingClosures.filter((c) => {
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        c.reason.toLowerCase().includes(q) ||
+        c.startDate.includes(q) ||
+        c.endDate.includes(q)
+      );
+    });
+  }, [activeAndUpcomingClosures, query]);
 
-  const upcomingCount = closures.filter((c) => c.startDate > todayStr).length;
+  // Calculate upcoming / active counts from active & upcoming closures
+  const activeTodayCount = useMemo(
+    () =>
+      activeAndUpcomingClosures.filter(
+        (c) => todayStr >= c.startDate && todayStr <= c.endDate,
+      ).length,
+    [activeAndUpcomingClosures, todayStr],
+  );
+
+  const upcomingCount = useMemo(
+    () => activeAndUpcomingClosures.filter((c) => c.startDate > todayStr).length,
+    [activeAndUpcomingClosures, todayStr],
+  );
 
   return (
     <>
@@ -231,9 +256,22 @@ function AdminClosuresPage() {
         onCancel={() => setClosureToDelete(null)}
       />
 
-      <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-8 py-6 sm:py-8 max-w-[1400px] mx-auto">
-        {/* Header matching Admin layout */}
-        <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
+      <div className="relative min-h-full -mx-4 sm:-mx-6 lg:-mx-12 -my-4 sm:-my-6 lg:-my-8 px-4 sm:px-6 lg:px-12 py-6 sm:py-8 overflow-hidden">
+        {/* ── Luxury floral/geometric background texture watermark ── */}
+        <div
+          className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+          style={{
+            backgroundImage: "url('/admin-floral-bg.png')",
+            backgroundRepeat: "repeat",
+            backgroundPosition: "center",
+            backgroundSize: "480px auto",
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto relative z-0">
+          {/* Header matching Admin layout */}
+          <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4 animate-fade-up">
           <div>
             <h1
               className="text-2xl sm:text-3xl font-bold"
@@ -242,7 +280,7 @@ function AdminClosuresPage() {
               Closure Manager
             </h1>
             <p className="mt-1 text-xs sm:text-sm" style={{ color: TEXT_MUTED }}>
-              {closures.length} scheduled closure{closures.length !== 1 ? "s" : ""} · Blocked
+              {activeAndUpcomingClosures.length} scheduled closure{activeAndUpcomingClosures.length !== 1 ? "s" : ""} · Blocked
               dates automatically disable time slots on the booking engine
             </p>
           </div>
@@ -287,9 +325,9 @@ function AdminClosuresPage() {
             <CalendarX className="h-3.5 w-3.5" style={{ color: "oklch(0.65 0.04 50)" }} />
             <span style={{ color: TEXT_MUTED }}>
               <span className="font-semibold" style={{ color: TEXT_DARK }}>
-                {closures.length}
+                {activeAndUpcomingClosures.length}
               </span>{" "}
-              closures configured
+              active &amp; upcoming closures
             </span>
           </div>
 
@@ -387,6 +425,7 @@ function AdminClosuresPage() {
                   <Input
                     type="date"
                     value={startDate}
+                    min={todayStr}
                     onChange={(e) => setStartDate(e.target.value)}
                     required
                     className="h-10 text-xs rounded-xl bg-white border-neutral-200"
@@ -402,7 +441,7 @@ function AdminClosuresPage() {
                     <Input
                       type="date"
                       value={endDate}
-                      min={startDate}
+                      min={startDate && startDate > todayStr ? startDate : todayStr}
                       onChange={(e) => setEndDate(e.target.value)}
                       required
                       className="h-10 text-xs rounded-xl bg-white border-neutral-200"
@@ -613,6 +652,7 @@ function AdminClosuresPage() {
               </table>
             </div>
           )}
+        </div>
         </div>
       </div>
     </>

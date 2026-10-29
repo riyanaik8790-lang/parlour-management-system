@@ -311,21 +311,36 @@ function BookPage() {
   // ── Not logged in - show inline prompt instead of silent redirect ──────────
   if (!user) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-serif text-3xl text-primary">Login required</h1>
-        <p className="mt-2 text-muted-foreground">Please log in to book an appointment.</p>
-        <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
-          Login
-        </Button>
-        <p className="mt-3 text-sm text-muted-foreground">
-          New here?{" "}
-          <span
-            className="cursor-pointer font-medium text-primary underline-offset-4 hover:underline"
-            onClick={() => navigate({ to: "/register" })}
-          >
-            Create an account
-          </span>
-        </p>
+      <div className="relative min-h-[calc(100vh-4rem)] w-full overflow-hidden flex items-center justify-center">
+        {/* ── Luxury floral/geometric background texture watermark ── */}
+        <div
+          className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+          style={{
+            backgroundImage: "url('/luxury-floral-bg.png')",
+            backgroundRepeat: "repeat",
+            backgroundPosition: "center",
+            backgroundSize: "480px auto",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative z-0 mx-auto max-w-md px-4 py-16 text-center">
+          <div className="rounded-2xl border border-border bg-card/95 backdrop-blur-sm p-8 shadow-sm">
+            <h1 className="font-serif text-3xl text-primary">Login required</h1>
+            <p className="mt-2 text-muted-foreground">Please log in to book an appointment.</p>
+            <Button className="mt-6 min-h-[44px]" onClick={() => navigate({ to: "/login" })}>
+              Login
+            </Button>
+            <p className="mt-3 text-sm text-muted-foreground">
+              New here?{" "}
+              <span
+                className="cursor-pointer font-medium text-primary underline-offset-4 hover:underline"
+                onClick={() => navigate({ to: "/register" })}
+              >
+                Create an account
+              </span>
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -334,14 +349,27 @@ function BookPage() {
   const isPreBridalBlocked = hasPreBridal && preBridalFullyBooked;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-      <h1 className="font-serif text-3xl sm:text-4xl text-primary">Book your appointment</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Select one or more services, then pick a date &amp; time.
-      </p>
-      <div className="mt-6 sm:mt-8 grid gap-6 md:grid-cols-2">
-        {/* ── Left column: service picker + date + time ── */}
-        <div className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div className="relative min-h-[calc(100vh-4rem)] w-full overflow-hidden">
+      {/* ── Luxury floral/geometric background texture watermark ── */}
+      <div
+        className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-85"
+        style={{
+          backgroundImage: "url('/luxury-floral-bg.png')",
+          backgroundRepeat: "repeat",
+          backgroundPosition: "center",
+          backgroundSize: "480px auto",
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative z-0 mx-auto max-w-4xl px-4 py-8 sm:py-12">
+        <h1 className="font-serif text-3xl sm:text-4xl text-primary">Book your appointment</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Select one or more services, then pick a date &amp; time.
+        </p>
+        <div className="mt-6 sm:mt-8 grid gap-6 md:grid-cols-2">
+          {/* ── Left column: service picker + date + time ── */}
+          <div className="space-y-6 rounded-2xl border border-border bg-card/95 backdrop-blur-sm p-6 shadow-sm">
 
           {/* ── Service multi-select (checkboxes) ── */}
           <div>
@@ -574,7 +602,7 @@ function BookPage() {
         </div>
 
         {/* ── Right column: booking summary ── */}
-        <div className="flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-col justify-between rounded-2xl border border-border bg-card/95 backdrop-blur-sm p-6 shadow-sm">
           <div>
             <div className="text-sm text-muted-foreground">Booking summary</div>
 
@@ -671,6 +699,7 @@ function BookPage() {
             )}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

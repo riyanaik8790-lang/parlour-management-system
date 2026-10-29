@@ -423,7 +423,7 @@ function CategoryModal({
             <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "oklch(0.90 0.025 82)" }}>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wide text-gray-800 block">
-                  Sub-Services List (1 to n)
+                  Sub-Services List
                 </label>
                 <span className="text-[11px] text-gray-400">
                   Enter sub-service names and pricing (e.g. Underarms: ₹60, Hand Wax: ₹200 - 300)

@@ -76,6 +76,17 @@ const SERVICE_IMAGES: Record<string, { src: string; position: string }> = {
   "D-Tan": { src: facialImg, position: "center 25%" },
 };
 
+const GALLERY_ITEMS = [
+  { src: facialGoldImg, label: "Gold Facial", position: "center 30%" },
+  { src: preBridalImg, label: "Pre Bridal", position: "center 20%" },
+  { src: hairCutImg, label: "Hair Cuts", position: "center 60%" },
+  { src: nailImg, label: "Nail Art", position: "center" },
+  { src: cleanupImg, label: "Cleanup", position: "center" },
+  { src: hairColor2Img, label: "Hair Treatment", position: "center 30%" },
+  { src: hairSpaImg, label: "Hair Spa", position: "center 25%" },
+  { src: pedicureImg, label: "Pedicure", position: "center" },
+];
+
 function Index() {
   const featured = SERVICE_CATEGORIES.slice(0, 6);
 
@@ -215,41 +226,53 @@ function Index() {
             </div>
 
             {/* Marquee Outer Wrapper */}
-            <div className="relative w-full overflow-hidden marquee-container py-2">
-              <div className="animate-marquee flex items-center gap-4 sm:gap-6 md:gap-8">
-                {/* Render items duplicated (first set + duplicate set) for infinite looping */}
-                {[
-                  { src: facialGoldImg, label: "Gold Facial", position: "center 30%" },
-                  { src: preBridalImg, label: "Pre Bridal", position: "center 20%" },
-                  { src: hairCutImg, label: "Hair Cuts", position: "center 60%" },
-                  { src: nailImg, label: "Nail Art", position: "center" },
-                  { src: cleanupImg, label: "Cleanup", position: "center" },
-                  { src: hairColor2Img, label: "Hair Treatment", position: "center 30%" },
-                  { src: facialGoldImg, label: "Gold Facial", position: "center 30%" },
-                  { src: preBridalImg, label: "Pre Bridal", position: "center 20%" },
-                  { src: hairCutImg, label: "Hair Cuts", position: "center 60%" },
-                  { src: nailImg, label: "Nail Art", position: "center" },
-                  { src: cleanupImg, label: "Cleanup", position: "center" },
-                  { src: hairColor2Img, label: "Hair Treatment", position: "center 30%" },
-                ].map((g, i) => (
-                  <div
-                    key={i}
-                    className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
-                  >
-                    <img
-                      src={g.src}
-                      alt={g.label}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      style={{ objectPosition: g.position || "center" }}
-                    />
-                    {/* Dark gradient overlay with label */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5">
-                      <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
-                        {g.label}
-                      </span>
+            <div className="relative w-full overflow-hidden marquee-container py-2 select-none">
+              <div className="animate-marquee flex items-center w-max">
+                {/* Track 1 */}
+                <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8 pr-4 sm:pr-6 md:pr-8">
+                  {GALLERY_ITEMS.map((g, i) => (
+                    <div
+                      key={`t1-${i}`}
+                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                    >
+                      <img
+                        src={g.src}
+                        alt={g.label}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        style={{ objectPosition: g.position || "center" }}
+                      />
+                      {/* Dark gradient overlay with label */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5">
+                        <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
+                          {g.label}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                {/* Track 2: Identical clone for seamless, mathematically gapless infinite looping */}
+                <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8 pr-4 sm:pr-6 md:pr-8" aria-hidden="true">
+                  {GALLERY_ITEMS.map((g, i) => (
+                    <div
+                      key={`t2-${i}`}
+                      className="group relative shrink-0 w-[220px] sm:w-72 md:w-80 h-[290px] sm:h-80 overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                    >
+                      <img
+                        src={g.src}
+                        alt={g.label}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        style={{ objectPosition: g.position || "center" }}
+                      />
+                      {/* Dark gradient overlay with label */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.35_0.15_22/85%)] via-[oklch(0.35_0.15_22/30%)] to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 sm:p-5">
+                        <span className="text-white font-serif text-base sm:text-lg md:text-xl tracking-wide font-medium">
+                          {g.label}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
