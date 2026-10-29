@@ -4,9 +4,9 @@ import { Link } from "@tanstack/react-router";
 export function Footer() {
   return (
     <footer
-      className="mt-16 border-t"
+      className="relative z-10 mt-16 border-t bg-[#EDE5D8]"
       style={{
-        background: "linear-gradient(180deg, oklch(0.92 0.04 82), oklch(0.88 0.055 80))",
+        background: "linear-gradient(180deg, #F0E8DC 0%, #E8DEC8 100%)",
         borderColor: "oklch(0.84 0.042 80 / 60%)",
       }}
     >

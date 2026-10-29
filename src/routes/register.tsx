@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { api, setSession } from "@/lib/api";
 import { Eye, EyeOff, User, Mail, Phone, Lock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import salonHeroBg from "@/assets/new_salon_hero_bg.jpg";
+import floralScissorsImg from "@/assets/image.png";
 
 // ─── Saved-credentials helper (shared with login.tsx) ────────────────────────
 const SAVED_CREDS_KEY = "salon_saved_creds";
@@ -30,8 +32,6 @@ const STRONG_PW_RE =
 
 type FieldErrors = { name?: string; email?: string; phone?: string; password?: string };
 
-// Only strip non-digit chars - no country-code logic needed since we show
-// "+91" as a static prefix outside the input and the input holds only digits.
 function stripPhoneDigits(raw: string): string {
   return raw.replace(/\D/g, "").slice(0, 10);
 }
@@ -77,7 +77,7 @@ function getPasswordStrength(pw: string): { score: 0 | 1 | 2 | 3; label: string 
   return { score: score as 0 | 1 | 2 | 3, label: labels[score] };
 }
 
-// ─── Colours / design tokens ────────────────────────────────────────────────
+// ─── Colours / design tokens (Strictly preserving original colors) ───────────
 const BURGUNDY = "oklch(0.35 0.15 22)";
 const BURGUNDY_MID = "oklch(0.45 0.13 25)";
 const GOLD = "oklch(0.68 0.13 68)";
@@ -86,12 +86,12 @@ const SUCCESS_COLOR = "oklch(0.52 0.18 150)";
 
 const strengthColors: Record<0 | 1 | 2 | 3, string> = {
   0: "oklch(0.88 0.025 82)",
-  1: "oklch(0.55 0.22 27)", // red
-  2: "oklch(0.68 0.16 70)", // amber/gold
-  3: "oklch(0.52 0.18 150)", // green
+  1: "oklch(0.55 0.22 27)",
+  2: "oklch(0.68 0.16 70)",
+  3: "oklch(0.52 0.18 150)",
 };
 
-// ─── PhoneField - static +91 badge, input holds only raw digits ──────────────
+// ─── PhoneField with Touch Friendly Height & Maroon Focus ─────────────────────
 function PhoneField({
   value,
   error,
@@ -111,10 +111,10 @@ function PhoneField({
   const borderColor = hasError
     ? "oklch(0.577 0.245 27.325)"
     : focused
-      ? GOLD
+      ? BURGUNDY
       : "oklch(0.88 0.030 82)";
   const boxShadow = focused
-    ? `0 0 0 3px ${hasError ? "oklch(0.577 0.245 27.325 / 12%)" : "oklch(0.68 0.13 68 / 14%)"}`
+    ? `0 0 0 2px ${hasError ? "oklch(0.577 0.245 27.325 / 20%)" : "oklch(0.35 0.15 22 / 20%)"}`
     : "none";
 
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -124,7 +124,7 @@ function PhoneField({
 
   return (
     <div
-      className="flex items-center rounded-xl px-3 py-3 transition-all duration-150"
+      className="flex items-center min-h-[44px] rounded-xl px-3 transition-all duration-150"
       style={{
         background: "oklch(0.998 0.004 85)",
         border: `1px solid ${borderColor}`,
@@ -135,13 +135,13 @@ function PhoneField({
     >
       <span
         className="flex-shrink-0 mr-2"
-        style={{ color: hasError ? ERROR_COLOR : focused ? GOLD : "oklch(0.62 0.04 55)" }}
+        style={{ color: hasError ? ERROR_COLOR : focused ? BURGUNDY : "oklch(0.62 0.04 55)" }}
       >
         <Phone className="h-4 w-4" />
       </span>
       <span
         className="flex-shrink-0 mr-1 select-none text-sm font-semibold"
-        style={{ color: focused ? GOLD : "oklch(0.50 0.06 48)", letterSpacing: "0.02em" }}
+        style={{ color: focused ? BURGUNDY : "oklch(0.50 0.06 48)", letterSpacing: "0.02em" }}
       >
         +91
       </span>
@@ -159,65 +159,51 @@ function PhoneField({
         onChange={handleInput}
         onBlur={onBlur}
         disabled={disabled}
-        maxLength={10}
-        className="flex-1 bg-transparent py-0 text-sm outline-none"
-        style={{ color: "oklch(0.25 0.05 50)", minWidth: 0 }}
+        className="flex-1 bg-transparent py-2 text-sm outline-none min-h-[44px]"
+        style={{ color: "oklch(0.25 0.05 50)" }}
       />
-      <span
-        className="flex-shrink-0 ml-2 text-xs tabular-nums"
-        style={{ color: value.length === 10 ? "oklch(0.52 0.18 150)" : "oklch(0.70 0.04 55)" }}
-      >
-        {value.length}/10
-      </span>
+      {value.length === 10 && !hasError && (
+        <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: SUCCESS_COLOR }} />
+      )}
       {hasError && (
-        <XCircle className="ml-1 h-4 w-4 flex-shrink-0" style={{ color: ERROR_COLOR }} />
+        <XCircle className="h-4 w-4 flex-shrink-0" style={{ color: ERROR_COLOR }} />
       )}
     </div>
   );
 }
 
-// ─── RegisterPage ────────────────────────────────────────────────────────────
+// ─── RegisterPage Component ───────────────────────────────────────────────────
 function RegisterPage() {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
-  // phone is stored as raw digits only (no +91 prefix); +91 is shown as a static badge
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [touched, setTouched] = useState<Record<keyof FieldErrors, boolean>>({
-    name: false,
-    email: false,
-    phone: false,
-    password: false,
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
   });
+
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const pwStrength = getPasswordStrength(form.password);
+  const strength = getPasswordStrength(form.password);
 
-  // Touch a field and validate it immediately
+  const setField = useCallback((field: keyof typeof form, value: string) => {
+    setForm((f) => ({ ...f, [field]: value }));
+    setServerError(null);
+    setErrors((prev) => ({ ...prev, [field]: validateField(field, value) }));
+  }, []);
+
   const touch = useCallback(
-    (field: keyof FieldErrors) => {
+    (field: keyof typeof form) => {
       setTouched((t) => ({ ...t, [field]: true }));
-      setErrors((e) => ({ ...e, [field]: validateField(field, form[field]) }));
+      setErrors((prev) => ({ ...prev, [field]: validateField(field, form[field]) }));
     },
     [form],
   );
-
-  function handleChange(field: keyof FieldErrors, rawValue: string) {
-    setServerError(null);
-    let value = rawValue;
-
-    if (field === "phone") {
-      // Input only ever holds raw digits (no country code). Just cap at 10.
-      value = stripPhoneDigits(rawValue);
-    }
-
-    setForm((f) => ({ ...f, [field]: value }));
-    if (touched[field]) {
-      setErrors((e) => ({ ...e, [field]: validateField(field, value) }));
-    }
-  }
 
   function validateAll(): boolean {
     const newErrors: FieldErrors = {};
@@ -239,17 +225,15 @@ function RegisterPage() {
       const payload = {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
-        phone: form.phone, // already stored as raw 10 digits
+        phone: form.phone,
         password: form.password,
       };
       const res = await api.register(payload);
-      // Save credentials so login page shows the "Welcome back" banner
       saveCredsLocal(payload.name, payload.email, payload.password);
       setSession(res.token, res.user);
       navigate({ to: "/book" });
     } catch (err) {
       if (err instanceof Error) {
-        // Try to parse per-field server errors
         try {
           const parsed = JSON.parse(err.message);
           if (parsed?.errors) {
@@ -269,292 +253,250 @@ function RegisterPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: "oklch(0.968 0.018 85)" }}
-    >
-      <div className="w-full max-w-md">
-        {/* Brand header */}
-        <div className="mb-8 text-center">
-          <div
-            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-          >
-            <span className="text-2xl">✂</span>
+    <div className="min-h-screen w-full lg:grid lg:grid-cols-2 bg-[#FAF6F0]">
+      {/* ── LEFT COLUMN: Clean salon interior image, no marketing copy or dark overlays ── */}
+      <div className="relative hidden lg:block h-full w-full overflow-hidden">
+        <img
+          src={salonHeroBg}
+          alt="Hemangi Glam Salon Interior"
+          className="h-full w-full object-cover object-center"
+        />
+      </div>
+
+      {/* ── RIGHT COLUMN: Vertically and Horizontally Centered Form Container ── */}
+      <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-8 md:px-12 lg:px-16 overflow-y-auto">
+        <div className="w-full max-w-md">
+          {/* Brand header with Vertical Floral Scissors */}
+          <div className="mb-6 text-center auth-stagger-1">
+            <img
+              src={floralScissorsImg}
+              alt="Floral Scissors"
+              className="mx-auto h-28 sm:h-32 w-auto mb-4 object-contain select-none mix-blend-multiply"
+            />
+            <h1
+              className="text-3xl font-bold"
+              style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
+            >
+              Create your account
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
+              Book in seconds, track every visit.
+            </p>
           </div>
-          <h1
-            className="text-3xl font-bold"
-            style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-          >
-            Create your account
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
-            Book in seconds, track every visit.
-          </p>
-        </div>
 
-        {/* Card */}
-        <div
-          className="overflow-hidden rounded-3xl shadow-xl"
-          style={{
-            background: "oklch(0.998 0.004 85)",
-            border: "1px solid oklch(0.88 0.030 82)",
-            boxShadow: "0 8px 48px oklch(0.35 0.15 22 / 10%)",
-          }}
-        >
-          {/* Top accent bar */}
+          {/* Form Card */}
           <div
-            className="h-1.5 w-full"
-            style={{ background: `linear-gradient(90deg, ${BURGUNDY}, ${GOLD})` }}
-          />
-
-          <form onSubmit={submit} noValidate className="space-y-5 p-8">
-            {/* Server-level error */}
-            {serverError && (
-              <div
-                className="flex items-start gap-3 rounded-xl p-4 text-sm"
-                style={{
-                  background: "oklch(0.577 0.245 27.325 / 8%)",
-                  border: "1px solid oklch(0.577 0.245 27.325 / 25%)",
-                  color: ERROR_COLOR,
-                }}
-              >
-                <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                {serverError}
-              </div>
-            )}
-
-            {/* ── Full Name ── */}
-            <FieldWrapper
-              id="name"
-              label="Full Name"
-              icon={<User className="h-4 w-4" />}
-              error={touched.name ? errors.name : undefined}
-              hint="First, middle (optional) and last name"
-            >
-              <input
-                id="name"
-                type="text"
-                autoComplete="name"
-                placeholder="Alex Robin Wood"
-                value={form.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                onBlur={() => touch("name")}
-                disabled={busy}
-                className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none"
-                style={{ color: "oklch(0.25 0.05 50)" }}
-              />
-            </FieldWrapper>
-
-            {/* ── Email ── */}
-            <FieldWrapper
-              id="email"
-              label="Email Address"
-              icon={<Mail className="h-4 w-4" />}
-              error={touched.email ? errors.email : undefined}
-            >
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                onBlur={() => touch("email")}
-                disabled={busy}
-                className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none"
-                style={{ color: "oklch(0.25 0.05 50)" }}
-              />
-            </FieldWrapper>
-
-            {/* ── Phone ── */}
-            {/* The +91 prefix is a STATIC badge - the input only holds the 10 raw digits
-                so there is no re-processing / doubling loop. */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="phone"
-                className="block text-xs font-semibold uppercase tracking-widest"
-                style={{
-                  color: touched.phone && errors.phone ? ERROR_COLOR : "oklch(0.50 0.06 48)",
-                }}
-              >
-                Mobile Number
-              </label>
-              <PhoneField
-                value={form.phone}
-                error={touched.phone ? errors.phone : undefined}
-                disabled={busy}
-                onChange={(digits) => handleChange("phone", digits)}
-                onBlur={() => touch("phone")}
-              />
-              {touched.phone && errors.phone ? (
-                <p className="flex items-center gap-1 text-xs" style={{ color: ERROR_COLOR }}>
-                  <XCircle className="h-3 w-3 flex-shrink-0" />
-                  {errors.phone}
-                </p>
-              ) : (
-                <p className="text-xs" style={{ color: "oklch(0.68 0.04 55)" }}>
-                  Used for booking confirmations &amp; SMS reminders
-                </p>
-              )}
-            </div>
-
-            {/* ── Password ── */}
-            <div className="space-y-1">
-              <FieldWrapper
-                id="password"
-                label="Password"
-                icon={<Lock className="h-4 w-4" />}
-                error={touched.password ? errors.password : undefined}
-                suffix={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="flex-shrink-0 p-1 transition-opacity hover:opacity-70"
-                    style={{ color: "oklch(0.60 0.04 50)" }}
-                    tabIndex={-1}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                }
-              >
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  placeholder="Min 8 chars, mixed case + symbol"
-                  value={form.password}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                  onBlur={() => touch("password")}
-                  disabled={busy}
-                  className="w-full bg-transparent py-0 pl-10 pr-2 text-sm outline-none"
-                  style={{ color: "oklch(0.25 0.05 50)" }}
-                />
-              </FieldWrapper>
-
-              {/* Password strength meter */}
-              {form.password.length > 0 && (
-                <div className="pt-1">
-                  <div className="flex gap-1.5">
-                    {([1, 2, 3] as const).map((level) => (
-                      <div
-                        key={level}
-                        className="h-1.5 flex-1 rounded-full transition-all duration-300"
-                        style={{
-                          background:
-                            pwStrength.score >= level
-                              ? strengthColors[pwStrength.score]
-                              : "oklch(0.90 0.020 82)",
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p
-                    className="mt-1 text-xs font-medium"
-                    style={{
-                      color:
-                        pwStrength.score > 0 ? strengthColors[pwStrength.score] : "transparent",
-                    }}
-                  >
-                    {pwStrength.label} password
-                  </p>
-                </div>
-              )}
-
-              {/* Password checklist */}
-              {form.password.length > 0 && (
+            className="overflow-hidden rounded-3xl shadow-xl auth-stagger-2"
+            style={{
+              background: "oklch(0.998 0.004 85)",
+              border: "1px solid oklch(0.88 0.030 82)",
+              boxShadow: "0 8px 48px oklch(0.35 0.15 22 / 10%)",
+            }}
+          >
+            <form onSubmit={submit} noValidate className="space-y-4 p-7 sm:p-8">
+              {/* Server-level error banner */}
+              {serverError && (
                 <div
-                  className="mt-2 grid grid-cols-2 gap-1 rounded-xl p-3 text-xs"
+                  className="flex items-start gap-3 rounded-xl p-4 text-sm"
                   style={{
-                    background: "oklch(0.96 0.016 83 / 70%)",
-                    border: "1px solid oklch(0.90 0.025 82)",
+                    background: "oklch(0.577 0.245 27.325 / 8%)",
+                    border: "1px solid oklch(0.577 0.245 27.325 / 25%)",
+                    color: ERROR_COLOR,
                   }}
                 >
-                  {[
-                    { label: "8+ characters", ok: form.password.length >= 8 },
-                    { label: "Uppercase (A–Z)", ok: /[A-Z]/.test(form.password) },
-                    { label: "Lowercase (a–z)", ok: /[a-z]/.test(form.password) },
-                    { label: "Number (0–9)", ok: /\d/.test(form.password) },
-                    {
-                      label: "Special char (!@#…)",
-                      ok: /[!@#$%^&*()_+-=[\]{};':"\\|,.<>/?`~]/.test(form.password),
-                    },
-                  ].map(({ label, ok }) => (
-                    <span
-                      key={label}
-                      className="flex items-center gap-1.5"
-                      style={{ color: ok ? SUCCESS_COLOR : "oklch(0.62 0.04 55)" }}
-                    >
-                      {ok ? (
-                        <CheckCircle className="h-3 w-3 flex-shrink-0" />
-                      ) : (
-                        <div
-                          className="h-3 w-3 flex-shrink-0 rounded-full border"
-                          style={{ borderColor: "oklch(0.75 0.030 60)" }}
-                        />
-                      )}
-                      {label}
-                    </span>
-                  ))}
+                  <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  {serverError}
                 </div>
               )}
-            </div>
 
-            {/* ── Submit ── */}
-            <button
-              id="register-submit-btn"
-              type="submit"
-              disabled={busy}
-              className="relative mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold shadow-lg transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-              style={{
-                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
-                color: "oklch(0.99 0.01 85)",
-                boxShadow: `0 6px 24px ${BURGUNDY}35`,
-              }}
-              onMouseEnter={(e) => {
-                if (!busy)
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    `0 8px 32px ${BURGUNDY}50`;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 24px ${BURGUNDY}35`;
-              }}
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating your account…
-                </>
-              ) : (
-                "Create account"
-              )}
-            </button>
+              {/* ── Full Name ── */}
+              <div className="auth-stagger-3">
+                <FieldWrapper
+                  id="name"
+                  label="Full Name"
+                  icon={<User className="h-4 w-4" />}
+                  error={touched.name ? errors.name : undefined}
+                >
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Priya Sharma"
+                    value={form.name}
+                    onChange={(e) => setField("name", e.target.value)}
+                    onBlur={() => touch("name")}
+                    disabled={busy}
+                    className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none min-h-[44px]"
+                    style={{ color: "oklch(0.25 0.05 50)" }}
+                  />
+                </FieldWrapper>
+              </div>
 
-            {/* ── Login link ── */}
-            <p className="text-center text-sm" style={{ color: "oklch(0.58 0.04 55)" }}>
-              Already have an account?{" "}
-              <Link
-                to="/login"
-                className="font-semibold transition-opacity hover:opacity-70"
-                style={{ color: BURGUNDY }}
-              >
-                Sign in
-              </Link>
-            </p>
-          </form>
+              {/* ── Email Address ── */}
+              <div className="auth-stagger-3">
+                <FieldWrapper
+                  id="email"
+                  label="Email Address"
+                  icon={<Mail className="h-4 w-4" />}
+                  error={touched.email ? errors.email : undefined}
+                >
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="priya@example.com"
+                    value={form.email}
+                    onChange={(e) => setField("email", e.target.value)}
+                    onBlur={() => touch("email")}
+                    disabled={busy}
+                    className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none min-h-[44px]"
+                    style={{ color: "oklch(0.25 0.05 50)" }}
+                  />
+                </FieldWrapper>
+              </div>
+
+              {/* ── Phone Number ── */}
+              <div className="space-y-1.5 auth-stagger-3">
+                <label
+                  htmlFor="phone"
+                  className="block text-xs font-semibold uppercase tracking-widest"
+                  style={{
+                    color: touched.phone && errors.phone ? ERROR_COLOR : "oklch(0.50 0.06 48)",
+                  }}
+                >
+                  Mobile Number
+                </label>
+                <PhoneField
+                  value={form.phone}
+                  error={touched.phone ? errors.phone : undefined}
+                  disabled={busy}
+                  onChange={(digits) => setField("phone", digits)}
+                  onBlur={() => touch("phone")}
+                />
+                {touched.phone && errors.phone && (
+                  <p className="flex items-center gap-1 text-xs" style={{ color: ERROR_COLOR }}>
+                    <XCircle className="h-3 w-3 flex-shrink-0" />
+                    {errors.phone}
+                  </p>
+                )}
+              </div>
+
+              {/* ── Password ── */}
+              <div className="auth-stagger-4">
+                <FieldWrapper
+                  id="password"
+                  label="Password"
+                  icon={<Lock className="h-4 w-4" />}
+                  error={touched.password ? errors.password : undefined}
+                  suffix={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="flex-shrink-0 p-1 transition-opacity hover:opacity-70 min-h-[44px] flex items-center justify-center"
+                      style={{ color: "oklch(0.60 0.04 50)" }}
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  }
+                >
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Min 8 chars, Aa1@..."
+                    value={form.password}
+                    onChange={(e) => setField("password", e.target.value)}
+                    onBlur={() => touch("password")}
+                    disabled={busy}
+                    className="w-full bg-transparent py-0 pl-10 pr-2 text-sm outline-none min-h-[44px]"
+                    style={{ color: "oklch(0.25 0.05 50)" }}
+                  />
+                </FieldWrapper>
+
+                {/* Password strength indicator */}
+                {form.password.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex gap-1.5">
+                      {([1, 2, 3] as const).map((step) => (
+                        <div
+                          key={step}
+                          className="h-1 flex-1 rounded-full transition-all duration-300"
+                          style={{
+                            background:
+                              strength.score >= step
+                                ? strengthColors[strength.score]
+                                : strengthColors[0],
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {strength.label && (
+                      <div className="flex justify-between text-xs">
+                        <span style={{ color: strengthColors[strength.score] }}>
+                          {strength.label} password
+                        </span>
+                        <span style={{ color: "oklch(0.68 0.04 55)" }}>
+                          {strength.score === 3 ? "Great password" : "Use mixed case, numbers & symbols"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Submit Button with Interactive Hover & Scale ── */}
+              <div className="pt-2 auth-stagger-4">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="relative flex w-full items-center justify-center gap-2 rounded-xl py-3 px-6 text-sm font-semibold shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 min-h-[46px]"
+                  style={{
+                    background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                    color: "oklch(0.99 0.01 85)",
+                    boxShadow: `0 6px 24px ${BURGUNDY}35`,
+                  }}
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating account…
+                    </>
+                  ) : (
+                    "Create account"
+                  )}
+                </button>
+              </div>
+
+              {/* ── Login link ── */}
+              <p className="text-center text-sm auth-stagger-4" style={{ color: "oklch(0.58 0.04 55)" }}>
+                Already have an account?{" "}
+                <Link
+                  to="/login"
+                  className="font-semibold transition-opacity hover:opacity-70"
+                  style={{ color: BURGUNDY }}
+                >
+                  Sign in
+                </Link>
+              </p>
+            </form>
+          </div>
+
+          {/* Footer note */}
+          <p className="mt-4 text-center text-xs" style={{ color: "oklch(0.68 0.04 55)" }}>
+            By creating an account, you agree to our terms of service and booking policies.
+          </p>
         </div>
-
-        {/* Footer note */}
-        <p className="mt-4 text-center text-xs" style={{ color: "oklch(0.68 0.04 55)" }}>
-          By creating an account you agree to receive booking confirmations via SMS/email.
-        </p>
       </div>
     </div>
   );
 }
 
-// ─── Reusable field wrapper ──────────────────────────────────────────────────
+// ─── Reusable FieldWrapper with Smooth Maroon Focus Ring ──────────────────────
 function FieldWrapper({
   id,
   label,
@@ -578,10 +520,10 @@ function FieldWrapper({
   const borderColor = hasError
     ? "oklch(0.577 0.245 27.325)"
     : focused
-      ? GOLD
+      ? BURGUNDY
       : "oklch(0.88 0.030 82)";
   const boxShadow = focused
-    ? `0 0 0 3px ${hasError ? "oklch(0.577 0.245 27.325 / 12%)" : "oklch(0.68 0.13 68 / 14%)"}`
+    ? `0 0 0 2px ${hasError ? "oklch(0.577 0.245 27.325 / 20%)" : "oklch(0.35 0.15 22 / 20%)"}`
     : "none";
 
   return (
@@ -595,7 +537,7 @@ function FieldWrapper({
       </label>
 
       <div
-        className="flex items-center gap-2 rounded-xl px-3 py-3 transition-all duration-150"
+        className="relative flex items-center min-h-[44px] rounded-xl px-3 transition-all duration-150"
         style={{
           background: "oklch(0.998 0.004 85)",
           border: `1px solid ${borderColor}`,
@@ -606,8 +548,8 @@ function FieldWrapper({
       >
         {/* Leading icon */}
         <span
-          className="flex-shrink-0"
-          style={{ color: hasError ? ERROR_COLOR : focused ? GOLD : "oklch(0.62 0.04 55)" }}
+          className="absolute left-3 flex-shrink-0 pointer-events-none"
+          style={{ color: hasError ? ERROR_COLOR : focused ? BURGUNDY : "oklch(0.62 0.04 55)" }}
         >
           {icon}
         </span>

@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SERVICE_CATEGORIES } from "@/lib/services-data";
+import { CalendarCheck } from "lucide-react";
 
+import salonHeroBg from "@/assets/new_salon_hero_bg.jpg";
 import facialImg from "@/assets/facial_service.png";
 import bridalImg from "@/assets/bridal_makeup.png";
 import hairSpaImg from "@/assets/hair_spa.png";
 import rosesImg from "@/assets/new_roses_decor.jpg";
+import floralBgImg from "@/assets/luxury-floral-bg.png";
 import nailImg from "@/assets/nail_art.png";
 import threadingImg from "@/assets/threading.jpeg";
 import waxingImg from "@/assets/waxing.jpeg";
@@ -53,78 +56,135 @@ const SERVICE_IMAGES: Record<string, { src: string; position: string }> = {
   Massage: { src: massageImg, position: "center" },
 };
 
-function useReveal() {
-  const ref = useRef<HTMLDivElement>(null);
+type TabId = "All" | "Skin" | "Hair" | "Waxing" | "Nails" | "Packages";
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "All",      label: "All" },
+  { id: "Skin",     label: "Skin" },
+  { id: "Hair",     label: "Hair" },
+  { id: "Waxing",   label: "Waxing" },
+  { id: "Nails",    label: "Nails" },
+  { id: "Packages", label: "Packages" },
+];
+
+const CATEGORY_TAB: Record<string, TabId> = {
+  Facial: "Skin",
+  Cleanup: "Skin",
+  Bleach: "Skin",
+  "D-Tan": "Skin",
+  "Threading & Face": "Skin",
+  "Hair Care": "Hair",
+  "Hair Cuts": "Hair",
+  "Hair Treatments": "Hair",
+  "Hair Colour": "Hair",
+  Waxing: "Waxing",
+  "Manicure & Pedicure": "Nails",
+  Nails: "Nails",
+  Packages: "Packages",
+  Massage: "Skin",
+};
+
+// Soft, light ambient floating particles (warm white / pale gold with delicate transparency)
+const HERO_PARTICLES = [
+  { id: 1, left: "12%", top: "45%", size: 4, delay: "0s", duration: "7.5s", bg: "rgba(255, 248, 235, 0.65)" },
+  { id: 2, left: "28%", top: "60%", size: 3, delay: "1.8s", duration: "8.5s", bg: "rgba(244, 226, 182, 0.45)" },
+  { id: 3, left: "45%", top: "70%", size: 5, delay: "0.9s", duration: "9.2s", bg: "rgba(255, 252, 245, 0.70)" },
+  { id: 4, left: "62%", top: "50%", size: 3, delay: "2.6s", duration: "8.0s", bg: "rgba(238, 218, 170, 0.40)" },
+  { id: 5, left: "78%", top: "65%", size: 4, delay: "1.2s", duration: "8.6s", bg: "rgba(255, 248, 235, 0.60)" },
+  { id: 6, left: "88%", top: "40%", size: 3, delay: "3.1s", duration: "7.8s", bg: "rgba(244, 226, 182, 0.45)" },
+  { id: 7, left: "20%", top: "30%", size: 4, delay: "4.0s", duration: "8.2s", bg: "rgba(255, 252, 245, 0.55)" },
+  { id: 8, left: "70%", top: "35%", size: 3, delay: "2.2s", duration: "9.5s", bg: "rgba(238, 218, 170, 0.40)" },
+];
+
+function ServiceCard({
+  cat,
+  index,
+}: {
+  cat: (typeof SERVICE_CATEGORIES)[number];
+  index: number;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
   useEffect(() => {
-    const el = ref.current;
+    const el = cardRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          el.classList.add("visible");
+          setInView(true);
           obs.disconnect();
         }
       },
-      { threshold: 0.08 },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
-  return ref;
-}
 
-function CategoryCard({ cat, index }: { cat: (typeof SERVICE_CATEGORIES)[number]; index: number }) {
-  const ref = useReveal();
   const imgData = SERVICE_IMAGES[cat.name];
   const img = imgData?.src;
   const position = imgData?.position || "center";
-  const delay = ((index % 4) + 1) * 100;
+  const firstItem = cat.items[0];
+  const priceDisplay =
+    firstItem?.price === "On request" || firstItem?.price === "Included"
+      ? firstItem.price
+      : firstItem
+        ? `from ₹${firstItem.price}`
+        : "";
 
   return (
     <div
-      ref={ref}
-      className={`reveal service-card rounded-2xl overflow-hidden bg-card shadow-sm border animate-fade-up delay-${delay}`}
-      style={{ borderColor: "oklch(0.84 0.042 80)" }}
+      ref={cardRef}
+      className={`svc-catalog-card${inView ? " in-view" : ""}`}
+      style={{
+        transitionDelay: `${(index % 2) * 90}ms`,
+      }}
     >
-      {/* Card image */}
-      {img && (
-        <div className="img-zoom h-44 w-full">
+      <div className="svc-card-img-wrap">
+        {img ? (
           <img
             src={img}
             alt={cat.name}
-            className="w-full h-full object-cover"
+            className="svc-card-img"
             style={{ objectPosition: position }}
+            loading="lazy"
           />
+        ) : (
+          <div className="svc-card-img-fallback" />
+        )}
+        <div className="svc-card-overlay">
+          <div className="svc-card-overlay-content">
+            <h2 className="svc-card-overlay-title">{cat.name}</h2>
+            {priceDisplay && (
+              <span className="svc-card-overlay-price">{priceDisplay}</span>
+            )}
+            <Link
+              to="/book"
+              className="svc-card-book-btn"
+              id={`book-${cat.name.toLowerCase().replace(/[\s&]+/g, "-")}`}
+            >
+              <CalendarCheck className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+              Book
+            </Link>
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Content */}
-      <div className="p-4 sm:p-5">
-        <div className="mb-1">
-          <h2 className="font-serif text-xl sm:text-2xl" style={{ color: "oklch(0.35 0.15 22)" }}>
-            {cat.name}
-          </h2>
-        </div>
-        <hr className="gold-divider my-3" />
-        <ul className="divide-y text-sm" style={{ borderColor: "oklch(0.84 0.042 80 / 60%)" }}>
+      <div className="svc-card-body">
+        <ul className="svc-card-list">
           {cat.items.map((s) => (
-            <li key={s.id} className="flex items-start justify-between gap-2 py-2.5">
+            <li key={s.id} className="svc-card-list-item">
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-foreground/90">{s.name}</div>
+                <div className="svc-item-name">{s.name}</div>
                 {s.description && (
-                  <div className="mt-0.5 text-xs text-muted-foreground">{s.description}</div>
+                  <div className="svc-item-desc">{s.description}</div>
                 )}
               </div>
-              <span
-                className="whitespace-nowrap text-xs sm:text-sm font-semibold px-2 sm:px-2.5 py-0.5 rounded-full shrink-0"
-                style={{
-                  color: "oklch(0.22 0.04 50)",
-                  background:
-                    "linear-gradient(135deg, oklch(0.68 0.13 68 / 20%), oklch(0.82 0.18 85 / 30%))",
-                  border: "1px solid oklch(0.68 0.13 68 / 30%)",
-                }}
-              >
-                {s.price === "On request" || s.price === "Included" ? s.price : `₹${s.price}`}
+              <span className="svc-item-price">
+                {s.price === "On request" || s.price === "Included"
+                  ? s.price
+                  : `₹${s.price}`}
               </span>
             </li>
           ))}
@@ -135,58 +195,147 @@ function CategoryCard({ cat, index }: { cat: (typeof SERVICE_CATEGORIES)[number]
 }
 
 function ServicesPage() {
+  const [activeTab, setActiveTab] = useState<TabId>("All");
+
+  const filtered = SERVICE_CATEGORIES.filter((cat) =>
+    activeTab === "All" ? true : CATEGORY_TAB[cat.name] === activeTab,
+  );
+
   return (
-    <div>
-      {/* Page header */}
-      <section
-        className="relative py-14 sm:py-20 px-4 text-center overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, oklch(0.968 0.018 85), oklch(0.92 0.04 82))",
-        }}
-      >
-        <span className="gold-badge mb-4 inline-block animate-fade-up">Full Service Menu</span>
-        <h1
-          className="font-serif text-2xl sm:text-5xl md:text-6xl animate-fade-up delay-100"
-          style={{ color: "oklch(0.35 0.15 22)" }}
-        >
-          Service <span className="gold-shimmer">Menu</span>
-        </h1>
-        <p className="mt-4 sm:mt-6 mb-6 sm:mb-8 text-sm sm:text-base text-muted-foreground animate-fade-up delay-200 max-w-lg mx-auto leading-relaxed">
-          Browse our full menu of beauty and wellness services with transparent pricing.
-        </p>
-        <div className="mt-4 sm:mt-6 mb-8 sm:mb-12 flex flex-col sm:flex-row justify-center gap-3 px-4 sm:px-0 animate-fade-up delay-300">
-          <Button
-            asChild
-            size="lg"
-            className="btn-maroon rounded-full px-8 w-full sm:w-auto min-h-[44px]"
-          >
-            <Link to="/book">Book Now</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="rounded-full px-8 w-full sm:w-auto min-h-[44px]"
-            style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}
-          >
-            <Link to="/try-on">Try Skin Analysis</Link>
-          </Button>
-        </div>
-
-        <hr className="gold-divider mt-6 sm:mt-10" />
-      </section>
-
-      {/* Service cards grid */}
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:py-16">
-        <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
-          {SERVICE_CATEGORIES.map((cat, i) => (
-            <CategoryCard key={cat.name} cat={cat} index={i} />
+    <div
+      className="services-page-wrapper"
+      style={{
+        // @ts-expect-error CSS variable for full-page background
+        "--services-bg-image": `url(${salonHeroBg})`,
+      }}
+    >
+      {/* HERO */}
+      <section className="services-hero relative pt-14 pb-12 sm:pt-20 sm:pb-16 px-4 text-center overflow-hidden">
+        {/* Subtle ambient floating sparkles */}
+        <div className="floating-particles-container" aria-hidden="true">
+          {HERO_PARTICLES.map((p) => (
+            <span
+              key={p.id}
+              className="floating-particle"
+              style={{
+                left: p.left,
+                top: p.top,
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                backgroundColor: p.bg,
+                boxShadow: `0 0 ${p.size * 2}px ${p.bg}`,
+                animationDelay: p.delay,
+                animationDuration: p.duration,
+              }}
+            />
           ))}
         </div>
 
-        {/* Bottom CTA */}
+        <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center justify-center">
+          <div className="pt-4 pb-2 overflow-visible">
+            <h1
+              className="font-serif text-3xl sm:text-5xl md:text-6xl leading-normal overflow-visible hero-word"
+              style={{ color: "oklch(0.35 0.15 22)", animationDelay: "0.2s" }}
+            >
+              Service{" "}
+              <span
+                className="gold-shimmer hero-script-reveal font-script inline-block px-1 overflow-visible"
+                style={{ animationDelay: "0.55s", paddingBottom: "0.15em" }}
+              >
+                Menu
+              </span>
+            </h1>
+          </div>
+
+          <p
+            className="mt-4 sm:mt-5 mb-8 text-sm sm:text-base text-muted-foreground hero-word max-w-md mx-auto leading-relaxed"
+            style={{ animationDelay: "0.35s" }}
+          >
+            Find your new favorite treatment. Browse our luxury menu below.
+          </p>
+
+          <div
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 px-4 sm:px-0 w-full animate-fade-up"
+            style={{ animationDelay: "0.5s" }}
+          >
+            <Button
+              asChild
+              size="lg"
+              className="btn-maroon btn-maroon-glow rounded-full px-8 w-full sm:w-auto min-h-[44px]"
+            >
+              <Link to="/book">
+                <CalendarCheck className="mr-2 h-5 w-5" />
+                Book Now
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="btn-outline-gold rounded-full px-8 w-full sm:w-auto min-h-[44px]"
+              style={{ borderColor: "oklch(0.68 0.13 68)", color: "oklch(0.35 0.15 22)" }}
+            >
+              <Link to="/try-on">Try Skin Analysis</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* FILTER TABS */}
+      <section className="sticky top-[56px] z-30 bg-[#FAF6F0]/95 border-b border-[#E8DEC8] shadow-sm">
+        <div className="mx-auto max-w-6xl px-4">
+          <div
+            className="svc-filter-bar"
+            role="tablist"
+            aria-label="Filter by category"
+          >
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`svc-filter-tab${activeTab === tab.id ? " svc-filter-tab-active" : ""}`}
+                id={`tab-${tab.id.toLowerCase()}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SERVICES MENU SECTION WITH SEAMLESS FULL-STRENGTH FLORAL WALLPAPER */}
+      <section className="relative w-full overflow-hidden">
+        {/* Full coverage, continuous seamless repeating floral watermark matching homepage render */}
         <div
-          className="mt-10 sm:mt-16 rounded-3xl p-6 sm:p-10 text-center relative overflow-hidden"
+          className="absolute inset-0 pointer-events-none -z-10 mix-blend-multiply opacity-100"
+          style={{
+            backgroundImage: "url('/luxury-floral-bg.png')",
+            backgroundRepeat: "repeat",
+            backgroundPosition: "center",
+            backgroundSize: "600px auto",
+          }}
+          aria-hidden="true"
+        />
+
+        {/* CARDS GRID */}
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+          {filtered.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              No services in this category yet.
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
+              {filtered.map((cat, i) => (
+                <ServiceCard key={cat.name} cat={cat} index={i} />
+              ))}
+            </div>
+          )}
+
+        {/* BOTTOM CTA */}
+        <div
+          className="mt-12 sm:mt-20 rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden"
           style={{
             background: "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.28 0.10 22))",
           }}
@@ -194,27 +343,28 @@ function ServicesPage() {
           <div className="absolute inset-0 opacity-10">
             <img src={rosesImg} alt="" className="w-full h-full object-cover" />
           </div>
-          <div className="relative">
-            <span className="gold-badge mb-3 inline-block">Ready?</span>
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mb-2">
+          <div className="relative max-w-xl mx-auto flex flex-col items-center">
+            <h3 className="font-serif text-2xl sm:text-4xl text-white mb-2.5">
               Book your favourite service
             </h3>
-            <p className="text-white/60 mb-5 sm:mb-6 text-sm">
-              Real-time slot booking, no waiting on hold.
+            <p className="text-white/75 mb-7 text-sm sm:text-base leading-relaxed">
+              Treat yourself to a premium salon experience.
             </p>
             <Button
               asChild
               size="lg"
-              className="rounded-full px-8 sm:px-10 w-full sm:w-auto min-h-[44px]"
+              className="rounded-full px-8 sm:px-10 w-full sm:w-auto min-h-[44px] btn-outline-gold"
               style={{
                 background: "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.82 0.18 85))",
                 color: "oklch(0.22 0.04 50)",
                 fontWeight: 700,
+                border: "none",
               }}
             >
-              <Link to="/book">Book an Appointment →</Link>
+              <Link to="/book">Book an Appointment &rarr;</Link>
             </Button>
           </div>
+        </div>
         </div>
       </section>
     </div>

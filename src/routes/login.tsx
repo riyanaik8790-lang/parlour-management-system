@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { api, setSession } from "@/lib/api";
 import { Eye, EyeOff, Mail, Lock, XCircle, Loader2, UserCheck } from "lucide-react";
+import salonHeroBg from "@/assets/new_salon_hero_bg.jpg";
+import floralScissorsImg from "@/assets/image.png";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -49,7 +51,7 @@ function validatePassword(value: string): string | undefined {
   return undefined;
 }
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── Design tokens (Strictly preserving original colors) ──────────────────────
 const BURGUNDY = "oklch(0.35 0.15 22)";
 const BURGUNDY_MID = "oklch(0.45 0.13 25)";
 const GOLD = "oklch(0.68 0.13 68)";
@@ -68,11 +70,9 @@ function LoginPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [showSuggestion, setShowSuggestion] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  // readOnly trick: prevents browsers from autofilling on page load.
-  // Removed as soon as the user interacts with a field.
   const [readOnly, setReadOnly] = useState(true);
 
-  // Saved credentials - loaded silently, never shown upfront
+  // Saved credentials
   const [savedCreds, setSavedCreds] = useState<SavedCreds | null>(null);
 
   // Per-field touched state
@@ -81,7 +81,6 @@ function LoginPage() {
   const emailError = emailTouched ? validateEmail(email) : undefined;
   const passwordError = passwordTouched ? validatePassword(password) : undefined;
 
-  // On mount: load saved credentials for banner only - do NOT pre-fill fields
   useEffect(() => {
     const creds = getSavedCreds();
     if (creds) {
@@ -99,7 +98,6 @@ function LoginPage() {
   function handleEmailChange(value: string) {
     setEmail(value);
     setServerError(null);
-    // Show suggestion dropdown only when user types something matching the saved email
     if (savedCreds && value.length > 0) {
       setShowSuggestion(savedCreds.email.toLowerCase().startsWith(value.toLowerCase()));
     } else {
@@ -119,7 +117,6 @@ function LoginPage() {
     setServerError(null);
     try {
       const res = await api.login({ email: email.trim().toLowerCase(), password });
-      // If remember me is checked, save credentials for next login
       if (rememberMe) {
         saveCreds(res.user.name, email.trim().toLowerCase(), password);
       } else {
@@ -135,283 +132,278 @@ function LoginPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: "oklch(0.968 0.018 85)" }}
-    >
-      <div className="w-full max-w-md">
-        {/* Brand header */}
-        <div className="mb-8 text-center">
-          <div
-            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})` }}
-          >
-            <span className="text-2xl">✂</span>
-          </div>
-          <h1
-            className="text-3xl font-bold"
-            style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
-          >
-            Welcome back
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
-            Sign in to manage your appointments.
-          </p>
-        </div>
+    <div className="min-h-screen w-full lg:grid lg:grid-cols-2 bg-[#FAF6F0]">
+      {/* ── LEFT COLUMN: Clean salon interior image, no marketing copy or dark overlays ── */}
+      <div className="relative hidden lg:block h-full w-full overflow-hidden">
+        <img
+          src={salonHeroBg}
+          alt="Hemangi Glam Salon Interior"
+          className="h-full w-full object-cover object-center"
+        />
+      </div>
 
-        {/* Card */}
-        <div
-          className="overflow-hidden rounded-3xl shadow-xl"
-          style={{
-            background: "oklch(0.998 0.004 85)",
-            border: "1px solid oklch(0.88 0.030 82)",
-            boxShadow: "0 8px 48px oklch(0.35 0.15 22 / 10%)",
-          }}
-        >
-          {/* Top accent gradient bar */}
-          <div
-            className="h-1.5 w-full"
-            style={{ background: `linear-gradient(90deg, ${BURGUNDY}, ${GOLD})` }}
-          />
-
-          <form onSubmit={submit} noValidate className="space-y-5 p-8">
-            {/* Server-level error banner */}
-            {serverError && (
-              <div
-                className="flex items-start gap-3 rounded-xl p-4 text-sm"
-                style={{
-                  background: "oklch(0.577 0.245 27.325 / 8%)",
-                  border: "1px solid oklch(0.577 0.245 27.325 / 25%)",
-                  color: ERROR_COLOR,
-                }}
-              >
-                <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                {serverError}
-              </div>
-            )}
-
-            {/* ── Email ── */}
-            <div className="relative">
-              <FieldWrapper
-                id="login-email"
-                label="Email Address"
-                icon={<Mail className="h-4 w-4" />}
-                error={emailError}
-              >
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  autoComplete="new-password"
-                  placeholder="you@example.com"
-                  readOnly={readOnly}
-                  value={email}
-                  onFocus={() => {
-                    setReadOnly(false);
-                    if (savedCreds && email.length > 0) {
-                      setShowSuggestion(
-                        savedCreds.email.toLowerCase().startsWith(email.toLowerCase()),
-                      );
-                    }
-                  }}
-                  onClick={() => setReadOnly(false)}
-                  onChange={(e) => handleEmailChange(e.target.value)}
-                  onBlur={() => {
-                    setEmailTouched(true);
-                    setTimeout(() => setShowSuggestion(false), 150);
-                  }}
-                  disabled={busy}
-                  className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none"
-                  style={{ color: "oklch(0.25 0.05 50)" }}
-                />
-              </FieldWrapper>
-
-              {/* Saved email suggestion dropdown */}
-              {showSuggestion && savedCreds && (
-                <button
-                  type="button"
-                  onMouseDown={applySavedCreds}
-                  className="absolute left-0 right-0 z-20 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-all duration-150"
-                  style={{
-                    top: "calc(100% + 4px)",
-                    background: "oklch(0.998 0.004 85)",
-                    border: `1px solid ${GOLD}60`,
-                    boxShadow: `0 4px 20px oklch(0.35 0.15 22 / 12%)`,
-                    color: "oklch(0.25 0.05 50)",
-                  }}
-                >
-                  <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: SUCCESS_COLOR }} />
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium">{savedCreds.email}</span>
-                    <span className="text-xs" style={{ color: "oklch(0.58 0.04 55)" }}>
-                      Saved account
-                    </span>
-                  </div>
-                </button>
-              )}
-            </div>
-
-            {/* ── Password with Eye Toggle ── */}
-            <FieldWrapper
-              id="login-password"
-              label="Password"
-              icon={<Lock className="h-4 w-4" />}
-              error={passwordError}
-              suffix={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="flex-shrink-0 p-1 transition-opacity hover:opacity-70"
-                  style={{ color: "oklch(0.60 0.04 50)" }}
-                  tabIndex={-1}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              }
+      {/* ── RIGHT COLUMN: Vertically and Horizontally Centered Form Container ── */}
+      <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-8 md:px-12 lg:px-16 overflow-y-auto">
+        <div className="w-full max-w-md">
+          {/* Brand header with Vertical Floral Scissors */}
+          <div className="mb-6 text-center auth-stagger-1">
+            <img
+              src={floralScissorsImg}
+              alt="Floral Scissors"
+              className="mx-auto h-28 sm:h-32 w-auto mb-4 object-contain select-none mix-blend-multiply"
+            />
+            <h1
+              className="text-3xl font-bold"
+              style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
             >
-              <input
-                id="login-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="Your password"
-                readOnly={readOnly}
-                value={password}
-                onFocus={() => setReadOnly(false)}
-                onClick={() => setReadOnly(false)}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setServerError(null);
-                }}
-                onBlur={() => setPasswordTouched(true)}
-                disabled={busy}
-                className="w-full bg-transparent py-0 pl-10 pr-2 text-sm outline-none"
-                style={{ color: "oklch(0.25 0.05 50)" }}
-              />
-            </FieldWrapper>
+              Welcome back
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: "oklch(0.55 0.04 50)" }}>
+              Sign in to manage your appointments.
+            </p>
+          </div>
 
-            {/* ── Remember Me & Forgot Password ── */}
-            <div className="flex items-center justify-between">
-              <label
-                htmlFor="login-remember"
-                className="flex cursor-pointer select-none items-center gap-2.5"
-              >
-                <span
-                  className="relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-150"
+          {/* Form Card */}
+          <div
+            className="overflow-hidden rounded-3xl shadow-xl auth-stagger-2"
+            style={{
+              background: "oklch(0.998 0.004 85)",
+              border: "1px solid oklch(0.88 0.030 82)",
+              boxShadow: "0 8px 48px oklch(0.35 0.15 22 / 10%)",
+            }}
+          >
+            <form onSubmit={submit} noValidate className="space-y-5 p-7 sm:p-8">
+              {/* Server-level error banner */}
+              {serverError && (
+                <div
+                  className="flex items-start gap-3 rounded-xl p-4 text-sm"
                   style={{
-                    background: rememberMe
-                      ? `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`
-                      : "oklch(0.998 0.004 85)",
-                    border: rememberMe ? "none" : "1.5px solid oklch(0.78 0.030 82)",
-                    boxShadow: rememberMe ? `0 2px 8px ${BURGUNDY}30` : "none",
+                    background: "oklch(0.577 0.245 27.325 / 8%)",
+                    border: "1px solid oklch(0.577 0.245 27.325 / 25%)",
+                    color: ERROR_COLOR,
                   }}
                 >
-                  {rememberMe && (
-                    <svg
-                      viewBox="0 0 12 10"
-                      fill="none"
-                      className="h-3 w-3"
-                      stroke="oklch(0.99 0.01 85)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  {serverError}
+                </div>
+              )}
+
+              {/* ── Email ── */}
+              <div className="relative auth-stagger-3">
+                <FieldWrapper
+                  id="login-email"
+                  label="Email Address"
+                  icon={<Mail className="h-4 w-4" />}
+                  error={emailError}
+                >
+                  <input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    autoComplete="new-password"
+                    placeholder="you@example.com"
+                    readOnly={readOnly}
+                    value={email}
+                    onFocus={() => {
+                      setReadOnly(false);
+                      if (savedCreds && email.length > 0) {
+                        setShowSuggestion(
+                          savedCreds.email.toLowerCase().startsWith(email.toLowerCase()),
+                        );
+                      }
+                    }}
+                    onClick={() => setReadOnly(false)}
+                    onChange={(e) => handleEmailChange(e.target.value)}
+                    onBlur={() => {
+                      setEmailTouched(true);
+                      setTimeout(() => setShowSuggestion(false), 150);
+                    }}
+                    disabled={busy}
+                    className="w-full bg-transparent py-0 pl-10 pr-4 text-sm outline-none min-h-[44px]"
+                    style={{ color: "oklch(0.25 0.05 50)" }}
+                  />
+                </FieldWrapper>
+
+                {/* Saved email suggestion dropdown */}
+                {showSuggestion && savedCreds && (
+                  <button
+                    type="button"
+                    onMouseDown={applySavedCreds}
+                    className="absolute left-0 right-0 z-20 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-all duration-150"
+                    style={{
+                      top: "calc(100% + 4px)",
+                      background: "oklch(0.998 0.004 85)",
+                      border: `1px solid ${GOLD}60`,
+                      boxShadow: `0 4px 20px oklch(0.35 0.15 22 / 12%)`,
+                      color: "oklch(0.25 0.05 50)",
+                    }}
+                  >
+                    <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: SUCCESS_COLOR }} />
+                    <div className="flex flex-col items-start text-left">
+                      <span className="font-medium">{savedCreds.email}</span>
+                      <span className="text-xs" style={{ color: "oklch(0.58 0.04 55)" }}>
+                        Saved account
+                      </span>
+                    </div>
+                  </button>
+                )}
+              </div>
+
+              {/* ── Password with Eye Toggle ── */}
+              <div className="auth-stagger-3">
+                <FieldWrapper
+                  id="login-password"
+                  label="Password"
+                  icon={<Lock className="h-4 w-4" />}
+                  error={passwordError}
+                  suffix={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="flex-shrink-0 p-1 transition-opacity hover:opacity-70 min-h-[44px] flex items-center justify-center"
+                      style={{ color: "oklch(0.60 0.04 50)" }}
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
-                      <polyline points="1.5,5 4.5,8 10.5,1.5" />
-                    </svg>
-                  )}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  }
+                >
+                  <input
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Your password"
+                    readOnly={readOnly}
+                    value={password}
+                    onFocus={() => setReadOnly(false)}
+                    onClick={() => setReadOnly(false)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setServerError(null);
+                    }}
+                    onBlur={() => setPasswordTouched(true)}
+                    disabled={busy}
+                    className="w-full bg-transparent py-0 pl-10 pr-2 text-sm outline-none min-h-[44px]"
+                    style={{ color: "oklch(0.25 0.05 50)" }}
+                  />
+                </FieldWrapper>
+              </div>
+
+              {/* ── Remember Me & Forgot Password ── */}
+              <div className="flex items-center justify-between auth-stagger-4">
+                <label
+                  htmlFor="login-remember"
+                  className="flex cursor-pointer select-none items-center gap-2.5"
+                >
+                  <span
+                    className="relative flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-150"
+                    style={{
+                      background: rememberMe
+                        ? `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`
+                        : "oklch(0.998 0.004 85)",
+                      border: rememberMe ? "none" : "1.5px solid oklch(0.78 0.030 82)",
+                      boxShadow: rememberMe ? `0 2px 8px ${BURGUNDY}30` : "none",
+                    }}
+                  >
+                    {rememberMe && (
+                      <svg
+                        viewBox="0 0 12 10"
+                        fill="none"
+                        className="h-3 w-3"
+                        stroke="oklch(0.99 0.01 85)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="1.5,5 4.5,8 10.5,1.5" />
+                      </svg>
+                    )}
+                  </span>
                   <input
                     id="login-remember"
-                    name="remember"
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="absolute inset-0 cursor-pointer opacity-0"
+                    className="sr-only"
                   />
-                </span>
-                <span className="text-sm" style={{ color: "oklch(0.45 0.05 50)" }}>
-                  Remember me
-                </span>
-              </label>
+                  <span className="text-xs" style={{ color: "oklch(0.45 0.05 50)" }}>
+                    Remember me
+                  </span>
+                </label>
 
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword((v) => !v)}
+                  className="text-xs font-medium transition-opacity hover:opacity-70"
+                  style={{ color: BURGUNDY }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              {showForgotPassword && (
+                <div
+                  className="rounded-xl p-4 text-sm animate-fade-up"
+                  style={{
+                    background: "oklch(0.92 0.030 83 / 50%)",
+                    border: "1px solid oklch(0.84 0.042 80 / 50%)",
+                    color: "oklch(0.45 0.05 50)",
+                  }}
+                >
+                  Please contact the salon at <span className="font-semibold">+91 8208576165</span> to
+                  reset your password.
+                </div>
+              )}
+
+              {/* ── Submit Button with Interactive Hover & Scale ── */}
               <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className="text-sm font-semibold transition-opacity hover:opacity-70"
-                style={{ color: BURGUNDY }}
-              >
-                Forgot password?
-              </button>
-            </div>
-
-            {showForgotPassword && (
-              <div
-                className="rounded-xl p-4 text-sm animate-fade-up"
+                id="login-submit-btn"
+                type="submit"
+                disabled={busy}
+                className="relative flex w-full items-center justify-center gap-2 rounded-xl py-3 px-6 text-sm font-semibold shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 min-h-[46px] auth-stagger-4"
                 style={{
-                  background: "oklch(0.92 0.030 83 / 50%)",
-                  border: "1px solid oklch(0.84 0.042 80 / 50%)",
-                  color: "oklch(0.45 0.05 50)",
+                  background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
+                  color: "oklch(0.99 0.01 85)",
+                  boxShadow: `0 6px 24px ${BURGUNDY}35`,
                 }}
               >
-                Please contact the salon at <span className="font-semibold">+91 8208576165</span> to
-                reset your password.
-              </div>
-            )}
+                {busy ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Signing in…
+                  </>
+                ) : (
+                  "Sign in"
+                )}
+              </button>
 
-            {/* ── Submit Button ── */}
-            <button
-              id="login-submit-btn"
-              type="submit"
-              disabled={busy}
-              className="relative flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold shadow-lg transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-              style={{
-                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
-                color: "oklch(0.99 0.01 85)",
-                boxShadow: `0 6px 24px ${BURGUNDY}35`,
-              }}
-              onMouseEnter={(e) => {
-                if (!busy)
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    `0 8px 32px ${BURGUNDY}50`;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 24px ${BURGUNDY}35`;
-              }}
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                "Sign in"
-              )}
-            </button>
+              {/* ── Register link ── */}
+              <p className="text-center text-sm auth-stagger-4" style={{ color: "oklch(0.58 0.04 55)" }}>
+                New here?{" "}
+                <Link
+                  to="/register"
+                  className="font-semibold transition-opacity hover:opacity-70"
+                  style={{ color: BURGUNDY }}
+                >
+                  Create an account
+                </Link>
+              </p>
+            </form>
+          </div>
 
-            {/* ── Register link ── */}
-            <p className="text-center text-sm" style={{ color: "oklch(0.58 0.04 55)" }}>
-              New here?{" "}
-              <Link
-                to="/register"
-                className="font-semibold transition-opacity hover:opacity-70"
-                style={{ color: BURGUNDY }}
-              >
-                Create an account
-              </Link>
-            </p>
-          </form>
+          {/* Footer note */}
+          <p className="mt-4 text-center text-xs" style={{ color: "oklch(0.68 0.04 55)" }}>
+            Your session is encrypted and secured with JWT.
+          </p>
         </div>
-
-        {/* Footer note */}
-        <p className="mt-4 text-center text-xs" style={{ color: "oklch(0.68 0.04 55)" }}>
-          Your session is encrypted and secured with JWT.
-        </p>
       </div>
     </div>
   );
 }
 
-// ─── Reusable FieldWrapper ─────────────────────────────────────────────────────
+// ─── Reusable FieldWrapper with Smooth Maroon Focus Ring ──────────────────────
 function FieldWrapper({
   id,
   label,
@@ -435,10 +427,10 @@ function FieldWrapper({
   const borderColor = hasError
     ? "oklch(0.577 0.245 27.325)"
     : focused
-      ? GOLD
+      ? BURGUNDY
       : "oklch(0.88 0.030 82)";
   const boxShadow = focused
-    ? `0 0 0 3px ${hasError ? "oklch(0.577 0.245 27.325 / 12%)" : "oklch(0.68 0.13 68 / 14%)"}`
+    ? `0 0 0 2px ${hasError ? "oklch(0.577 0.245 27.325 / 20%)" : "oklch(0.35 0.15 22 / 20%)"}`
     : "none";
 
   return (
@@ -452,7 +444,7 @@ function FieldWrapper({
       </label>
 
       <div
-        className="flex items-center gap-2 rounded-xl px-3 py-3 transition-all duration-150"
+        className="relative flex items-center min-h-[44px] rounded-xl px-3 transition-all duration-150"
         style={{
           background: "oklch(0.998 0.004 85)",
           border: `1px solid ${borderColor}`,
@@ -463,8 +455,8 @@ function FieldWrapper({
       >
         {/* Leading icon */}
         <span
-          className="flex-shrink-0"
-          style={{ color: hasError ? ERROR_COLOR : focused ? GOLD : "oklch(0.62 0.04 55)" }}
+          className="absolute left-3 flex-shrink-0 pointer-events-none"
+          style={{ color: hasError ? ERROR_COLOR : focused ? BURGUNDY : "oklch(0.62 0.04 55)" }}
         >
           {icon}
         </span>

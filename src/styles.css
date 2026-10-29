@@ -190,7 +190,43 @@
   100% { background-position:  200% center; }
 }
 
+/* Ken Burns: extremely slow zoom-in on hero background */
+@keyframes kenBurns {
+  0%   { transform: scale(1);    }
+  100% { transform: scale(1.08); }
+}
 
+/* Hero word: gentle slide-up fade-in for "Beauty booked" */
+@keyframes heroWordReveal {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Handwriting mask reveal for "beautifully." */
+@keyframes handwritingReveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0% 0 0); }
+}
+
+/* Maroon glow pulse for primary CTA */
+@keyframes maroonPulseGlow {
+  0%, 100% {
+    box-shadow:
+      0 4px 18px oklch(0.35 0.15 22 / 30%),
+      0 0 0 0 oklch(0.35 0.15 22 / 0%);
+  }
+  50% {
+    box-shadow:
+      0 8px 28px oklch(0.35 0.15 22 / 45%),
+      0 0 22px 6px oklch(0.68 0.13 68 / 22%);
+  }
+}
+
+/* Staggered badge fade-in */
+@keyframes badgeFadeIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 @keyframes pulseGlow {
   0%, 100% { box-shadow: 0 0 0 0 oklch(0.68 0.13 68 / 0%); }
@@ -228,6 +264,38 @@
 .animate-scale-in       { animation: scaleIn 0.6s ease-out both; }
 .animate-float          { animation: float 6s ease-in-out infinite; }
 .animate-pulse-glow     { animation: pulseGlow 3s ease-in-out infinite; }
+
+/* Ken Burns hero background */
+.hero-bg-kenburns {
+  animation: kenBurns 20s ease-in-out infinite alternate both;
+  transform-origin: center center;
+}
+
+/* Hero word slide-up */
+.hero-word {
+  display: inline-block;
+  animation: heroWordReveal 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Handwriting / mask reveal */
+.hero-script-reveal {
+  display: inline-block;
+  animation: handwritingReveal 1.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Primary CTA pulsing glow */
+.btn-maroon-glow {
+  animation: maroonPulseGlow 2.8s ease-in-out infinite;
+}
+
+/* Staggered badge */
+.badge-reveal {
+  opacity: 0;
+  animation: badgeFadeIn 0.6s ease-out forwards;
+}
+.badge-reveal-1 { animation-delay: 0.15s; }
+.badge-reveal-2 { animation-delay: 0.5s; }
+.badge-reveal-3 { animation-delay: 0.8s; }
 
 .delay-100 { animation-delay: 0.1s; }
 .delay-200 { animation-delay: 0.2s; }
@@ -337,11 +405,23 @@
   background: linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25));
   color: oklch(0.99 0.01 85);
   border: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
 }
 .btn-maroon:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px oklch(0.35 0.15 22 / 35%);
+  transform: scale(1.05) translateY(-1px);
+  box-shadow:
+    0 10px 28px oklch(0.35 0.15 22 / 40%),
+    0 4px 10px oklch(0.35 0.15 22 / 20%);
+}
+
+/* Secondary outline button hover */
+.btn-outline-gold {
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease, background 0.2s ease;
+}
+.btn-outline-gold:hover {
+  transform: scale(1.05) translateY(-1px);
+  box-shadow: 0 8px 22px oklch(0.68 0.13 68 / 28%);
+  background: oklch(0.96 0.025 82);
 }
 
 /* Navbar scroll shadow */
@@ -375,3 +455,444 @@
 .stat-card:hover {
   transform: translateY(-4px);
 }
+
+/* ============================================================
+   SERVICES PAGE — HERO
+   ============================================================ */
+
+.services-hero {
+  isolation: isolate;
+}
+
+/* Decorative soft blobs for hero depth */
+.services-hero-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+  pointer-events: none;
+  z-index: 0;
+}
+.services-hero-blob-1 {
+  width: 420px;
+  height: 420px;
+  top: -80px;
+  left: -120px;
+  background: oklch(0.82 0.18 85 / 22%);
+}
+.services-hero-blob-2 {
+  width: 320px;
+  height: 320px;
+  bottom: -60px;
+  right: -80px;
+  background: oklch(0.68 0.13 68 / 16%);
+}
+
+/* ============================================================
+   SERVICES PAGE — FULL-PAGE BACKDROP & PARTICLES
+   ============================================================ */
+
+/* Full-page seamless backdrop */
+.services-page-wrapper {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  background-color: #FAF6F0;
+  background-image: 
+    linear-gradient(
+      180deg,
+      rgba(250, 246, 240, 0.88) 0%,
+      rgba(250, 246, 240, 0.92) 25%,
+      rgba(250, 246, 240, 0.94) 60%,
+      rgba(250, 246, 240, 0.90) 100%
+    ),
+    var(--services-bg-image);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+}
+
+/* Floating sparkles / particles in hero */
+.floating-particles-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.floating-particle {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  animation: floatDriftUp infinite ease-in-out;
+}
+
+@keyframes floatDriftUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.6);
+  }
+  20% {
+    opacity: 0.75;
+  }
+  60% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-90px) scale(1.15);
+  }
+}
+
+/* ============================================================
+   SERVICES PAGE — FILTER TABS
+   ============================================================ */
+
+/* Scrollable tab bar — hides scrollbar on all browsers */
+.svc-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow-x: auto;
+  padding: 0.625rem 0;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.svc-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.svc-filter-tab {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.35rem 1rem;
+  border-radius: 9999px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: oklch(0.45 0.04 50);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0.01em;
+}
+.svc-filter-tab:hover:not(.svc-filter-tab-active) {
+  color: oklch(0.35 0.15 22);
+  background: rgba(235, 227, 218, 0.8);
+  border-color: oklch(0.84 0.042 80);
+}
+.svc-filter-tab-active {
+  background: linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25));
+  color: oklch(0.99 0.01 85);
+  border-color: transparent;
+  box-shadow: 0 2px 10px oklch(0.35 0.15 22 / 30%);
+  font-weight: 600;
+}
+
+/* ============================================================
+   SERVICES PAGE — PREMIUM CATALOG CARDS
+   ============================================================ */
+
+.svc-catalog-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid oklch(0.86 0.035 80);
+  background: #FFFFFF;
+  box-shadow: 0 4px 18px rgba(90, 35, 45, 0.06);
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
+}
+
+/* When in view via IntersectionObserver */
+.svc-catalog-card.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hover dynamics: subtly rise (-translate-y-1.5) with soft natural shadow */
+.svc-catalog-card.in-view:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 16px 36px rgba(90, 35, 45, 0.12),
+    0 4px 12px rgba(90, 35, 45, 0.06);
+}
+
+/* Image container */
+.svc-card-img-wrap {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+@media (min-width: 640px) {
+  .svc-card-img-wrap { height: 220px; }
+}
+
+/* Image — scales up slowly (scale-105) on card hover */
+.svc-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.65s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.svc-catalog-card:hover .svc-card-img {
+  transform: scale(1.05);
+}
+
+.svc-card-img-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, oklch(0.92 0.04 82), oklch(0.85 0.055 80));
+}
+
+/* Gradient overlay — slides up and fades in on card hover */
+.svc-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    oklch(0.15 0.05 22 / 90%) 0%,
+    oklch(0.15 0.05 22 / 55%) 45%,
+    transparent 100%
+  );
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  display: flex;
+  align-items: flex-end;
+  padding: 1.25rem;
+}
+.svc-catalog-card:hover .svc-card-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Mobile: always show a thin overlay so the image doesn't look bare */
+@media (hover: none) {
+  .svc-card-overlay {
+    opacity: 0.7;
+    transform: translateY(0);
+  }
+}
+
+.svc-card-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+}
+.svc-card-overlay-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.svc-card-overlay-price {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: oklch(0.88 0.16 82);
+  letter-spacing: 0.02em;
+}
+
+/* Small "Book" button inside overlay */
+.svc-card-book-btn {
+  margin-top: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.85rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.82 0.18 85));
+  color: oklch(0.22 0.04 50);
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.svc-card-book-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 12px oklch(0.68 0.13 68 / 40%);
+}
+.svc-card-book-btn:active {
+  transform: scale(0.97);
+}
+
+/* Card text body */
+.svc-card-body {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+@media (min-width: 640px) {
+  .svc-card-body { padding: 1.15rem 1.5rem; }
+}
+
+.svc-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: oklch(0.35 0.15 22);
+  line-height: 1.25;
+}
+@media (min-width: 640px) {
+  .svc-card-title { font-size: 1.4rem; }
+}
+
+/* Service item list */
+.svc-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.svc-card-list-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px dashed oklch(0.84 0.042 80 / 70%);
+  font-size: 0.85rem;
+}
+.svc-card-list-item:last-child {
+  border-bottom: none;
+}
+
+.svc-item-name {
+  font-weight: 500;
+  color: oklch(0.3 0.05 50);
+}
+.svc-item-desc {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: oklch(0.55 0.04 50);
+}
+.svc-item-price {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+  color: oklch(0.22 0.04 50);
+  background: linear-gradient(135deg, oklch(0.68 0.13 68 / 18%), oklch(0.82 0.18 85 / 28%));
+  border: 1px solid oklch(0.68 0.13 68 / 30%);
+}
+
+/* Inline "Book this service →" link at card bottom */
+.svc-card-inline-book {
+  margin-top: 1rem;
+  display: inline-flex;
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: oklch(0.68 0.13 68);
+  text-decoration: none;
+  transition: color 0.18s ease, gap 0.18s ease;
+  letter-spacing: 0.01em;
+}
+.svc-card-inline-book:hover {
+  color: oklch(0.35 0.15 22);
+}
+
+/* ============================================================
+   AUTH PAGES — SPLIT-SCREEN & ANIMATIONS
+   ============================================================ */
+
+/* Continuous subtle Ken Burns / panning animation on left image */
+@keyframes authKenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1.5%, -1%);
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.auth-kenburns-img {
+  animation: authKenBurns 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* Staggered entry animations */
+@keyframes authFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-stagger-1 {
+  animation: authFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.08s;
+}
+
+.auth-stagger-2 {
+  animation: authFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.18s;
+}
+
+.auth-stagger-3 {
+  animation: authFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.28s;
+}
+
+.auth-stagger-4 {
+  animation: authFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.38s;
+}
+
+/* ============================================================
+   INFINITE MARQUEE SLIDER
+   ============================================================ */
+@keyframes marqueeScroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll 45s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover,
+.marquee-container:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
+

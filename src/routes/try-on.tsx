@@ -40,6 +40,12 @@ import {
   CheckCircle2,
   Info,
 } from "lucide-react";
+import salonBgImg from "@/assets/new_salon_hero_bg.jpg";
+import floralScissorsImg from "@/assets/image.png";
+
+const BURGUNDY = "oklch(0.35 0.15 22)";
+const BURGUNDY_MID = "oklch(0.45 0.13 25)";
+const GOLD = "oklch(0.68 0.13 68)";
 
 // ---------------------------------------------------------------------------
 // Route definition
@@ -213,39 +219,82 @@ function SkinAdvisorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ── Page hero header ── */}
-      <div className="border-b border-border bg-card/60 backdrop-blur-sm">
-        <div className="mx-auto max-w-4xl px-4 py-8 text-center">
-          <h1 className="font-serif text-4xl text-primary">Skin-Tone Colour Advisor</h1>
-        </div>
+    <div className="relative w-full bg-[#FAF6F0] overflow-hidden">
+      {/* ── Background Image with Subtle Slow Zoom (scoped strictly to this page's content) ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <img
+          src={salonBgImg}
+          alt="Salon Ambient Texture"
+          className="h-full w-full object-cover object-center auth-kenburns-img opacity-25 filter blur-[0.5px]"
+        />
+        {/* Semi-transparent beige/cream overlay for 100% crisp legibility */}
+        <div className="absolute inset-0 bg-[#FAF6F0]/85 backdrop-blur-[1px]" />
       </div>
 
-      {/* ── Main content ── */}
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        {view === "warning" && <LightingWarningScreen onProceed={() => setView("capture")} />}
-
-        {view === "capture" && (
-          <CaptureSection
-            onAnalyze={runAnalysis}
-            onBack={() => setView("warning")}
-            error={captureError}
-          />
+      {/* ── Page Content Container ── */}
+      <div className="relative z-10 flex min-h-[calc(100vh-140px)] flex-col">
+        {/* Top Header if in non-warning view */}
+        {view !== "warning" && (
+          <div className="border-b border-border/40 bg-card/60 backdrop-blur-sm">
+            <div className="mx-auto max-w-4xl px-4 py-8 text-center">
+              <h1
+                className="font-serif text-3xl sm:text-4xl font-bold"
+                style={{ color: BURGUNDY }}
+              >
+                Skin-Tone Colour Advisor
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Precision AI undertone detection & personalised beauty swatches
+              </p>
+            </div>
+          </div>
         )}
 
-        {view === "loading" && <LoadingScreen />}
+        {/* ── Main content wrapper ── */}
+        <div
+          className={`flex-1 flex flex-col items-center justify-center px-4 py-10 sm:px-6 md:px-8 ${
+            view === "warning" ? "py-12" : ""
+          }`}
+        >
+          {view === "warning" && (
+            <div className="w-full max-w-2xl flex flex-col items-center">
+              {/* Maroon Title directly above the card as in original UI */}
+              <h1
+                className="font-serif text-3xl sm:text-4xl font-bold mb-8 text-center tracking-tight"
+                style={{ color: BURGUNDY }}
+              >
+                Skin-Tone Colour Advisor
+              </h1>
+              <LightingWarningScreen onProceed={() => setView("capture")} />
+            </div>
+          )}
 
-        {view === "results" && result && (
-          <ResultsSection
-            result={result}
-            onRetake={handleRetake}
-            overrideOpen={overrideOpen}
-            overrideLoading={overrideLoading}
-            manualUndertone={manualUndertone}
-            onOpenOverride={() => setOverrideOpen(true)}
-            onManualSelect={applyOverride}
-          />
-        )}
+          {view === "capture" && (
+            <div className="w-full max-w-3xl">
+              <CaptureSection
+                onAnalyze={runAnalysis}
+                onBack={() => setView("warning")}
+                error={captureError}
+              />
+            </div>
+          )}
+
+          {view === "loading" && <LoadingScreen />}
+
+          {view === "results" && result && (
+            <div className="w-full max-w-4xl">
+              <ResultsSection
+                result={result}
+                onRetake={handleRetake}
+                overrideOpen={overrideOpen}
+                overrideLoading={overrideLoading}
+                manualUndertone={manualUndertone}
+                onOpenOverride={() => setOverrideOpen(true)}
+                onManualSelect={applyOverride}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -280,12 +329,12 @@ const LIGHTING_TIPS = [
 
 function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border border-amber-200/70 bg-amber-50/50 p-8 shadow-sm dark:border-amber-800/40 dark:bg-amber-950/20">
-        {/* Header */}
+    <div className="mx-auto w-full max-w-2xl">
+      <div className="rounded-2xl border border-amber-200/70 bg-amber-50/50 p-8 shadow-sm backdrop-blur-[2px]">
+        {/* Header with Sun Icon */}
         <div className="mb-6 flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
-            <Sun className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+            <Sun className="h-6 w-6 text-amber-600" />
           </div>
           <div>
             <h2 className="font-serif text-2xl text-foreground">For the most accurate results…</h2>
@@ -296,12 +345,12 @@ function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
           </div>
         </div>
 
-        {/* Tips grid */}
+        {/* 2x2 Grid of Bordered Instruction Boxes */}
         <div className="grid gap-3 sm:grid-cols-2">
           {LIGHTING_TIPS.map((tip) => (
             <div
               key={tip.title}
-              className="flex gap-3 rounded-xl border border-border bg-background/80 p-4"
+              className="flex gap-3 rounded-xl border border-amber-200/60 bg-white/80 p-4 shadow-2xs"
             >
               <span className="shrink-0 text-xl" aria-hidden>
                 {tip.icon}
@@ -314,16 +363,21 @@ function LightingWarningScreen({ onProceed }: { onProceed: () => void }) {
           ))}
         </div>
 
+        {/* Maroon Button */}
         <div className="mt-8 flex justify-center">
-          <Button
+          <button
             id="proceed-to-capture-btn"
-            size="lg"
+            type="button"
             onClick={onProceed}
-            className="gap-2 px-10 text-base min-h-[44px]"
+            className="flex items-center gap-2 rounded-xl py-3 px-8 text-sm font-semibold shadow-md transition-all duration-200 hover:opacity-90 active:scale-[0.98] min-h-[44px] cursor-pointer"
+            style={{
+              backgroundColor: BURGUNDY,
+              color: "white",
+            }}
           >
             I'm Ready - Proceed
             <ChevronRight className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </div>
     </div>
