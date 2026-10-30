@@ -279,19 +279,6 @@ function MyBookingsPage() {
     }
   };
 
-  const updateReminder = async (id: number, newMinutes: number) => {
-    setBusyId(id);
-    try {
-      await api.updateBooking(id, { reminder_minutes: newMinutes });
-      toast.success(`Reminder set to ${formatReminderLabel(newMinutes)}`);
-      load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to update reminder");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const saveEdit = async (id: number) => {
     if (!editIsoDate || !editTime) {
       toast.error("Please pick a date and a time slot.");
@@ -791,25 +778,7 @@ function MyBookingsPage() {
                     </span>
                   </span>
 
-                  {/* Quick-change reminder dropdown */}
-                  {b.status === "confirmed" && (
-                    <Select
-                      value={String(b.reminder_minutes ?? 30)}
-                      onValueChange={(val) => updateReminder(b.id, Number(val))}
-                      disabled={busyId === b.id}
-                    >
-                      <SelectTrigger className="h-6 text-[10px] px-2 py-0 bg-transparent border-dashed border-border/80 text-muted-foreground hover:text-foreground hover:border-primary/50 w-auto gap-1 whitespace-nowrap">
-                        <span className="text-[10px] whitespace-nowrap">Change</span>
-                      </SelectTrigger>
-                      <SelectContent align="start">
-                        {REMINDER_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+
                 </div>
               </div>
             )}
