@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { api, getUser } from "@/lib/api";
 import { toast } from "sonner";
 import { Star, Heart, Sparkles, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,7 @@ export function FeedbackPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
       toast.error("Please select a star rating");
@@ -44,12 +45,20 @@ export function FeedbackPage() {
     }
 
     setIsSubmitting(true);
-    // Simulate quick feedback capture
-    setTimeout(() => {
-      setIsSubmitting(false);
+    const currentUser = getUser();
+    try {
+      await api.submitFeedback({
+        rating,
+        comments,
+        client_name: currentUser?.name || undefined,
+      });
       setSubmitted(true);
       toast.success("Thank you for your valuable feedback! 💖");
-    }, 400);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit review");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const activeRating = hoverRating || rating;

@@ -609,6 +609,14 @@ export const api = {
       method: "DELETE",
     }),
 
+  // ── Feedback & Reviews ──────────────────────────────────────────────────────
+  submitFeedback: (payload: { rating: number; comments?: string; client_name?: string; service_name?: string }) =>
+    request<{ ok: boolean; review: any }>("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getAdminReviews: () => request<{ reviews: any[] }>("/api/admin/reviews"),
+
   // ── Web Push ────────────────────────────────────────────────────────────────
   getVapidPublicKey: () => request<{ public_key: string }>("/api/push/vapid-public-key"),
 

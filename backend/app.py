@@ -670,6 +670,93 @@ def delete_salon_closure(closure_id: str):
         return db_error(err)
 
 
+# ---------------------------------------------------------------------------
+# Feedback & Reviews endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/feedback")
+def submit_feedback():
+    data = request.get_json(silent=True) or {}
+    rating_raw = data.get("rating")
+    comments = (data.get("comments") or "").strip()
+    client_name = (data.get("client_name") or "").strip()
+    service_name = (data.get("service_name") or "").strip()
+
+    try:
+        rating = int(rating_raw)
+        if rating < 1 or rating > 5:
+            return jsonify({"error": "Rating must be between 1 and 5"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Valid star rating (1-5) is required"}), 400
+
+    # Optional auth if logged in
+    user_id = None
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        token = header[7:]
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            user_id = int(payload.get("sub", 0)) or None
+        except Exception:
+            pass
+
+    try:
+        db = get_db()
+        cur = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if user_id and not client_name:
+            cur.execute("SELECT name FROM users WHERE id = %s", (user_id,))
+            u = cur.fetchone()
+            if u:
+                client_name = u.get("name") or "Valued Client"
+
+        cur.execute(
+            """
+            INSERT INTO public.reviews (user_id, client_name, service_name, rating, comments)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, client_name, service_name, rating, comments, created_at
+            """,
+            (user_id, client_name or "Valued Client", service_name or "Salon Visit", rating, comments),
+        )
+        saved = cur.fetchone()
+        db.commit()
+        cur.close()
+
+        if hasattr(saved.get("created_at"), "isoformat"):
+            saved["created_at"] = saved["created_at"].isoformat()
+
+        return jsonify({"ok": True, "review": saved}), 201
+    except PGError as err:
+        return db_error(err)
+
+
+@app.get("/api/admin/reviews")
+@require_admin
+def get_admin_reviews():
+    try:
+        cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            SELECT r.id, r.user_id, COALESCE(r.client_name, u.name, 'Valued Client') as client_name,
+                   r.service_name, r.rating, r.comments, r.created_at,
+                   u.email as client_email, u.phone as client_phone
+            FROM public.reviews r
+            LEFT JOIN public.users u ON u.id = r.user_id
+            ORDER BY r.created_at DESC
+            """
+        )
+        rows = cur.fetchall()
+        cur.close()
+
+        for r in rows:
+            if hasattr(r.get("created_at"), "isoformat"):
+                r["created_at"] = r["created_at"].isoformat()
+
+        return jsonify({"reviews": rows})
+    except PGError as err:
+        return db_error(err)
+
+
+
 @app.post("/api/book")
 @require_auth
 def book():
