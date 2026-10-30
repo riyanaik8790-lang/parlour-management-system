@@ -39,17 +39,8 @@ import {
   ArrowLeft,
   RotateCw,
 } from "lucide-react";
-import { REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -140,36 +131,6 @@ function SettingsPage() {
   const [deletingNotifId, setDeletingNotifId] = useState<number | null>(null);
   const [clearingHistory, setClearingHistory] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("salon_reminder_pref");
-      if (saved) {
-        const parsed = Number(saved);
-        if (!isNaN(parsed) && parsed > 0) return parsed;
-      }
-    }
-    return 30;
-  });
-  const isInitialPreset = REMINDER_OPTIONS.some((o) => o.value === defaultReminderMinutes);
-  const [isCustomReminder, setIsCustomReminder] = useState<boolean>(!isInitialPreset);
-  const [customReminderVal, setCustomReminderVal] = useState<string>(() => {
-    if (!isInitialPreset) {
-      if (defaultReminderMinutes >= 1440 && defaultReminderMinutes % 1440 === 0) return String(Math.round(defaultReminderMinutes / 1440));
-      if (defaultReminderMinutes >= 60 && defaultReminderMinutes % 60 === 0) return String(Math.round(defaultReminderMinutes / 60));
-      return String(defaultReminderMinutes);
-    }
-    return "45";
-  });
-  const [customReminderUnit, setCustomReminderUnit] = useState<"mins" | "hours" | "days">(() => {
-    if (!isInitialPreset) {
-      if (defaultReminderMinutes >= 1440 && defaultReminderMinutes % 1440 === 0) return "days";
-      if (defaultReminderMinutes >= 60 && defaultReminderMinutes % 60 === 0) return "hours";
-    }
-    return "mins";
-  });
-  const [savingReminderPref, setSavingReminderPref] = useState(false);
-  const [customReminderSaved, setCustomReminderSaved] = useState(false);
-  const [customReminderError, setCustomReminderError] = useState<string | null>(null);
 
   // Sync alert sound state when modified elsewhere
   useEffect(() => {
@@ -329,48 +290,8 @@ function SettingsPage() {
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null); // filename being deleted
   const [archiveToDelete, setArchiveToDelete] = useState<string | null>(null);  // filename pending confirm
 
-  // Helper to decompose minutes into value and unit
-  const parseMinutesToCustom = useCallback((mins: number): { val: number; unit: "mins" | "hours" | "days" } => {
-    if (mins >= 1440 && mins % 1440 === 0) {
-      return { val: Math.round(mins / 1440), unit: "days" };
-    }
-    if (mins >= 60 && mins % 60 === 0) {
-      return { val: Math.round(mins / 60), unit: "hours" };
-    }
-    return { val: mins, unit: "mins" };
-  }, []);
-
-  // Helper to apply reminder minutes to React state and localStorage
-  const applyReminderPreference = useCallback(
-    (m: number) => {
-      if (!m || isNaN(m) || m <= 0) return;
-      setDefaultReminderMinutes(m);
-      localStorage.setItem("salon_reminder_pref", String(m));
-      const preset = REMINDER_OPTIONS.some((o) => o.value === m);
-      if (!preset) {
-        setIsCustomReminder(true);
-        const parsed = parseMinutesToCustom(m);
-        setCustomReminderVal(String(parsed.val));
-        setCustomReminderUnit(parsed.unit);
-      } else {
-        setIsCustomReminder(false);
-      }
-    },
-    [parseMinutesToCustom],
-  );
-
-  // Load profile and sync reminder preference
+  // Fetch profile on mount
   useEffect(() => {
-    // 1. Immediately read from localStorage on mount so selection is active instantly
-    const saved = localStorage.getItem("salon_reminder_pref");
-    if (saved) {
-      const m = Number(saved);
-      if (!isNaN(m) && m > 0) {
-        applyReminderPreference(m);
-      }
-    }
-
-    // 2. Fetch authenticated user profile
     setLoadingProfile(true);
     api
       .getProfile()
@@ -381,9 +302,6 @@ function SettingsPage() {
         setRole(p.role);
         setAvatarUrl(p.avatar_url ?? null);
         setPushEnabled(p.push_enabled ?? false);
-        if (p.default_reminder_minutes) {
-          applyReminderPreference(p.default_reminder_minutes);
-        }
       })
       .catch(() => {
         const u = getUser();
@@ -394,130 +312,7 @@ function SettingsPage() {
         }
       })
       .finally(() => setLoadingProfile(false));
-  }, [applyReminderPreference]);
-
-  // Sync reminder state across tabs and booking page
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "salon_reminder_pref" && e.newValue) {
-        const m = Number(e.newValue);
-        if (!isNaN(m) && m > 0) {
-          applyReminderPreference(m);
-        }
-      }
-    };
-    const handleCustomSync = (e: Event) => {
-      const customEvent = e as CustomEvent<number>;
-      if (customEvent.detail && typeof customEvent.detail === "number") {
-        applyReminderPreference(customEvent.detail);
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("salon-reminder-updated", handleCustomSync);
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("salon-reminder-updated", handleCustomSync);
-    };
-  }, [applyReminderPreference]);
-
-  const handleReminderPrefChange = (mins: number) => {
-    // 1. Update React state and localStorage synchronously — instant UI feedback
-    setDefaultReminderMinutes(mins);
-    localStorage.setItem("salon_reminder_pref", String(mins));
-    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: mins }));
-    // 2. Persist to backend in background — never blocks or locks the UI
-    api.updateProfile({ default_reminder_minutes: mins }).catch((err) => {
-      console.warn("[settings] Background reminder sync failed (preference already saved locally):", err);
-    });
-  };
-
-  const handleReminderSelect = (val: string) => {
-    setCustomReminderError(null);
-    if (val === "custom") {
-      setIsCustomReminder(true);
-      const numVal = Number(customReminderVal);
-      const safeVal = numVal > 0 ? numVal : 45;
-      setCustomReminderVal(String(safeVal));
-      const m =
-        customReminderUnit === "days"
-          ? safeVal * 1440
-          : customReminderUnit === "hours"
-            ? safeVal * 60
-            : safeVal;
-      handleReminderPrefChange(m);
-    } else {
-      setIsCustomReminder(false);
-      handleReminderPrefChange(Number(val));
-      toast.success(`Notification reminder set to ${formatReminderLabel(Number(val))}`);
-    }
-  };
-
-  const handleCustomValChange = (raw: string) => {
-    // Allow free typing including empty string — do NOT force to 1
-    setCustomReminderVal(raw);
-    setCustomReminderSaved(false);
-    setCustomReminderError(null);
-    const numVal = Number(raw);
-    if (raw !== "" && !isNaN(numVal) && numVal >= 1) {
-      // Only update live state when value is valid
-      const m =
-        customReminderUnit === "days"
-          ? numVal * 1440
-          : customReminderUnit === "hours"
-            ? numVal * 60
-            : numVal;
-      setDefaultReminderMinutes(m);
-      localStorage.setItem("salon_reminder_pref", String(m));
-      window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
-    }
-  };
-
-  const handleCustomUnitChange = (unit: "mins" | "hours" | "days") => {
-    setCustomReminderUnit(unit);
-    setCustomReminderSaved(false);
-    setCustomReminderError(null);
-    const numVal = Number(customReminderVal);
-    if (!isNaN(numVal) && numVal >= 1) {
-      const m =
-        unit === "days"
-          ? numVal * 1440
-          : unit === "hours"
-            ? numVal * 60
-            : numVal;
-      setDefaultReminderMinutes(m);
-      localStorage.setItem("salon_reminder_pref", String(m));
-      window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
-    }
-  };
-
-  const handleSaveCustomReminder = () => {
-    const numVal = Number(customReminderVal);
-    if (customReminderVal === "" || isNaN(numVal) || numVal < 1) {
-      setCustomReminderError("Please enter a valid number (minimum 1).");
-      return;
-    }
-    const max = customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440;
-    if (numVal > max) {
-      setCustomReminderError(`Maximum is ${max} ${customReminderUnit}.`);
-      return;
-    }
-    setCustomReminderError(null);
-    // Normalise display value (e.g. strip leading zeros)
-    setCustomReminderVal(String(numVal));
-    const m =
-      customReminderUnit === "days"
-        ? numVal * 1440
-        : customReminderUnit === "hours"
-          ? numVal * 60
-          : numVal;
-    // 1. Persist synchronously (localStorage + background API) — no await, no spinner
-    handleReminderPrefChange(m);
-    // 2. Show toast immediately
-    toast.success(`Reminder set to ${formatReminderLabel(m)}`);
-    // 3. Flash "Saved ✓" on the button immediately
-    setCustomReminderSaved(true);
-    setTimeout(() => setCustomReminderSaved(false), 2500);
-  };
+  }, []);
 
   // ── Upload Avatar File helper ──────────────────────────────────────────────
   async function uploadAvatarFile(file: File) {
@@ -1508,142 +1303,14 @@ function SettingsPage() {
                         </button>
                       </div>
 
-                      {/* Option: Notification Reminder */}
-                      <div className="flex flex-col gap-3 py-4 border-t border-b border-border/50">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                            <div
-                              className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-xl"
-                              style={{
-                                background: "oklch(0.68 0.13 68 / 15%)",
-                                color: GOLD,
-                              }}
-                            >
-                              <Clock className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <span className="text-sm font-medium text-gray-900 block truncate">
-                                Notification Reminder
-                              </span>
-                              <span className="text-xs text-muted-foreground block">
-                                Choose how soon before your visit you wish to be notified
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="w-full sm:w-56 shrink-0">
-                            <Select
-                              value={isCustomReminder ? "custom" : String(defaultReminderMinutes)}
-                              onValueChange={handleReminderSelect}
-                            >
-                              <SelectTrigger className="w-full h-10 bg-background text-xs font-medium">
-                                <SelectValue placeholder="Select reminder">
-                                  {isCustomReminder
-                                    ? `Custom: ${customReminderVal} ${customReminderUnit} before`
-                                    : formatReminderLabel(defaultReminderMinutes)}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {REMINDER_OPTIONS.map((opt) => (
-                                  <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                                <SelectItem value="custom" className="text-xs font-semibold text-primary">
-                                  {isCustomReminder
-                                    ? `⏱️ Custom (${customReminderVal} ${customReminderUnit} before)`
-                                    : "⏱️ Custom time..."}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Inline Custom Reminder Controls with explicit Save Button */}
-                        {isCustomReminder && (
-                          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl border border-primary/20 bg-primary/5 text-xs animate-fade-in sm:ml-13.5">
-                            <div className="flex flex-wrap items-center gap-2.5">
-                              <span className="font-semibold text-foreground shrink-0 text-xs">Remind me:</span>
-                              <div className="flex flex-col gap-1">
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
-                                  value={customReminderVal}
-                                  onChange={(e) => handleCustomValChange(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      handleSaveCustomReminder();
-                                    }
-                                  }}
-                                  placeholder="e.g. 30"
-                                  className={cn(
-                                    "h-8.5 w-18 text-center text-xs font-semibold bg-background border-border rounded-lg",
-                                    customReminderError && "border-destructive focus-visible:ring-destructive"
-                                  )}
-                                />
-                              </div>
-                              <div className="flex rounded-lg border border-border bg-background p-0.5">
-                                {(["mins", "hours", "days"] as const).map((unit) => (
-                                  <button
-                                    key={unit}
-                                    type="button"
-                                    onClick={() => handleCustomUnitChange(unit)}
-                                    className={cn(
-                                      "px-2.5 py-1 text-[11px] font-medium rounded-md capitalize transition cursor-pointer",
-                                      customReminderUnit === unit
-                                        ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                                        : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                  >
-                                    {unit}
-                                  </button>
-                                ))}
-                              </div>
-                              <span className="text-[11px] text-muted-foreground">before appointment</span>
-                            </div>
-                            {customReminderError && (
-                              <p className="w-full text-[11px] font-medium text-destructive mt-1 pl-0.5">
-                                ⚠ {customReminderError}
-                              </p>
-                            )}
-
-                            {/* Explicit Save Button */}
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={handleSaveCustomReminder}
-                              className="h-8.5 px-4 text-xs font-semibold rounded-xl shrink-0 gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer ml-auto"
-                              style={{
-                                background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
-                                color: "white",
-                              }}
-                            >
-                              {customReminderSaved ? (
-                                <>
-                                  <Check className="h-3.5 w-3.5 text-emerald-300" />
-                                  <span>Saved</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Save className="h-3.5 w-3.5" />
-                                  <span>Save</span>
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Option 3: Notification History */}
+                      {/* Option 2: Notification History */}
                       <button
                         type="button"
                         onClick={() => {
                           setNotifSubTab("history");
                           loadNotifHistory();
                         }}
-                        className="w-full flex items-center justify-between py-4 text-left transition-colors hover:bg-black/[0.02] rounded-xl px-1"
+                        className="w-full flex items-center justify-between py-4 text-left transition-colors hover:bg-black/[0.02] rounded-xl px-1 border-t border-border/50"
                       >
                         <div className="flex items-center gap-3.5 min-w-0 flex-1">
                           <div
