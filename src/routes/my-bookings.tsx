@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api, getUser, clearSession } from "@/lib/api";
@@ -104,6 +105,10 @@ function MyBookingsPage() {
   const [editDate, setEditDate] = useState<Date | undefined>(undefined);
   const [editTime, setEditTime] = useState("");
   const [editReminderMinutes, setEditReminderMinutes] = useState<number>(30);
+  const [editIsCustomReminder, setEditIsCustomReminder] = useState<boolean>(false);
+  const [editCustomVal, setEditCustomVal] = useState<string>("45");
+  const [editCustomUnit, setEditCustomUnit] = useState<"mins" | "hours" | "days">("mins");
+  const [editCustomError, setEditCustomError] = useState<string | null>(null);
   const [editServiceName, setEditServiceName] = useState("");
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
   const [editPreBridalFullyBooked, setEditPreBridalFullyBooked] = useState(false);
@@ -188,9 +193,90 @@ function MyBookingsPage() {
     const parsed = new Date(b.date + "T00:00:00");
     setEditDate(isNaN(parsed.getTime()) ? undefined : parsed);
     setEditTime(b.time);
-    setEditReminderMinutes(b.reminder_minutes ?? 30);
+    const mins = b.reminder_minutes ?? 30;
+    setEditReminderMinutes(mins);
+
+    const isPreset = REMINDER_OPTIONS.some((o) => o.value === mins);
+    if (!isPreset) {
+      setEditIsCustomReminder(true);
+      if (mins >= 1440 && mins % 1440 === 0) {
+        setEditCustomVal(String(Math.round(mins / 1440)));
+        setEditCustomUnit("days");
+      } else if (mins >= 60 && mins % 60 === 0) {
+        setEditCustomVal(String(Math.round(mins / 60)));
+        setEditCustomUnit("hours");
+      } else {
+        setEditCustomVal(String(mins));
+        setEditCustomUnit("mins");
+      }
+    } else {
+      setEditIsCustomReminder(false);
+      setEditCustomVal("45");
+      setEditCustomUnit("mins");
+    }
+    setEditCustomError(null);
     setTakenSlots([]);
     setEditPreBridalFullyBooked(false);
+  };
+
+  const handleEditReminderSelect = (val: string) => {
+    setEditCustomError(null);
+    if (val === "custom") {
+      setEditIsCustomReminder(true);
+      const numVal = Number(editCustomVal);
+      const safeVal = numVal > 0 ? numVal : 45;
+      setEditCustomVal(String(safeVal));
+      const m =
+        editCustomUnit === "days"
+          ? safeVal * 1440
+          : editCustomUnit === "hours"
+            ? safeVal * 60
+            : safeVal;
+      setEditReminderMinutes(m);
+    } else {
+      setEditIsCustomReminder(false);
+      setEditReminderMinutes(Number(val));
+    }
+  };
+
+  const handleEditCustomValChange = (raw: string) => {
+    setEditCustomVal(raw);
+    setEditCustomError(null);
+    const numVal = Number(raw);
+    if (raw !== "" && !isNaN(numVal) && numVal >= 1) {
+      const max = editCustomUnit === "days" ? 30 : editCustomUnit === "hours" ? 72 : 1440;
+      if (numVal > max) {
+        setEditCustomError(`Maximum is ${max} ${editCustomUnit}.`);
+        return;
+      }
+      const m =
+        editCustomUnit === "days"
+          ? numVal * 1440
+          : editCustomUnit === "hours"
+            ? numVal * 60
+            : numVal;
+      setEditReminderMinutes(m);
+    }
+  };
+
+  const handleEditCustomUnitChange = (unit: "mins" | "hours" | "days") => {
+    setEditCustomUnit(unit);
+    setEditCustomError(null);
+    const numVal = Number(editCustomVal);
+    if (!isNaN(numVal) && numVal >= 1) {
+      const max = unit === "days" ? 30 : unit === "hours" ? 72 : 1440;
+      if (numVal > max) {
+        setEditCustomError(`Maximum is ${max} ${unit}.`);
+        return;
+      }
+      const m =
+        unit === "days"
+          ? numVal * 1440
+          : unit === "hours"
+            ? numVal * 60
+            : numVal;
+      setEditReminderMinutes(m);
+    }
   };
 
   const updateReminder = async (id: number, newMinutes: number) => {
@@ -519,16 +605,20 @@ function MyBookingsPage() {
                   </div>
 
                   {/* Reminder Timing Selector in Edit Panel */}
-                  <div className="space-y-1.5 sm:col-span-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                       <Bell className="h-3.5 w-3.5 text-primary" /> Reminder Time
                     </label>
                     <Select
-                      value={String(editReminderMinutes)}
-                      onValueChange={(val) => setEditReminderMinutes(Number(val))}
+                      value={editIsCustomReminder ? "custom" : String(editReminderMinutes)}
+                      onValueChange={handleEditReminderSelect}
                     >
                       <SelectTrigger className="w-full h-10 bg-background text-xs sm:text-sm">
-                        <SelectValue placeholder="Choose reminder timing" />
+                        <SelectValue placeholder="Choose reminder timing">
+                          {editIsCustomReminder
+                            ? `Custom: ${editCustomVal} ${editCustomUnit} before`
+                            : formatReminderLabel(editReminderMinutes)}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {REMINDER_OPTIONS.map((opt) => (
@@ -536,8 +626,59 @@ function MyBookingsPage() {
                             {opt.label}
                           </SelectItem>
                         ))}
+                        <SelectItem value="custom" className="text-xs sm:text-sm font-semibold text-primary">
+                          {editIsCustomReminder
+                            ? `⏱️ Custom (${editCustomVal} ${editCustomUnit} before)`
+                            : "⏱️ Custom time..."}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+
+                    {/* Inline Custom Reminder Controls */}
+                    {editIsCustomReminder && (
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground shrink-0 text-xs">Remind me:</span>
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={editCustomUnit === "days" ? 30 : editCustomUnit === "hours" ? 72 : 1440}
+                              value={editCustomVal}
+                              onChange={(e) => handleEditCustomValChange(e.target.value)}
+                              placeholder="e.g. 45"
+                              className={cn(
+                                "h-8.5 w-18 text-center text-xs font-semibold bg-background border-border rounded-lg",
+                                editCustomError && "border-destructive focus-visible:ring-destructive"
+                              )}
+                            />
+                          </div>
+                          <div className="flex rounded-lg border border-border bg-background p-0.5">
+                            {(["mins", "hours", "days"] as const).map((unit) => (
+                              <button
+                                key={unit}
+                                type="button"
+                                onClick={() => handleEditCustomUnitChange(unit)}
+                                className={cn(
+                                  "px-2.5 py-1 text-[11px] font-medium rounded-md capitalize transition cursor-pointer",
+                                  editCustomUnit === unit
+                                    ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                {unit}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground shrink-0">before appointment</span>
+                        </div>
+                        {editCustomError && (
+                          <p className="w-full text-[11px] font-medium text-destructive mt-0.5 pl-0.5">
+                            ⚠ {editCustomError}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
