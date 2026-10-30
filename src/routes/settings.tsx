@@ -37,6 +37,7 @@ import {
   FileText,
   ChevronRight,
   ArrowLeft,
+  RotateCw,
 } from "lucide-react";
 import { REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
 import { cn } from "@/lib/utils";
@@ -1149,46 +1150,51 @@ function SettingsPage() {
                 {notifSubTab === "history" ? (
                   /* ── Notification History Sub-View ── */
                   <div>
-                    <div className="flex items-center justify-between border-b pb-4 mb-4" style={{ borderColor: BORDER }}>
+                    {/* Clean Top Action Bar */}
+                    <div className="flex items-center justify-between border-b pb-3 mb-5" style={{ borderColor: BORDER }}>
                       <button
                         type="button"
                         onClick={() => setNotifSubTab("preferences")}
-                        className="flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-80"
+                        className="flex items-center gap-2 text-xs sm:text-sm font-semibold transition-opacity hover:opacity-80 cursor-pointer"
                         style={{ color: BURGUNDY }}
                       >
                         <ArrowLeft className="h-4 w-4" />
-                        <span>Back to Notifications</span>
+                        <span>Back</span>
                       </button>
                       <div className="flex items-center gap-3">
+                        {/* Icon-only refresh button (rotating arrow) */}
                         <button
                           type="button"
                           onClick={loadNotifHistory}
-                          className="text-xs font-medium hover:underline"
-                          style={{ color: BURGUNDY }}
+                          title="Refresh notifications"
+                          aria-label="Refresh notifications"
+                          disabled={loadingNotifHistory}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:text-gray-900 hover:bg-black/5 transition-colors cursor-pointer disabled:opacity-50"
                         >
-                          Refresh
+                          <RotateCw className={cn("h-4 w-4", loadingNotifHistory && "animate-spin")} style={{ color: BURGUNDY }} />
                         </button>
                         {historyNotifications.length > 0 && (
                           <button
                             type="button"
                             onClick={() => setShowClearConfirm(true)}
-                            className="flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 hover:underline transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Clear History</span>
+                            <Trash2 className="h-4 w-4" />
+                            <span>Clear</span>
                           </button>
                         )}
                       </div>
                     </div>
 
-                    <div className="mb-3">
+                    {/* Dedicated Title and Description with comfortable spacing */}
+                    <div className="mb-5 space-y-1">
                       <h2
-                        className="text-base font-semibold"
+                        className="text-base sm:text-lg font-bold leading-tight"
                         style={{ color: BURGUNDY, fontFamily: "var(--font-serif)" }}
                       >
                         Notification History
                       </h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-xs text-muted-foreground leading-normal">
                         Past alerts and appointment updates for your account.
                       </p>
                     </div>
