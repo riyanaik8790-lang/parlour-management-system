@@ -104,6 +104,7 @@ function MyBookingsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState<Date | undefined>(undefined);
   const [editTime, setEditTime] = useState("");
+  const [originalBooking, setOriginalBooking] = useState<B | null>(null);
   const [editReminderMinutes, setEditReminderMinutes] = useState<number>(30);
   const [editIsCustomReminder, setEditIsCustomReminder] = useState<boolean>(false);
   const [editCustomVal, setEditCustomVal] = useState<string>("45");
@@ -162,12 +163,22 @@ function MyBookingsPage() {
     }
     let alive = true;
     setLoadingSlots(true);
-    setEditTime("");
+
+    // Only clear editTime if the date was actually changed away from the original appointment's date
+    const isOriginalDate = originalBooking && originalBooking.date === editIsoDate;
+    if (!isOriginalDate) {
+      setEditTime("");
+    }
+
     api
       .slots(editIsoDate)
       .then((res) => {
         if (alive) {
           setTakenSlots(res.taken);
+          // If on the original booking date, preserve the current booking's time slot
+          if (isOriginalDate && originalBooking?.time) {
+            setEditTime(originalBooking.time);
+          }
           // Only show the Pre-Bridal blockout if the booking being edited IS a Pre-Bridal Package
           const isPreBridal =
             editServiceName === "Pre-Bridal Package" ||
@@ -185,10 +196,11 @@ function MyBookingsPage() {
     return () => {
       alive = false;
     };
-  }, [editIsoDate, editServiceName]);
+  }, [editIsoDate, editServiceName, originalBooking]);
 
   const startEdit = (b: B) => {
     setEditingId(b.id);
+    setOriginalBooking(b);
     setEditServiceName(b.service_name);
     const parsed = new Date(b.date + "T00:00:00");
     setEditDate(isNaN(parsed.getTime()) ? undefined : parsed);
@@ -280,8 +292,16 @@ function MyBookingsPage() {
   };
 
   const saveEdit = async (id: number) => {
-    if (!editIsoDate || !editTime) {
+    // If editTime was momentarily unselected, fall back to the booking's existing time if date is unchanged
+    const finalTime = editTime || (originalBooking && originalBooking.date === editIsoDate ? originalBooking.time : "");
+
+    if (!editIsoDate || !finalTime) {
       toast.error("Please pick a date and a time slot.");
+      return;
+    }
+
+    if (editCustomError) {
+      toast.error(editCustomError);
       return;
     }
 
@@ -299,7 +319,7 @@ function MyBookingsPage() {
       editDate!.getMonth() === istNow.getMonth() &&
       editDate!.getFullYear() === istNow.getFullYear()
     ) {
-      const [h, m] = editTime.split(":").map(Number);
+      const [h, m] = finalTime.split(":").map(Number);
       if (h * 60 + m <= istNow.getHours() * 60 + istNow.getMinutes()) {
         toast.error("Cannot book an appointment in the past.");
         return;
@@ -310,11 +330,12 @@ function MyBookingsPage() {
     try {
       await api.updateBooking(id, {
         date: editIsoDate,
-        time: editTime,
+        time: finalTime,
         reminder_minutes: editReminderMinutes,
       });
       toast.success("Booking updated!");
       setEditingId(null);
+      setOriginalBooking(null);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Update failed");
@@ -577,12 +598,16 @@ function MyBookingsPage() {
                             const prevSlot = index > 0 ? TIME_SLOTS[index - 1] : null;
                             const isBuffer = prevSlot ? takenSlots.includes(prevSlot) : false;
 
-                            const isTaken = takenSlots.includes(t);
-                            const isDisabled = isTaken || isPast || isBuffer;
+                            const isOwnCurrentSlot =
+                              originalBooking &&
+                              originalBooking.date === editIsoDate &&
+                              originalBooking.time === t;
+                            const isTaken = !isOwnCurrentSlot && takenSlots.includes(t);
+                            const isDisabled = (isTaken || isPast || isBuffer) && !isOwnCurrentSlot;
 
                             return (
                               <SelectItem key={t} value={t} disabled={isDisabled}>
-                                {t} {isTaken || isBuffer ? "(Booked)" : ""}
+                                {t} {isOwnCurrentSlot ? "(Current)" : isTaken || isBuffer ? "(Booked)" : ""}
                               </SelectItem>
                             );
                           })}
@@ -676,7 +701,11 @@ function MyBookingsPage() {
                 >
                   <Button
                     onClick={() => saveEdit(b.id)}
-                    disabled={busyId === b.id || !editIsoDate || !editTime}
+                    disabled={
+                      busyId === b.id ||
+                      !editIsoDate ||
+                      (!editTime && !(originalBooking && originalBooking.date === editIsoDate && originalBooking.time))
+                    }
                     className="flex-1 min-h-[44px] gap-2"
                   >
                     {busyId === b.id ? (
