@@ -99,14 +99,15 @@ function BookPage() {
     return "mins";
   });
 
-  const [savingCustomReminder, setSavingCustomReminder] = useState(false);
   const [customReminderSaved, setCustomReminderSaved] = useState(false);
   const [customReminderError, setCustomReminderError] = useState<string | null>(null);
 
   const applyReminder = (m: number) => {
     if (!m || isNaN(m) || m <= 0) return;
     setReminderMinutes(m);
-    localStorage.setItem("salon_reminder_pref", String(m));
+    // NOTE: Do NOT write to localStorage here. applyReminder is called when reading
+    // from localStorage or syncing from settings — writing back would cause a loop
+    // and would overwrite the value with itself (or worse, a stale one).
     const preset = REMINDER_OPTIONS.some((o) => o.value === m);
     if (!preset) {
       setIsCustomReminder(true);
@@ -135,15 +136,20 @@ function BookPage() {
 
   const handleSelectCustomReminder = () => {
     setIsCustomReminder(true);
+    // Parse string → number before arithmetic (avoids JS string concatenation bug)
+    const numVal = Number(customReminderVal);
+    const safeVal = numVal > 0 ? numVal : 45;
+    setCustomReminderVal(String(safeVal));
     const m =
       customReminderUnit === "days"
-        ? customReminderVal * 1440
+        ? safeVal * 1440
         : customReminderUnit === "hours"
-          ? customReminderVal * 60
-          : customReminderVal;
+          ? safeVal * 60
+          : safeVal;
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
-    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
+    // NOTE: do NOT dispatch salon-reminder-updated here — the listener in this
+    // same component would call applyReminder() and overwrite the state we just set.
   };
 
   const handleUpdateCustomReminder = (raw: string, unit: "mins" | "hours" | "days") => {
@@ -165,7 +171,7 @@ function BookPage() {
     }
   };
 
-  const handleSaveCustomReminder = async () => {
+  const handleSaveCustomReminder = () => {
     const numVal = Number(customReminderVal);
     if (customReminderVal === "" || isNaN(numVal) || numVal < 1) {
       setCustomReminderError("Please enter a valid number (minimum 1).");
@@ -177,6 +183,7 @@ function BookPage() {
       return;
     }
     setCustomReminderError(null);
+    // Normalise display value (strip leading zeros etc.)
     setCustomReminderVal(String(numVal));
     const m =
       customReminderUnit === "days"
@@ -184,28 +191,23 @@ function BookPage() {
         : customReminderUnit === "hours"
           ? numVal * 60
           : numVal;
+    // 1. Persist to state + localStorage synchronously — instant, never blocks UI
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
-    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
-    setSavingCustomReminder(true);
-    try {
-      const u = getUser();
-      if (u) {
-        await api.updateProfile({ default_reminder_minutes: m }).catch(() => {});
-      }
-      setCustomReminderSaved(true);
-      toast.success(`Reminder set to ${formatReminderLabel(m)}`);
-      setTimeout(() => setCustomReminderSaved(false), 2500);
-    } catch {
-      toast.success(`Reminder set to ${formatReminderLabel(m)}`);
-    } finally {
-      setSavingCustomReminder(false);
+    // 2. Sync to backend in background — fire-and-forget, never locks the UI
+    const u = getUser();
+    if (u) {
+      api.updateProfile({ default_reminder_minutes: m }).catch(() => {});
     }
+    // 3. Show feedback immediately
+    setCustomReminderSaved(true);
+    toast.success(`Reminder set to ${formatReminderLabel(m)}`);
+    setTimeout(() => setCustomReminderSaved(false), 2500);
   };
 
   // Sync reminder preference with storage, custom events, and user profile
   useEffect(() => {
-    // 1. Check local storage preference first as immediate fallback
+    // 1. Read localStorage immediately — highest priority for in-session state
     const localPref = localStorage.getItem("salon_reminder_pref");
     if (localPref) {
       const m = Number(localPref);
@@ -214,9 +216,10 @@ function BookPage() {
       }
     }
 
-    // 2. Sync with user profile if authenticated
+    // 2. Sync with user profile ONLY as a one-time fallback when no local pref exists.
+    //    Never let the profile overwrite a value the user has already chosen this session.
     const user = getUser();
-    if (user) {
+    if (user && !localPref) {
       api
         .getProfile()
         .then((p) => {
@@ -227,7 +230,7 @@ function BookPage() {
         .catch(() => {});
     }
 
-    // 3. Listen to cross-component and storage updates
+    // 3. Listen for cross-tab storage changes (other tabs updating the preference)
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "salon_reminder_pref" && e.newValue) {
         const m = Number(e.newValue);
@@ -236,17 +239,13 @@ function BookPage() {
         }
       }
     };
-    const handleCustomSync = (e: Event) => {
-      const customEvent = e as CustomEvent<number>;
-      if (customEvent.detail && typeof customEvent.detail === "number") {
-        applyReminder(customEvent.detail);
-      }
-    };
     window.addEventListener("storage", handleStorage);
-    window.addEventListener("salon-reminder-updated", handleCustomSync);
+    // NOTE: We do NOT listen to "salon-reminder-updated" here because that custom
+    // event is fired from within this same component's save handlers. Listening to
+    // it would cause applyReminder() to run again and overwrite the state we just
+    // set, making the UI appear to revert or become unresponsive.
     return () => {
       window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("salon-reminder-updated", handleCustomSync);
     };
   }, []);
 
@@ -879,15 +878,9 @@ function BookPage() {
                     type="button"
                     size="sm"
                     onClick={handleSaveCustomReminder}
-                    disabled={savingCustomReminder}
                     className="h-8 px-3.5 text-xs font-semibold rounded-lg shrink-0 gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer ml-auto"
                   >
-                    {savingCustomReminder ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Saving…</span>
-                      </>
-                    ) : customReminderSaved ? (
+                    {customReminderSaved ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-emerald-300" />
                         <span>Saved</span>

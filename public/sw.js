@@ -35,6 +35,11 @@ self.addEventListener("push", function (event) {
   let icon  = LOGO_ICON;
   let badge = STATUS_BADGE;
 
+  let actions = [
+    { action: "open", title: "View Details" },
+  ];
+  let reviewUrl = "https://g.page/r/HemAngiGlamSalon/review";
+
   if (event.data) {
     try {
       const data = event.data.json();
@@ -45,6 +50,10 @@ self.addEventListener("push", function (event) {
         if (data.type)   type   = data.type;
         if (data.icon)   icon   = data.icon;
         if (data.badge)  badge  = data.badge;
+        if (Array.isArray(data.actions) && data.actions.length > 0) {
+          actions = data.actions;
+        }
+        if (data.review_url) reviewUrl = data.review_url;
       }
     } catch (_) {
       // Plain-text fallback
@@ -52,12 +61,20 @@ self.addEventListener("push", function (event) {
     }
   }
 
+  // If this is a feedback notification and no specific actions provided, ensure direct review action
+  if ((type === "feedback" || type === "post_treatment_feedback") && actions.length === 1 && actions[0].action === "open") {
+    actions = [
+      { action: "leave_review", title: "⭐ Leave Review" },
+      { action: "open", title: "View Booking" }
+    ];
+  }
+
   // ── 2. Build unique tag so every push shows (not collapses) ───────────────
   const tag = "hemangi-" + (type || "notification") + "-" + Date.now();
 
   // ── 3. requireInteraction for time-sensitive push types ───────────────────
   const needsInteraction =
-    type === "reminder" || type === "feedback" || type === "appointment_reminder";
+    type === "reminder" || type === "feedback" || type === "post_treatment_feedback" || type === "appointment_reminder";
 
   const notifOptions = {
     body:              body,
@@ -67,10 +84,8 @@ self.addEventListener("push", function (event) {
     renotify:          true,
     requireInteraction: needsInteraction,
     vibrate:           [200, 100, 200],
-    data:              { url: url },
-    actions: [
-      { action: "open", title: "View Details" },
-    ],
+    data:              { url: url, review_url: reviewUrl, type: type },
+    actions:           actions,
   };
 
   // ── 4. ALWAYS show OS popup first — waitUntil keeps SW alive for it ────────
@@ -99,33 +114,42 @@ self.addEventListener("push", function (event) {
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
 
-  let targetUrl =
-    event.notification.data && event.notification.data.url
-      ? event.notification.data.url
-      : APP_ORIGIN + "/admin";
+  const notifData = event.notification.data || {};
+  let targetUrl = notifData.url || APP_ORIGIN + "/my-bookings";
 
-  // "View Details" action button → use the notification's own URL
-  if (event.action === "open") {
-    targetUrl = event.notification.data && event.notification.data.url
-      ? event.notification.data.url
-      : APP_ORIGIN + "/admin";
+  // If user clicked the "Leave Review" action button directly
+  if (event.action === "leave_review") {
+    targetUrl = notifData.review_url || "https://g.page/r/HemAngiGlamSalon/review";
+  } else if (event.action === "open") {
+    targetUrl = notifData.url || APP_ORIGIN + "/my-bookings";
+  } else if (!event.action) {
+    // Tapping the main notification body:
+    // If it's a feedback notification, navigate directly to review URL
+    if (notifData.type === "feedback" || notifData.type === "post_treatment_feedback") {
+      targetUrl = notifData.review_url || notifData.url || "https://g.page/r/HemAngiGlamSalon/review";
+    }
   }
+
+  // Check if target is external link (e.g. Google review)
+  const isExternal = /^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith(APP_ORIGIN);
 
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then(function (windowClients) {
-        // Focus and navigate an existing tab if possible
-        for (let i = 0; i < windowClients.length; i++) {
-          const client = windowClients[i];
-          if (client.url.startsWith(APP_ORIGIN) && "focus" in client) {
-            if ("navigate" in client && client.url !== targetUrl) {
-              client.navigate(targetUrl);
+        if (!isExternal) {
+          // Focus and navigate an existing app tab if possible
+          for (let i = 0; i < windowClients.length; i++) {
+            const client = windowClients[i];
+            if (client.url.startsWith(APP_ORIGIN) && "focus" in client) {
+              if ("navigate" in client && client.url !== targetUrl) {
+                client.navigate(targetUrl);
+              }
+              return client.focus();
             }
-            return client.focus();
           }
         }
-        // Otherwise open a new tab
+        // Otherwise open a new tab/window directly to the target URL
         if (clients.openWindow) {
           return clients.openWindow(targetUrl);
         }

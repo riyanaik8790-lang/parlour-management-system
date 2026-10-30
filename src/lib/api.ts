@@ -224,7 +224,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-  const token = getToken();
+  // Prefer the admin token when present so that admin users visiting /settings
+  // can delete/clear their own notifications (which go through this shared
+  // request wrapper). Admin-specific endpoints already do getAdminToken() ??
+  // getToken() in their own fetch calls; we unify that here so ALL API calls
+  // work correctly regardless of which session type is active.
+  const token = getAdminToken() ?? getToken();
   console.log(
     `[request] ${init.method ?? "GET"} ${path} | token: ${token ? token.slice(0, 40) + "..." : "NULL - NO TOKEN IN localStorage"}`,
   );
