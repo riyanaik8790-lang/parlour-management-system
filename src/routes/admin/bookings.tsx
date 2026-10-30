@@ -12,6 +12,7 @@ import {
   UserX,
   ChevronDown,
   MessageCircle,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -281,11 +282,60 @@ function AdminBookingsPage() {
     loadBookings();
   }, []);
 
+  const [autoWhatsApp, setAutoWhatsApp] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("admin_auto_wa") !== "false";
+  });
+
   async function handleStatusUpdate(id: number, status: string) {
+    const booking = bookings.find((b) => b.id === id);
     try {
       await api.adminUpdateBookingStatus(id, status);
       toast.success(`Booking #${id} marked as ${status}`);
       setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+
+      // Automated actions upon status change (100% free)
+      if (booking && autoWhatsApp) {
+        const phone = normalizePhone(booking.offline_phone ?? booking.user_phone);
+        const name = booking.offline_name ?? booking.user_name;
+
+        if (status === "completed") {
+          const feedbackText =
+            `Hi ${name}! Thank you for visiting Hemangi Glam Salon 💖\n\n` +
+            `We hope you loved your ${booking.service_name} session!\n\n` +
+            `We'd really appreciate it if you could leave us a Google review – it helps us serve you better:\n` +
+            `🔗 https://g.page/r/HemAngiGlamSalon/review\n\n` +
+            `Your feedback means the world to us! ✨`;
+
+          if (phone) {
+            toast.info(`Auto-launching WhatsApp review request for ${name}...`, {
+              action: {
+                label: "Open Now",
+                onClick: () => openWhatsApp(phone, feedbackText),
+              },
+            });
+            openWhatsApp(phone, feedbackText);
+          }
+        } else if (status === "confirmed") {
+          const reminderText =
+            `Hi ${name}! This is a friendly reminder from Hemangi Glam Salon 🌸\n\n` +
+            `📋 Your Upcoming Appointment:\n` +
+            `• Service: ${booking.service_name}\n` +
+            `• Date: ${new Date(booking.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}\n` +
+            `• Time: ${booking.time}\n\n` +
+            `We look forward to seeing you! If you have any questions, reply to this message. 😊`;
+
+          if (phone) {
+            toast.info(`Auto-launching WhatsApp confirmation for ${name}...`, {
+              action: {
+                label: "Open Now",
+                onClick: () => openWhatsApp(phone, reminderText),
+              },
+            });
+            openWhatsApp(phone, reminderText);
+          }
+        }
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
@@ -358,20 +408,76 @@ function AdminBookingsPage() {
                 : `${bookings.length} total · ${counts.confirmed} confirmed · ${counts.completed} completed · ${counts.cancelled} cancelled`}
             </p>
           </div>
-          <button
-            onClick={handleManualRefresh}
-            disabled={loading || refreshing}
-            className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition disabled:opacity-40 min-h-[44px] cursor-pointer"
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !autoWhatsApp;
+                setAutoWhatsApp(next);
+                localStorage.setItem("admin_auto_wa", next ? "true" : "false");
+                toast.info(next ? "Auto-launch WhatsApp on status change enabled" : "Auto-launch WhatsApp disabled");
+              }}
+              className="flex items-center gap-1.5 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold transition min-h-[44px] cursor-pointer"
+              style={{
+                border: autoWhatsApp ? "1.5px solid #25D366" : "1px solid oklch(0.84 0.042 80)",
+                background: autoWhatsApp ? "#25D36615" : "oklch(0.998 0.004 85)",
+                color: autoWhatsApp ? "#15803d" : "oklch(0.55 0.04 50)",
+                boxShadow: autoWhatsApp ? "0 2px 10px #25D36625" : "0 2px 8px oklch(0.35 0.15 22 / 4%)",
+              }}
+              title="Automatically launch WhatsApp with pre-filled reminder or review link when appointment status changes"
+            >
+              <Zap className={`h-4 w-4 ${autoWhatsApp ? "text-[#25D366] fill-[#25D366]" : "text-muted-foreground"}`} />
+              <span>Auto-WhatsApp: <strong className={autoWhatsApp ? "text-[#16a34a]" : ""}>{autoWhatsApp ? "ON" : "OFF"}</strong></span>
+            </button>
+
+            <button
+              onClick={handleManualRefresh}
+              disabled={loading || refreshing}
+              className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm transition disabled:opacity-40 min-h-[44px] cursor-pointer"
+              style={{
+                border: "1px solid oklch(0.84 0.042 80)",
+                background: "oklch(0.998 0.004 85)",
+                color: "oklch(0.45 0.04 50)",
+                boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
+              }}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading || refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* 100% Free Background Automation Status Banner */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl p-3 sm:p-4 text-xs sm:text-sm shadow-sm"
+          style={{
+            background: "linear-gradient(135deg, oklch(0.98 0.015 85), oklch(0.96 0.025 88))",
+            border: "1px solid oklch(0.88 0.030 82)",
+            color: "oklch(0.35 0.08 40)",
+          }}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+            </span>
+            <span className="font-semibold" style={{ color: "oklch(0.30 0.12 145)" }}>
+              Free Background Automation Active
+            </span>
+            <span className="text-muted-foreground hidden md:inline">
+              • APScheduler runs every 60s in background to send Web Push reminders & post-treatment review alerts with zero manual admin clicks.
+            </span>
+          </div>
+          <span
+            className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
             style={{
-              border: "1px solid oklch(0.84 0.042 80)",
-              background: "oklch(0.998 0.004 85)",
-              color: "oklch(0.45 0.04 50)",
-              boxShadow: "0 2px 8px oklch(0.35 0.15 22 / 4%)",
+              background: "#25D36618",
+              color: "#16a34a",
+              border: "1px solid #25D36640",
             }}
           >
-            <RefreshCw className={`h-4 w-4 ${loading || refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+            100% Free Tier
+          </span>
         </div>
 
         {/* Status filter chips - Horizontal swipeable/scrollable bar */}

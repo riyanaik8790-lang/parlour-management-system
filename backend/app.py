@@ -1275,6 +1275,47 @@ def _generate_reminders(db, user_id: int):
                             pass
             except Exception:
                 pass
+        # Concluded appointments needing feedback for this user
+        cur.execute(
+            """SELECT a.id, a.date, a.time, a.status, s.name AS service_name
+               FROM appointments a
+               JOIN services s ON s.id = a.service_id
+               WHERE a.user_id = %s AND a.date <= CURRENT_DATE
+                 AND a.status IN ('confirmed', 'completed')
+                 AND NOT EXISTS (
+                     SELECT 1 FROM notifications n
+                     WHERE n.booking_id = a.id AND n.type = 'post_treatment_feedback'
+                 )""",
+            (user_id,),
+        )
+        for appt in cur.fetchall():
+            try:
+                appt_time_str = str(appt["time"])[:5]
+                appt_date_str = appt["date"].isoformat() if hasattr(appt["date"], "isoformat") else str(appt["date"])
+                appt_dt = datetime.strptime(f"{appt_date_str} {appt_time_str}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+                if now_ist >= appt_dt + timedelta(minutes=30):
+                    if appt["status"] == "confirmed":
+                        cur.execute("UPDATE appointments SET status = 'completed' WHERE id = %s", (appt["id"],))
+                    fb_msg = (
+                        f"Thank you for visiting Hemangi Glam Salon! 💖 How was your {appt['service_name']} session? "
+                        f"Tap to share your review: https://g.page/r/HemAngiGlamSalon/review"
+                    )
+                    cur.execute(
+                        "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'post_treatment_feedback', %s, %s)",
+                        (user_id, fb_msg, appt["id"]),
+                    )
+                    try:
+                        _send_push(
+                            db,
+                            user_id,
+                            "How was your salon treatment? 💖",
+                            f"Thank you for visiting! Tap to share your feedback on {appt['service_name']}.",
+                            f"/my-bookings?feedback=true&booking_id={appt['id']}",
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
         db.commit()
         cur.close()
     except Exception:
@@ -2122,24 +2163,43 @@ def admin_update_booking_status(booking_id: int):
 
         # Notify the customer about the status change (additive — never fails the request)
         try:
-            status_labels = {
-                "confirmed": "confirmed ✅",
-                "cancelled": "cancelled ❌",
-                "completed": "marked as completed",
-                "no-show": "marked as no-show",
-            }
-            label = status_labels.get(new_status, new_status)
-            msg = (
-                f"Your {booking['service_name']} appointment on "
-                f"{booking['date']} at {booking['time']} has been {label} by the salon."
-            )
-            notif_type = "booking_status_update"
-            cur.execute(
-                "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, %s, %s, %s)",
-                (booking["user_id"], notif_type, msg, booking_id),
-            )
-            db.commit()
-            _send_push(db, booking["user_id"], "Appointment Update", msg, "/my-bookings")
+            if new_status == "completed":
+                notif_type = "post_treatment_feedback"
+                msg = (
+                    f"Thank you for visiting Hemangi Glam Salon! 💖 We hope you loved your "
+                    f"{booking['service_name']} session on {booking['date']}. "
+                    f"We'd really appreciate your feedback & Google review: https://g.page/r/HemAngiGlamSalon/review"
+                )
+                cur.execute(
+                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, %s, %s, %s)",
+                    (booking["user_id"], notif_type, msg, booking_id),
+                )
+                db.commit()
+                _send_push(
+                    db,
+                    booking["user_id"],
+                    "How was your salon treatment? 💖",
+                    f"Thank you for visiting! Tap to share your feedback & Google review for your {booking['service_name']} session.",
+                    f"/my-bookings?feedback=true&booking_id={booking_id}",
+                )
+            else:
+                status_labels = {
+                    "confirmed": "confirmed ✅",
+                    "cancelled": "cancelled ❌",
+                    "no-show": "marked as no-show",
+                }
+                label = status_labels.get(new_status, new_status)
+                msg = (
+                    f"Your {booking['service_name']} appointment on "
+                    f"{booking['date']} at {booking['time']} has been {label} by the salon."
+                )
+                notif_type = "booking_status_update"
+                cur.execute(
+                    "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, %s, %s, %s)",
+                    (booking["user_id"], notif_type, msg, booking_id),
+                )
+                db.commit()
+                _send_push(db, booking["user_id"], "Appointment Update", msg, "/my-bookings")
         except Exception as e:
             print(f"[notify] Failed to notify user on status change: {e}")
 
@@ -3007,6 +3067,60 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                                 print(f"[scheduler] Push error for user {appt['user_id']}: {pe}")
                 except Exception as ex:
                     print(f"[scheduler] Error evaluating reminder for appointment {appt.get('id')}: {ex}")
+
+            # 2. Automated Post-Treatment Feedback Trigger
+            # Concluded appointments (started > 30 mins ago) automatically trigger post-treatment feedback
+            try:
+                cur.execute(
+                    """SELECT a.id, a.user_id, a.date, a.time, a.status,
+                              s.name AS service_name,
+                              u.name AS user_name,
+                              u.push_enabled
+                       FROM appointments a
+                       JOIN users u ON a.user_id = u.id
+                       LEFT JOIN services s ON a.service_id = s.id
+                       WHERE a.date <= CURRENT_DATE
+                         AND a.status IN ('confirmed', 'completed')
+                         AND NOT EXISTS (
+                             SELECT 1 FROM notifications n
+                             WHERE n.booking_id = a.id AND n.type = 'post_treatment_feedback'
+                         )"""
+                )
+                past_candidates = cur.fetchall()
+                for p_appt in past_candidates:
+                    try:
+                        p_time_str = str(p_appt["time"])[:5]
+                        p_date_str = p_appt["date"].isoformat() if hasattr(p_appt["date"], "isoformat") else str(p_appt["date"])
+                        p_dt = datetime.strptime(f"{p_date_str} {p_time_str}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+                        # When appointment concluded (30 mins after start time)
+                        if now_ist >= p_dt + timedelta(minutes=30):
+                            if p_appt["status"] == "confirmed":
+                                cur.execute("UPDATE appointments SET status = 'completed' WHERE id = %s", (p_appt["id"],))
+
+                            svc_name = p_appt.get("service_name") or "salon service"
+                            fb_msg = (
+                                f"Thank you for visiting Hemangi Glam Salon! 💖 How was your {svc_name} session? "
+                                f"Tap to share your review: https://g.page/r/HemAngiGlamSalon/review"
+                            )
+                            cur.execute(
+                                "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'post_treatment_feedback', %s, %s)",
+                                (p_appt["user_id"], fb_msg, p_appt["id"]),
+                            )
+                            if p_appt.get("push_enabled"):
+                                try:
+                                    _send_push(
+                                        db,
+                                        p_appt["user_id"],
+                                        "How was your salon treatment? 💖",
+                                        f"Thank you for visiting! Tap to share your feedback on {svc_name}.",
+                                        f"/my-bookings?feedback=true&booking_id={p_appt['id']}",
+                                    )
+                                except Exception as pe:
+                                    print(f"[scheduler] Auto-feedback push error: {pe}")
+                    except Exception as p_ex:
+                        print(f"[scheduler] Error evaluating past appointment {p_appt.get('id')}: {p_ex}")
+            except Exception as fb_err:
+                print(f"[scheduler] Automated feedback scan error: {fb_err}")
 
             db.commit()
             cur.close()
