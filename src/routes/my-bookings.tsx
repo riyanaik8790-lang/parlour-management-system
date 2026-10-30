@@ -9,7 +9,7 @@ import { api, getUser, clearSession } from "@/lib/api";
 import { toast } from "sonner";
 import { CalendarIcon, Loader2, Pencil, Trash2, X, Check, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TIME_SLOTS, ALL_SERVICES, REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
+import { TIME_SLOTS, ALL_SERVICES, REMINDER_OPTIONS, formatReminderLabel, formatReminderShortLabel } from "@/lib/services-data";
 import {
   Select,
   SelectContent,
@@ -712,70 +712,57 @@ function MyBookingsPage() {
                 </div>
               </div>
             ) : (
-              /* ---- READ-ONLY ROW ---- */
-              <div className="flex items-center gap-3 px-4 py-3.5">
-                {/* Left: info */}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-foreground truncate text-sm sm:text-base">
-                    {b.service_name}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                    <span className="text-xs sm:text-sm text-muted-foreground">
+              /* ---- READ-ONLY CARD ---- */
+              <div className="px-4 py-3.5 space-y-2">
+                {/* Row 1 — service name + date/time */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-foreground truncate text-sm sm:text-base">
+                      {b.service_name}
+                    </div>
+                    <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                       {b.date} &middot; {b.time}
-                    </span>
-                    <span
-                      className="sm:hidden rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize"
-                      style={{
-                        background:
-                          b.status === "confirmed"
-                            ? "oklch(0.35 0.15 22 / 10%)"
-                            : b.status === "cancelled"
-                              ? "oklch(0.577 0.245 27 / 10%)"
-                              : "oklch(0.68 0.13 68 / 12%)",
-                        color:
-                          b.status === "confirmed"
-                            ? BURGUNDY
-                            : b.status === "cancelled"
-                              ? "oklch(0.50 0.22 27)"
-                              : GOLD,
-                      }}
-                    >
-                      {b.status}
-                    </span>
+                    </div>
                   </div>
 
-                  {/* Reminder Pill & Quick-changer */}
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border/60">
-                      <Bell className="h-3 w-3 text-primary" />
-                      <span>{formatReminderLabel(b.reminder_minutes)}</span>
-                    </span>
-
+                  {/* Action buttons — always top-right */}
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {b.status === "confirmed" && (
-                      <Select
-                        value={String(b.reminder_minutes ?? 30)}
-                        onValueChange={(val) => updateReminder(b.id, Number(val))}
-                        disabled={busyId === b.id}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(b)}
+                        className="h-9 px-3 gap-1.5 text-xs sm:text-sm"
                       >
-                        <SelectTrigger className="h-6 text-[10px] px-2 py-0 bg-transparent border-dashed border-border/80 text-muted-foreground hover:text-foreground hover:border-primary/50 w-auto gap-1">
-                          <span className="text-[10px]">Change</span>
-                        </SelectTrigger>
-                        <SelectContent align="start">
-                          {REMINDER_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <Pencil className="h-3 w-3" />
+                        <span>Edit</span>
+                      </Button>
                     )}
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => cancelBooking(b.id)}
+                      disabled={busyId === b.id}
+                      className="h-9 px-3 gap-1.5 text-xs sm:text-sm"
+                    >
+                      {busyId === b.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Trash2 className="h-3 w-3" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
 
-                {/* Right: status + action buttons */}
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* Row 2 — status badge · reminder pill · change dropdown */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Status badge */}
                   <span
-                    className="hidden sm:inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize"
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize whitespace-nowrap"
                     style={{
                       background:
                         b.status === "confirmed"
@@ -794,35 +781,35 @@ function MyBookingsPage() {
                     {b.status}
                   </span>
 
-
-                  {b.status === "confirmed" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => startEdit(b)}
-                      className="h-9 px-3 gap-1.5 text-xs sm:text-sm"
-                    >
-                      <Pencil className="h-3 w-3" />
-                      <span>Edit</span>
-                    </Button>
-                  )}
-
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => cancelBooking(b.id)}
-                    disabled={busyId === b.id}
-                    className="h-9 px-3 gap-1.5 text-xs sm:text-sm"
+                  {/* Reminder pill — compact, single-line, no wrap */}
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-secondary text-secondary-foreground border border-border/60"
                   >
-                    {busyId === b.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Trash2 className="h-3 w-3" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </>
-                    )}
-                  </Button>
+                    <Bell className="h-3 w-3 shrink-0 text-primary" />
+                    <span className="whitespace-nowrap">
+                      {formatReminderShortLabel(b.reminder_minutes)}
+                    </span>
+                  </span>
+
+                  {/* Quick-change reminder dropdown */}
+                  {b.status === "confirmed" && (
+                    <Select
+                      value={String(b.reminder_minutes ?? 30)}
+                      onValueChange={(val) => updateReminder(b.id, Number(val))}
+                      disabled={busyId === b.id}
+                    >
+                      <SelectTrigger className="h-6 text-[10px] px-2 py-0 bg-transparent border-dashed border-border/80 text-muted-foreground hover:text-foreground hover:border-primary/50 w-auto gap-1 whitespace-nowrap">
+                        <span className="text-[10px] whitespace-nowrap">Change</span>
+                      </SelectTrigger>
+                      <SelectContent align="start">
+                        {REMINDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
             )}

@@ -289,3 +289,24 @@ export function formatReminderLabel(minutes?: number | null): string {
   }
   return `${minutes} mins before`;
 }
+
+/** Compact label for the reminder pill badge (fits on one line in small UI). */
+export function formatReminderShortLabel(minutes?: number | null): string {
+  if (!minutes) return "30m before";
+  const opt = REMINDER_OPTIONS.find((o) => o.value === minutes);
+  if (opt) return opt.shortLabel;
+  if (minutes >= 1440 && minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return `${days}d before`;
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const hrs = minutes / 60;
+    return `${hrs} hr${hrs > 1 ? "s" : ""} before`;
+  }
+  if (minutes >= 60) {
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hrs}h ${mins}m before`;
+  }
+  return `${minutes}m before`;
+}
