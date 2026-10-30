@@ -19,86 +19,6 @@ export const Route = createFileRoute("/admin/bookings")({
   component: AdminBookingsPage,
 });
 
-const SALON_WHATSAPP = "918208576165"; // Hemangi Glam Salon
-
-/** Strip non-digits and ensure country code for wa.me */
-function normalizePhone(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10) return `91${digits}`; // Indian mobile
-  if (digits.length >= 11) return digits;
-  return null;
-}
-
-/** Open WhatsApp click-to-chat with pre-filled text */
-function openWhatsApp(phone: string, text: string) {
-  const encoded = encodeURIComponent(text);
-  window.open(`https://wa.me/${phone}?text=${encoded}`, "_blank", "noopener,noreferrer");
-}
-
-/** WhatsApp Reminder button – for confirmed bookings */
-function WaReminderBtn({ booking }: { booking: AdminBooking }) {
-  const phone = normalizePhone(booking.offline_phone ?? booking.user_phone) ?? SALON_WHATSAPP;
-  const name = booking.offline_name ?? booking.user_name;
-  const text =
-    `Hi ${name}! This is a friendly reminder from Hemangi Glam Salon 🌸\n\n` +
-    `📋 Your Upcoming Appointment:\n` +
-    `• Service: ${booking.service_name}\n` +
-    `• Date: ${new Date(booking.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}\n` +
-    `• Time: ${booking.time}\n\n` +
-    `We look forward to seeing you! If you have any questions, reply to this message. 😊`;
-  return (
-    <button
-      type="button"
-      id={`admin-wa-remind-${booking.id}`}
-      title="Send WhatsApp reminder to customer"
-      onClick={() => openWhatsApp(phone, text)}
-      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 min-h-[38px] cursor-pointer"
-      style={{
-        background: "#25D366",
-        color: "white",
-        border: "1px solid #1ebe5e",
-        boxShadow: "0 2px 8px #25D36630",
-      }}
-      aria-label="Send WhatsApp reminder"
-    >
-      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
-      <span>Remind</span>
-    </button>
-  );
-}
-
-/** WhatsApp Feedback button – for completed bookings */
-function WaFeedbackBtn({ booking }: { booking: AdminBooking }) {
-  const phone = normalizePhone(booking.offline_phone ?? booking.user_phone) ?? SALON_WHATSAPP;
-  const name = booking.offline_name ?? booking.user_name;
-  const text =
-    `Hi ${name}! Thank you for visiting Hemangi Glam Salon 💖\n\n` +
-    `We hope you loved your ${booking.service_name} session!\n\n` +
-    `We'd really appreciate it if you could leave us a Google review – it helps us serve you better:\n` +
-    `🔗 https://g.page/r/HemAngiGlamSalon/review\n\n` +
-    `Your feedback means the world to us! ✨`;
-  return (
-    <button
-      type="button"
-      id={`admin-wa-feedback-${booking.id}`}
-      title="Request feedback via WhatsApp"
-      onClick={() => openWhatsApp(phone, text)}
-      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 min-h-[38px] cursor-pointer"
-      style={{
-        background: "#25D366",
-        color: "white",
-        border: "1px solid #1ebe5e",
-        boxShadow: "0 2px 8px #25D36630",
-      }}
-      aria-label="Request feedback via WhatsApp"
-    >
-      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
-      <span>Feedback</span>
-    </button>
-  );
-}
-
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses", color: "text-white/60" },
   { value: "confirmed", label: "Confirmed", color: "text-emerald-400" },
@@ -280,65 +200,15 @@ function AdminBookingsPage() {
     loadBookings();
   }, []);
 
-  const [autoWhatsApp, setAutoWhatsApp] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("admin_auto_wa") !== "false";
-  });
-
   async function handleStatusUpdate(id: number, status: string) {
-    const booking = bookings.find((b) => b.id === id);
     try {
       await api.adminUpdateBookingStatus(id, status);
       toast.success(`Booking #${id} marked as ${status}`);
       setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
-
-      // Automated actions upon status change (100% free)
-      if (booking && autoWhatsApp) {
-        const phone = normalizePhone(booking.offline_phone ?? booking.user_phone);
-        const name = booking.offline_name ?? booking.user_name;
-
-        if (status === "completed") {
-          const feedbackText =
-            `Hi ${name}! Thank you for visiting Hemangi Glam Salon 💖\n\n` +
-            `We hope you loved your ${booking.service_name} session!\n\n` +
-            `We'd really appreciate it if you could leave us a Google review – it helps us serve you better:\n` +
-            `🔗 https://g.page/r/HemAngiGlamSalon/review\n\n` +
-            `Your feedback means the world to us! ✨`;
-
-          if (phone) {
-            toast.info(`Auto-launching WhatsApp review request for ${name}...`, {
-              action: {
-                label: "Open Now",
-                onClick: () => openWhatsApp(phone, feedbackText),
-              },
-            });
-            openWhatsApp(phone, feedbackText);
-          }
-        } else if (status === "confirmed") {
-          const reminderText =
-            `Hi ${name}! This is a friendly reminder from Hemangi Glam Salon 🌸\n\n` +
-            `📋 Your Upcoming Appointment:\n` +
-            `• Service: ${booking.service_name}\n` +
-            `• Date: ${new Date(booking.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}\n` +
-            `• Time: ${booking.time}\n\n` +
-            `We look forward to seeing you! If you have any questions, reply to this message. 😊`;
-
-          if (phone) {
-            toast.info(`Auto-launching WhatsApp confirmation for ${name}...`, {
-              action: {
-                label: "Open Now",
-                onClick: () => openWhatsApp(phone, reminderText),
-              },
-            });
-            openWhatsApp(phone, reminderText);
-          }
-        }
-      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
   }
-
   const filtered = bookings.filter((b) => {
     if (statusFilter !== "all" && b.status?.toLowerCase() !== statusFilter.toLowerCase()) return false;
     const q = query.toLowerCase();
@@ -407,27 +277,6 @@ function AdminBookingsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const next = !autoWhatsApp;
-                setAutoWhatsApp(next);
-                localStorage.setItem("admin_auto_wa", next ? "true" : "false");
-                toast.info(next ? "Auto-launch WhatsApp on status change enabled" : "Auto-launch WhatsApp disabled");
-              }}
-              className="flex items-center gap-1.5 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold transition min-h-[44px] cursor-pointer"
-              style={{
-                border: autoWhatsApp ? "1.5px solid #25D366" : "1px solid oklch(0.84 0.042 80)",
-                background: autoWhatsApp ? "#25D36615" : "oklch(0.998 0.004 85)",
-                color: autoWhatsApp ? "#15803d" : "oklch(0.55 0.04 50)",
-                boxShadow: autoWhatsApp ? "0 2px 10px #25D36625" : "0 2px 8px oklch(0.35 0.15 22 / 4%)",
-              }}
-              title="Automatically launch WhatsApp with pre-filled reminder or review link when appointment status changes"
-            >
-              <Zap className={`h-4 w-4 ${autoWhatsApp ? "text-[#25D366] fill-[#25D366]" : "text-muted-foreground"}`} />
-              <span>Auto-WhatsApp: <strong className={autoWhatsApp ? "text-[#16a34a]" : ""}>{autoWhatsApp ? "ON" : "OFF"}</strong></span>
-            </button>
-
             <button
               onClick={handleManualRefresh}
               disabled={loading || refreshing}
@@ -744,8 +593,6 @@ function AdminBookingsPage() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           {statusBadge(b.status)}
-                          {b.status === "confirmed" && <WaReminderBtn booking={b} />}
-                          {b.status === "completed" && <WaFeedbackBtn booking={b} />}
                         </div>
                         <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
                       </div>
@@ -882,11 +729,7 @@ function AdminBookingsPage() {
                             })}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex flex-col gap-2">
-                              {b.status === "confirmed" && <WaReminderBtn booking={b} />}
-                              {b.status === "completed" && <WaFeedbackBtn booking={b} />}
-                              <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
-                            </div>
+                            <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
                           </td>
                         </tr>
                       ))}

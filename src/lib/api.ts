@@ -494,6 +494,24 @@ export const api = {
 
   markAllRead: () => request<{ ok: boolean }>("/api/notifications/read-all", { method: "PUT" }),
 
+  deleteNotification: (id: number) =>
+    request<{ ok: boolean; deleted?: number }>(`/api/notifications/${id}`, { method: "DELETE" }),
+
+  clearAllNotifications: () =>
+    request<{ ok: boolean; deleted?: number }>("/api/notifications", { method: "DELETE" }),
+
+  // ── Salon Closures ──────────────────────────────────────────────────────────
+  getClosures: () => request<{ closures: any[] }>("/api/closures"),
+  createClosure: (closure: { id?: string; startDate: string; endDate?: string; reason?: string }) =>
+    request<{ ok: boolean; closure: any }>("/api/closures", {
+      method: "POST",
+      body: JSON.stringify(closure),
+    }),
+  deleteClosure: (id: string) =>
+    request<{ ok: boolean; deleted: string }>(`/api/closures/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+
   // ── Web Push ────────────────────────────────────────────────────────────────
   getVapidPublicKey: () => request<{ public_key: string }>("/api/push/vapid-public-key"),
 

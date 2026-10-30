@@ -269,9 +269,14 @@ export function NotificationBell({ autoRefreshMs }: { autoRefreshMs?: number } =
     }
   }, []);
 
-  // Fetch on mount
+  // Fetch on mount and listen to global notification changes (e.g. deletion from history)
   useEffect(() => {
     load();
+    const handleChanged = () => {
+      load();
+    };
+    window.addEventListener("notifications-changed", handleChanged);
+    return () => window.removeEventListener("notifications-changed", handleChanged);
   }, [load]);
 
   // Auto-refresh (for live updates across users and admin)

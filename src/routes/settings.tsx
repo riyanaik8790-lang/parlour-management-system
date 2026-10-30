@@ -136,6 +136,9 @@ function SettingsPage() {
   });
   const [historyNotifications, setHistoryNotifications] = useState<AppNotification[]>([]);
   const [loadingNotifHistory, setLoadingNotifHistory] = useState(false);
+  const [deletingNotifId, setDeletingNotifId] = useState<number | null>(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("salon_reminder_pref");
@@ -191,6 +194,41 @@ function SettingsPage() {
       setLoadingNotifHistory(false);
     }
   }, []);
+
+  const handleDeleteNotification = async (id: number) => {
+    setDeletingNotifId(id);
+    try {
+      await api.deleteNotification(id);
+      setHistoryNotifications((prev) => prev.filter((n) => n.id !== id));
+      toast.success("Notification removed");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("notifications-changed"));
+      }
+    } catch (e) {
+      console.error("Failed to delete notification:", e);
+      toast.error(e instanceof Error ? e.message : "Failed to delete notification");
+    } finally {
+      setDeletingNotifId(null);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    setClearingHistory(true);
+    try {
+      await api.clearAllNotifications();
+      setHistoryNotifications([]);
+      setShowClearConfirm(false);
+      toast.success("Notification history cleared");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("notifications-changed"));
+      }
+    } catch (e) {
+      console.error("Failed to clear notification history:", e);
+      toast.error(e instanceof Error ? e.message : "Failed to clear notification history");
+    } finally {
+      setClearingHistory(false);
+    }
+  };
 
   const toggleAlertSounds = () => {
     const next = !alertSoundEnabled;
@@ -1100,14 +1138,26 @@ function SettingsPage() {
                         <ArrowLeft className="h-4 w-4" />
                         <span>Back to Notifications</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={loadNotifHistory}
-                        className="text-xs font-medium hover:underline"
-                        style={{ color: BURGUNDY }}
-                      >
-                        Refresh
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={loadNotifHistory}
+                          className="text-xs font-medium hover:underline"
+                          style={{ color: BURGUNDY }}
+                        >
+                          Refresh
+                        </button>
+                        {historyNotifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowClearConfirm(true)}
+                            className="flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 hover:underline transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Clear History</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mb-3">
@@ -1121,6 +1171,50 @@ function SettingsPage() {
                         Past alerts and appointment updates for your account.
                       </p>
                     </div>
+
+                    {showClearConfirm && (
+                      <div
+                        className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl p-3 border"
+                        style={{
+                          background: "oklch(0.98 0.02 25)",
+                          borderColor: "oklch(0.577 0.245 27.325 / 30%)",
+                        }}
+                      >
+                        <div className="flex items-center gap-2 text-xs text-red-900 font-medium">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+                          <span>Clear all {historyNotifications.length} notification{historyNotifications.length > 1 ? "s" : ""}? This cannot be undone.</span>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end shrink-0">
+                          <button
+                            type="button"
+                            disabled={clearingHistory}
+                            onClick={() => setShowClearConfirm(false)}
+                            className="px-2.5 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+                            style={{ borderColor: BORDER }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={clearingHistory}
+                            onClick={handleClearHistory}
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg text-white font-medium bg-red-600 hover:bg-red-700 transition-colors shadow-xs"
+                          >
+                            {clearingHistory ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>Clearing…</span>
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-3 w-3" />
+                                <span>Yes, Clear All</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {loadingNotifHistory ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
@@ -1184,7 +1278,7 @@ function SettingsPage() {
                                   <Sparkles className="h-4 w-4" />
                                 )}
                               </div>
-                              <div className="flex-1 min-w-0">
+                              <div className="flex-1 min-w-0 pr-1">
                                 <p className="text-xs font-medium text-gray-800 leading-relaxed">
                                   {n.message}
                                 </p>
@@ -1202,6 +1296,20 @@ function SettingsPage() {
                                   )}
                                 </div>
                               </div>
+                              <button
+                                type="button"
+                                title="Delete notification"
+                                aria-label="Delete notification"
+                                disabled={deletingNotifId === n.id}
+                                onClick={() => handleDeleteNotification(n.id)}
+                                className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              >
+                                {deletingNotifId === n.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-red-600" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </button>
                             </div>
                           );
                         })}

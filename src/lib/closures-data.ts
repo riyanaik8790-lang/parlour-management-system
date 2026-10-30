@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
+import { api } from "./api";
 
 export type SalonClosure = {
   id: string;
@@ -121,12 +122,28 @@ if (typeof window !== "undefined") {
  */
 export async function fetchRemoteClosures(): Promise<SalonClosure[]> {
   try {
+    // 1. Centralized Backend API (PostgreSQL database)
+    try {
+      const res = await api.getClosures();
+      if (res && Array.isArray(res.closures)) {
+        const mapped: SalonClosure[] = res.closures;
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(mapped));
+          } catch {}
+        }
+        notifyListeners(mapped);
+        return mapped;
+      }
+    } catch {}
+
+    // 2. Direct Supabase fallback
     const { data, error } = await supabase
       .from("salon_closures")
       .select("*")
       .order("start_date", { ascending: true });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       const mapped: SalonClosure[] = data.map((r: {
         id: string;
         start_date: string;
@@ -158,18 +175,18 @@ export async function fetchRemoteClosures(): Promise<SalonClosure[]> {
 }
 
 export function getAllClosures(): SalonClosure[] {
-  if (typeof window === "undefined") return DEFAULT_CLOSURES;
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(CLOSURES_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
-    // Seed initial defaults into localStorage
+    // Only seed initial defaults if uninitialized in localStorage
     localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(DEFAULT_CLOSURES));
     return DEFAULT_CLOSURES;
   } catch {
-    return DEFAULT_CLOSURES;
+    return [];
   }
 }
 
@@ -209,11 +226,11 @@ export function saveAllClosures(closures: SalonClosure[]): void {
   } catch {}
 }
 
-export function addClosure(data: {
+export async function addClosure(data: {
   startDate: string;
   endDate?: string;
   reason: string;
-}): SalonClosure {
+}): Promise<SalonClosure> {
   const current = getAllClosures();
   const start = data.startDate;
   const end = data.endDate && data.endDate >= start ? data.endDate : start;
@@ -231,41 +248,53 @@ export function addClosure(data: {
   );
   saveAllClosures(updated);
 
-  // Sync to remote Supabase database immediately
-  (async () => {
-    try {
-      const { error } = await supabase.from("salon_closures").upsert({
-        id: newClosure.id,
-        start_date: newClosure.startDate,
-        end_date: newClosure.endDate,
-        reason: newClosure.reason,
-      });
-      if (error) console.warn("[closures] Remote upsert failed:", error.message);
-    } catch (err) {
-      console.warn("[closures] Remote upsert error:", err);
-    }
-  })();
+  // 1. Sync to backend API
+  try {
+    await api.createClosure(newClosure);
+  } catch (err) {
+    console.warn("[closures] Backend API create failed:", err);
+  }
+
+  // 2. Sync to remote Supabase database immediately
+  try {
+    const { error } = await supabase.from("salon_closures").upsert({
+      id: newClosure.id,
+      start_date: newClosure.startDate,
+      end_date: newClosure.endDate,
+      reason: newClosure.reason,
+    });
+    if (error) console.warn("[closures] Remote upsert failed:", error.message);
+  } catch (err) {
+    console.warn("[closures] Remote upsert error:", err);
+  }
 
   return newClosure;
 }
 
-export function deleteClosure(id: string): void {
+export async function deleteClosure(id: string): Promise<SalonClosure[]> {
   const current = getAllClosures();
   const updated = current.filter((c) => c.id !== id);
   saveAllClosures(updated);
 
-  // Sync delete to remote Supabase database immediately
-  (async () => {
-    try {
-      const { error } = await supabase
-        .from("salon_closures")
-        .delete()
-        .eq("id", id);
-      if (error) console.warn("[closures] Remote delete failed:", error.message);
-    } catch (err) {
-      console.warn("[closures] Remote delete error:", err);
-    }
-  })();
+  // 1. Sync delete to backend API
+  try {
+    await api.deleteClosure(id);
+  } catch (err) {
+    console.warn("[closures] Backend API delete failed:", err);
+  }
+
+  // 2. Sync delete to remote Supabase database
+  try {
+    const { error } = await supabase
+      .from("salon_closures")
+      .delete()
+      .eq("id", id);
+    if (error) console.warn("[closures] Remote delete failed:", error.message);
+  } catch (err) {
+    console.warn("[closures] Remote delete error:", err);
+  }
+
+  return updated;
 }
 
 export function isDateClosed(dateStr: string): boolean {

@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  Loader2,
   Calendar as CalendarIcon,
   CheckCircle2,
   AlertTriangle,
@@ -50,7 +51,7 @@ const QUICK_PRESETS = [
 ];
 
 // ── Confirmation Modal ────────────────────────────────────────────────────────
-function ConfirmReopenModal({
+function ConfirmDeleteModal({
   open,
   closure,
   onConfirm,
@@ -92,7 +93,7 @@ function ConfirmReopenModal({
         >
           <div className="flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-white" />
-            <h2 className="text-base font-bold text-white font-serif">Reopen Blocked Date?</h2>
+            <h2 className="text-base font-bold text-white font-serif">Delete Closure?</h2>
           </div>
         </div>
         <div className="p-6">
@@ -123,7 +124,7 @@ function ConfirmReopenModal({
               }}
             >
               <Trash2 className="h-4 w-4" />
-              Reopen Date
+              Delete
             </button>
           </div>
         </div>
@@ -165,7 +166,7 @@ function AdminClosuresPage() {
   // Today in YYYY-MM-DD (min selectable date) - uses local/IST calendar so past dates are strictly disabled
   const todayStr = useMemo(() => getTodayDateString(), []);
 
-  const handleAddClosure = (e: React.FormEvent) => {
+  const handleAddClosure = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!startDate) {
       toast.error("Please pick a start date.");
@@ -189,7 +190,7 @@ function AdminClosuresPage() {
 
     setSaving(true);
     try {
-      addClosure({
+      await addClosure({
         startDate,
         endDate: finalEnd,
         reason: cleanReason,
@@ -199,7 +200,6 @@ function AdminClosuresPage() {
       setStartDate("");
       setEndDate("");
       setReason("");
-      refreshClosures();
     } catch {
       toast.error("Failed to add closure.");
     } finally {
@@ -207,12 +207,21 @@ function AdminClosuresPage() {
     }
   };
 
-  const confirmDelete = () => {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
     if (!closureToDelete) return;
-    deleteClosure(closureToDelete.id);
-    toast.success("Closure removed. Date has been reopened for bookings.");
+    const target = closureToDelete;
+    setDeletingId(target.id);
     setClosureToDelete(null);
-    refreshClosures();
+    try {
+      await deleteClosure(target.id);
+      toast.success("Closure removed. Date has been reopened for bookings.");
+    } catch {
+      toast.error("Failed to delete closure.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "upcoming">("all");
@@ -268,8 +277,8 @@ function AdminClosuresPage() {
 
   return (
     <>
-      {/* Delete / Reopen Confirmation Dialog */}
-      <ConfirmReopenModal
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteModal
         open={Boolean(closureToDelete)}
         closure={closureToDelete}
         onConfirm={confirmDelete}
@@ -645,15 +654,20 @@ function AdminClosuresPage() {
                         </span>
                       </div>
 
-                      {/* Bottom row: Reopen action button */}
+                      {/* Bottom row: Delete action button */}
                       <div className="pt-1 flex justify-end">
                         <button
                           type="button"
+                          disabled={deletingId === item.id}
                           onClick={() => setClosureToDelete(item)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:text-red-600 hover:bg-red-50 border border-neutral-200 hover:border-red-200 transition cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Reopen Date</span>
+                          {deletingId === item.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-red-600" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
@@ -746,16 +760,21 @@ function AdminClosuresPage() {
                             )}
                           </td>
 
-                          {/* Action: Reopen / Delete */}
+                          {/* Action: Delete */}
                           <td className="py-4 px-4 text-right">
                             <button
                               type="button"
+                              disabled={deletingId === item.id}
                               onClick={() => setClosureToDelete(item)}
-                              title="Reopen Date"
+                              title="Delete"
                               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:text-red-600 hover:bg-red-50 border border-neutral-200 hover:border-red-200 transition cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Reopen Date</span>
+                              {deletingId === item.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-red-600" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                              <span>Delete</span>
                             </button>
                           </td>
                         </tr>

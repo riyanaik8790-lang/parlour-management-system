@@ -1407,6 +1407,42 @@ def mark_all_read():
         return db_error(err)
 
 
+@app.delete("/api/notifications/<int:notification_id>")
+@require_auth
+def delete_notification(notification_id):
+    user_id = g.current_user["id"]
+    try:
+        db = get_db()
+        cur = db.cursor()
+        if g.current_user.get("role") == "ADMIN":
+            cur.execute("DELETE FROM notifications WHERE id = %s", (notification_id,))
+        else:
+            cur.execute("DELETE FROM notifications WHERE id = %s AND user_id = %s", (notification_id, user_id))
+        deleted = cur.rowcount
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True, "deleted": deleted})
+    except PGError as err:
+        return db_error(err)
+
+
+@app.delete("/api/notifications")
+@app.delete("/api/notifications/clear-all")
+@require_auth
+def clear_all_notifications():
+    user_id = g.current_user["id"]
+    try:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
+        deleted = cur.rowcount
+        db.commit()
+        cur.close()
+        return jsonify({"ok": True, "deleted": deleted})
+    except PGError as err:
+        return db_error(err)
+
+
 # ---------------------------------------------------------------------------
 # Account deletion
 # ---------------------------------------------------------------------------
