@@ -7,7 +7,9 @@
 
 import { api } from "./api";
 
-const VITE_VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+// Fallback VAPID public key matching backend/app.py in case build environment variable is missing
+const DEFAULT_VAPID_PUBLIC_KEY = "BDCR8NDbPyNBiIhn7u35tzYZoXL_IAJexvnK5sarbirfGooFaKv_hWMiCZM4o9kfX9qW0uoqcFuAevmFW94aiJU";
+const VITE_VAPID_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || DEFAULT_VAPID_PUBLIC_KEY;
 
 // ── Support detection ─────────────────────────────────────────────────────────
 

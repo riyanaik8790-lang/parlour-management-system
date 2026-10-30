@@ -1,5 +1,5 @@
-// Small typed fetch wrapper around the local Flask backend.
-// Configure VITE_API_BASE at build time; falls back to localhost:5000 for XAMPP dev.
+// Small typed fetch wrapper around the Flask backend.
+// Configure VITE_API_BASE_URL at build time; falls back to the Render production URL.
 //
 // DEMO MOCK MODE:
 // When the backend is unreachable (network error / TypeError from fetch) or a
@@ -13,7 +13,7 @@ import { SERVICE_CATEGORIES } from "./services-data";
 export const API_BASE =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
   (import.meta.env.VITE_API_BASE as string | undefined) ??
-  "http://localhost:5000"; // fallback for local dev
+  "https://parlour-backend.onrender.com"; // hardcoded production fallback (Vercel build has no env vars)
 
 const TOKEN_KEY = "salon_token";
 const USER_KEY = "salon_user";
