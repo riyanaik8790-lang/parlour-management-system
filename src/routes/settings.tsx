@@ -16,6 +16,7 @@ import {
   Loader2,
   ShieldCheck,
   Save,
+  Check,
   AlertTriangle,
   Trash2,
   Settings as SettingsIcon,
@@ -138,7 +139,10 @@ function SettingsPage() {
   const [defaultReminderMinutes, setDefaultReminderMinutes] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("salon_reminder_pref");
-      if (saved) return Number(saved);
+      if (saved) {
+        const parsed = Number(saved);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
     }
     return 30;
   });
@@ -160,6 +164,7 @@ function SettingsPage() {
     return "mins";
   });
   const [savingReminderPref, setSavingReminderPref] = useState(false);
+  const [customReminderSaved, setCustomReminderSaved] = useState(false);
 
   // Sync alert sound state when modified elsewhere
   useEffect(() => {
@@ -281,8 +286,49 @@ function SettingsPage() {
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null); // filename being deleted
   const [archiveToDelete, setArchiveToDelete] = useState<string | null>(null);  // filename pending confirm
 
-  // Load profile
+  // Helper to decompose minutes into value and unit
+  const parseMinutesToCustom = useCallback((mins: number): { val: number; unit: "mins" | "hours" | "days" } => {
+    if (mins >= 1440 && mins % 1440 === 0) {
+      return { val: Math.round(mins / 1440), unit: "days" };
+    }
+    if (mins >= 60 && mins % 60 === 0) {
+      return { val: Math.round(mins / 60), unit: "hours" };
+    }
+    return { val: mins, unit: "mins" };
+  }, []);
+
+  // Helper to apply reminder minutes to React state and localStorage
+  const applyReminderPreference = useCallback(
+    (m: number) => {
+      if (!m || isNaN(m) || m <= 0) return;
+      setDefaultReminderMinutes(m);
+      localStorage.setItem("salon_reminder_pref", String(m));
+      const preset = REMINDER_OPTIONS.some((o) => o.value === m);
+      if (!preset) {
+        setIsCustomReminder(true);
+        const parsed = parseMinutesToCustom(m);
+        setCustomReminderVal(parsed.val);
+        setCustomReminderUnit(parsed.unit);
+      } else {
+        setIsCustomReminder(false);
+      }
+    },
+    [parseMinutesToCustom],
+  );
+
+  // Load profile and sync reminder preference
   useEffect(() => {
+    // 1. Immediately read from localStorage on mount so selection is active instantly
+    const saved = localStorage.getItem("salon_reminder_pref");
+    if (saved) {
+      const m = Number(saved);
+      if (!isNaN(m) && m > 0) {
+        applyReminderPreference(m);
+      }
+    }
+
+    // 2. Fetch authenticated user profile
+    setLoadingProfile(true);
     api
       .getProfile()
       .then((p) => {
@@ -293,25 +339,7 @@ function SettingsPage() {
         setAvatarUrl(p.avatar_url ?? null);
         setPushEnabled(p.push_enabled ?? false);
         if (p.default_reminder_minutes) {
-          const m = p.default_reminder_minutes;
-          setDefaultReminderMinutes(m);
-          localStorage.setItem("salon_reminder_pref", String(m));
-          const preset = REMINDER_OPTIONS.some((o) => o.value === m);
-          if (!preset) {
-            setIsCustomReminder(true);
-            if (m >= 1440 && m % 1440 === 0) {
-              setCustomReminderVal(m / 1440);
-              setCustomReminderUnit("days");
-            } else if (m >= 60 && m % 60 === 0) {
-              setCustomReminderVal(m / 60);
-              setCustomReminderUnit("hours");
-            } else {
-              setCustomReminderVal(m);
-              setCustomReminderUnit("mins");
-            }
-          } else {
-            setIsCustomReminder(false);
-          }
+          applyReminderPreference(p.default_reminder_minutes);
         }
       })
       .catch(() => {
@@ -323,11 +351,36 @@ function SettingsPage() {
         }
       })
       .finally(() => setLoadingProfile(false));
-  }, []);
+  }, [applyReminderPreference]);
+
+  // Sync reminder state across tabs and booking page
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "salon_reminder_pref" && e.newValue) {
+        const m = Number(e.newValue);
+        if (!isNaN(m) && m > 0) {
+          applyReminderPreference(m);
+        }
+      }
+    };
+    const handleCustomSync = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (customEvent.detail && typeof customEvent.detail === "number") {
+        applyReminderPreference(customEvent.detail);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("salon-reminder-updated", handleCustomSync);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("salon-reminder-updated", handleCustomSync);
+    };
+  }, [applyReminderPreference]);
 
   const handleReminderPrefChange = async (mins: number) => {
     setDefaultReminderMinutes(mins);
     localStorage.setItem("salon_reminder_pref", String(mins));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: mins }));
     setSavingReminderPref(true);
     try {
       await api.updateProfile({ default_reminder_minutes: mins });
@@ -339,13 +392,51 @@ function SettingsPage() {
     }
   };
 
-  const handleReminderSelect = (val: string) => {
+  const handleReminderSelect = async (val: string) => {
     if (val === "custom") {
       setIsCustomReminder(true);
+      const safeVal = Math.max(1, customReminderVal);
+      const m =
+        customReminderUnit === "days"
+          ? safeVal * 1440
+          : customReminderUnit === "hours"
+            ? safeVal * 60
+            : safeVal;
+      await handleReminderPrefChange(m);
     } else {
       setIsCustomReminder(false);
-      handleReminderPrefChange(Number(val));
+      await handleReminderPrefChange(Number(val));
     }
+  };
+
+  const handleCustomValChange = (newVal: number) => {
+    const safeVal = Math.max(1, newVal);
+    setCustomReminderVal(safeVal);
+    setCustomReminderSaved(false);
+    const m =
+      customReminderUnit === "days"
+        ? safeVal * 1440
+        : customReminderUnit === "hours"
+          ? safeVal * 60
+          : safeVal;
+    setDefaultReminderMinutes(m);
+    localStorage.setItem("salon_reminder_pref", String(m));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
+  };
+
+  const handleCustomUnitChange = (unit: "mins" | "hours" | "days") => {
+    setCustomReminderUnit(unit);
+    setCustomReminderSaved(false);
+    const safeVal = Math.max(1, customReminderVal);
+    const m =
+      unit === "days"
+        ? safeVal * 1440
+        : unit === "hours"
+          ? safeVal * 60
+          : safeVal;
+    setDefaultReminderMinutes(m);
+    localStorage.setItem("salon_reminder_pref", String(m));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
   };
 
   const handleSaveCustomReminder = async () => {
@@ -358,6 +449,8 @@ function SettingsPage() {
           ? safeVal * 60
           : safeVal;
     await handleReminderPrefChange(m);
+    setCustomReminderSaved(true);
+    setTimeout(() => setCustomReminderSaved(false), 2500);
   };
 
   // ── Upload Avatar File helper ──────────────────────────────────────────────
@@ -1301,7 +1394,9 @@ function SettingsPage() {
                                   </SelectItem>
                                 ))}
                                 <SelectItem value="custom" className="text-xs font-semibold text-primary">
-                                  ⏱️ Custom time...
+                                  {isCustomReminder
+                                    ? `⏱️ Custom (${customReminderVal} ${customReminderUnit} before)`
+                                    : "⏱️ Custom time..."}
                                 </SelectItem>
                               </SelectContent>
                             </Select>
@@ -1318,7 +1413,7 @@ function SettingsPage() {
                                 min={1}
                                 max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
                                 value={customReminderVal}
-                                onChange={(e) => setCustomReminderVal(Math.max(1, Number(e.target.value) || 1))}
+                                onChange={(e) => handleCustomValChange(Number(e.target.value) || 1)}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     e.preventDefault();
@@ -1332,7 +1427,7 @@ function SettingsPage() {
                                   <button
                                     key={unit}
                                     type="button"
-                                    onClick={() => setCustomReminderUnit(unit)}
+                                    onClick={() => handleCustomUnitChange(unit)}
                                     className={cn(
                                       "px-2.5 py-1 text-[11px] font-medium rounded-md capitalize transition cursor-pointer",
                                       customReminderUnit === unit
@@ -1363,6 +1458,11 @@ function SettingsPage() {
                                 <>
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                   <span>Saving…</span>
+                                </>
+                              ) : customReminderSaved ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5 text-emerald-300" />
+                                  <span>Saved</span>
                                 </>
                               ) : (
                                 <>

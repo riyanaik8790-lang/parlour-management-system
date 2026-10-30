@@ -482,7 +482,7 @@ def update_profile():
         if "default_reminder_minutes" in data:
             try:
                 drm = int(data.get("default_reminder_minutes"))
-                if drm in (15, 30, 60, 120, 1440):
+                if 1 <= drm <= 43200:
                     updates.append("default_reminder_minutes = %s")
                     values.append(drm)
             except (ValueError, TypeError):
@@ -693,7 +693,7 @@ def book():
         reminder_minutes = int(reminder_minutes_raw) if reminder_minutes_raw is not None else 30
     except (ValueError, TypeError):
         reminder_minutes = 30
-    if reminder_minutes not in (15, 30, 60, 120, 1440):
+    if reminder_minutes < 1 or reminder_minutes > 43200:
         reminder_minutes = 30
 
     if not services_list or not date_str or not time_str:
@@ -1458,7 +1458,7 @@ def update_booking(booking_id: int):
     if reminder_minutes_raw is not None and not date_str and not time_str:
         try:
             rm_val = int(reminder_minutes_raw)
-            if rm_val in (15, 30, 60, 120, 1440):
+            if 1 <= rm_val <= 43200:
                 db = get_db()
                 cur = db.cursor()
                 cur.execute(
@@ -1530,7 +1530,7 @@ def update_booking(booking_id: int):
         if reminder_minutes_raw is not None:
             try:
                 rm_val = int(reminder_minutes_raw)
-                if rm_val in (15, 30, 60, 120, 1440):
+                if 1 <= rm_val <= 43200:
                     cur.execute(
                         "UPDATE appointments SET date = %s, time = %s, reminder_minutes = %s, reminder_sent = false WHERE id = %s",
                         (slot_date, time_str, rm_val, booking_id),

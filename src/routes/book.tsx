@@ -102,10 +102,33 @@ function BookPage() {
   const [savingCustomReminder, setSavingCustomReminder] = useState(false);
   const [customReminderSaved, setCustomReminderSaved] = useState(false);
 
+  const applyReminder = (m: number) => {
+    if (!m || isNaN(m) || m <= 0) return;
+    setReminderMinutes(m);
+    localStorage.setItem("salon_reminder_pref", String(m));
+    const preset = REMINDER_OPTIONS.some((o) => o.value === m);
+    if (!preset) {
+      setIsCustomReminder(true);
+      if (m >= 1440 && m % 1440 === 0) {
+        setCustomReminderVal(Math.round(m / 1440));
+        setCustomReminderUnit("days");
+      } else if (m >= 60 && m % 60 === 0) {
+        setCustomReminderVal(Math.round(m / 60));
+        setCustomReminderUnit("hours");
+      } else {
+        setCustomReminderVal(m);
+        setCustomReminderUnit("mins");
+      }
+    } else {
+      setIsCustomReminder(false);
+    }
+  };
+
   const handleSelectPresetReminder = (mins: number) => {
     setIsCustomReminder(false);
     setReminderMinutes(mins);
     localStorage.setItem("salon_reminder_pref", String(mins));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: mins }));
     setCustomReminderSaved(false);
   };
 
@@ -119,6 +142,7 @@ function BookPage() {
           : customReminderVal;
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
   };
 
   const handleUpdateCustomReminder = (val: number, unit: "mins" | "hours" | "days") => {
@@ -134,6 +158,7 @@ function BookPage() {
           : safeVal;
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
   };
 
   const handleSaveCustomReminder = async () => {
@@ -147,6 +172,7 @@ function BookPage() {
           : safeVal;
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
+    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
     setSavingCustomReminder(true);
     try {
       const u = getUser();
@@ -163,37 +189,51 @@ function BookPage() {
     }
   };
 
-  // Sync reminder preference with user profile if authenticated
+  // Sync reminder preference with storage, custom events, and user profile
   useEffect(() => {
+    // 1. Check local storage preference first as immediate fallback
+    const localPref = localStorage.getItem("salon_reminder_pref");
+    if (localPref) {
+      const m = Number(localPref);
+      if (!isNaN(m) && m > 0) {
+        applyReminder(m);
+      }
+    }
+
+    // 2. Sync with user profile if authenticated
     const user = getUser();
     if (user) {
       api
         .getProfile()
         .then((p) => {
           if (p.default_reminder_minutes) {
-            const m = p.default_reminder_minutes;
-            setReminderMinutes(m);
-            localStorage.setItem("salon_reminder_pref", String(m));
-            const preset = REMINDER_OPTIONS.some((o) => o.value === m);
-            if (!preset) {
-              setIsCustomReminder(true);
-              if (m >= 1440 && m % 1440 === 0) {
-                setCustomReminderVal(m / 1440);
-                setCustomReminderUnit("days");
-              } else if (m >= 60 && m % 60 === 0) {
-                setCustomReminderVal(m / 60);
-                setCustomReminderUnit("hours");
-              } else {
-                setCustomReminderVal(m);
-                setCustomReminderUnit("mins");
-              }
-            } else {
-              setIsCustomReminder(false);
-            }
+            applyReminder(p.default_reminder_minutes);
           }
         })
         .catch(() => {});
     }
+
+    // 3. Listen to cross-component and storage updates
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "salon_reminder_pref" && e.newValue) {
+        const m = Number(e.newValue);
+        if (!isNaN(m) && m > 0) {
+          applyReminder(m);
+        }
+      }
+    };
+    const handleCustomSync = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (customEvent.detail && typeof customEvent.detail === "number") {
+        applyReminder(customEvent.detail);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("salon-reminder-updated", handleCustomSync);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("salon-reminder-updated", handleCustomSync);
+    };
   }, []);
 
   const isoDate = useMemo(() => (date ? format(date, "yyyy-MM-dd") : ""), [date]);
