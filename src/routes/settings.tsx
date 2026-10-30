@@ -419,22 +419,18 @@ function SettingsPage() {
     };
   }, [applyReminderPreference]);
 
-  const handleReminderPrefChange = async (mins: number) => {
+  const handleReminderPrefChange = (mins: number) => {
+    // 1. Update React state and localStorage synchronously — instant UI feedback
     setDefaultReminderMinutes(mins);
     localStorage.setItem("salon_reminder_pref", String(mins));
     window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: mins }));
-    setSavingReminderPref(true);
-    try {
-      await api.updateProfile({ default_reminder_minutes: mins });
-      toast.success(`Notification reminder set to ${formatReminderLabel(mins)}`);
-    } catch {
-      toast.success(`Reminder preference saved to ${formatReminderLabel(mins)}`);
-    } finally {
-      setSavingReminderPref(false);
-    }
+    // 2. Persist to backend in background — never blocks or locks the UI
+    api.updateProfile({ default_reminder_minutes: mins }).catch((err) => {
+      console.warn("[settings] Background reminder sync failed (preference already saved locally):", err);
+    });
   };
 
-  const handleReminderSelect = async (val: string) => {
+  const handleReminderSelect = (val: string) => {
     setCustomReminderError(null);
     if (val === "custom") {
       setIsCustomReminder(true);
@@ -447,10 +443,11 @@ function SettingsPage() {
           : customReminderUnit === "hours"
             ? safeVal * 60
             : safeVal;
-      await handleReminderPrefChange(m);
+      handleReminderPrefChange(m);
     } else {
       setIsCustomReminder(false);
-      await handleReminderPrefChange(Number(val));
+      handleReminderPrefChange(Number(val));
+      toast.success(`Notification reminder set to ${formatReminderLabel(Number(val))}`);
     }
   };
 
@@ -492,7 +489,7 @@ function SettingsPage() {
     }
   };
 
-  const handleSaveCustomReminder = async () => {
+  const handleSaveCustomReminder = () => {
     const numVal = Number(customReminderVal);
     if (customReminderVal === "" || isNaN(numVal) || numVal < 1) {
       setCustomReminderError("Please enter a valid number (minimum 1).");
@@ -504,6 +501,7 @@ function SettingsPage() {
       return;
     }
     setCustomReminderError(null);
+    // Normalise display value (e.g. strip leading zeros)
     setCustomReminderVal(String(numVal));
     const m =
       customReminderUnit === "days"
@@ -511,7 +509,11 @@ function SettingsPage() {
         : customReminderUnit === "hours"
           ? numVal * 60
           : numVal;
-    await handleReminderPrefChange(m);
+    // 1. Persist synchronously (localStorage + background API) — no await, no spinner
+    handleReminderPrefChange(m);
+    // 2. Show toast immediately
+    toast.success(`Reminder set to ${formatReminderLabel(m)}`);
+    // 3. Flash "Saved ✓" on the button immediately
     setCustomReminderSaved(true);
     setTimeout(() => setCustomReminderSaved(false), 2500);
   };
@@ -1527,7 +1529,6 @@ function SettingsPage() {
                             <Select
                               value={isCustomReminder ? "custom" : String(defaultReminderMinutes)}
                               onValueChange={handleReminderSelect}
-                              disabled={savingReminderPref}
                             >
                               <SelectTrigger className="w-full h-10 bg-background text-xs font-medium">
                                 <SelectValue placeholder="Select reminder">
@@ -1607,19 +1608,13 @@ function SettingsPage() {
                               type="button"
                               size="sm"
                               onClick={handleSaveCustomReminder}
-                              disabled={savingReminderPref}
                               className="h-8.5 px-4 text-xs font-semibold rounded-xl shrink-0 gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer ml-auto"
                               style={{
                                 background: `linear-gradient(135deg, ${BURGUNDY}, ${BURGUNDY_MID})`,
                                 color: "white",
                               }}
                             >
-                              {savingReminderPref ? (
-                                <>
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  <span>Saving…</span>
-                                </>
-                              ) : customReminderSaved ? (
+                              {customReminderSaved ? (
                                 <>
                                   <Check className="h-3.5 w-3.5 text-emerald-300" />
                                   <span>Saved</span>
