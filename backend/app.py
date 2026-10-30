@@ -1635,6 +1635,26 @@ def update_booking(booking_id: int):
                 (slot_date, time_str, booking_id),
             )
         db.commit()
+
+        # Send push notification to user confirming their updated appointment
+        try:
+            update_msg = f"Your appointment for {existing['service_name']} has been rescheduled to {date_str} at {time_str}."
+            cur.execute(
+                "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'booking_update', %s, %s)",
+                (g.current_user["id"], update_msg, booking_id),
+            )
+            db.commit()
+            _send_push(
+                db,
+                g.current_user["id"],
+                "Appointment Updated 📅",
+                update_msg,
+                "/my-bookings",
+                notif_type="booking_update",
+            )
+        except Exception as pe:
+            print(f"[push] Booking edit push notice error: {pe}")
+
         cur.close()
         return jsonify({"ok": True})
     except PGError as err:
