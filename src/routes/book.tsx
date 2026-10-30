@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { CalendarIcon, CheckCircle2, ShoppingCart, X, Ban, CalendarX, Bell } from "lucide-react";
+import { CalendarIcon, CheckCircle2, ShoppingCart, X, Ban, CalendarX, Bell, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getUser, clearSession } from "@/lib/api";
 import {
@@ -99,10 +99,14 @@ function BookPage() {
     return "mins";
   });
 
+  const [savingCustomReminder, setSavingCustomReminder] = useState(false);
+  const [customReminderSaved, setCustomReminderSaved] = useState(false);
+
   const handleSelectPresetReminder = (mins: number) => {
     setIsCustomReminder(false);
     setReminderMinutes(mins);
     localStorage.setItem("salon_reminder_pref", String(mins));
+    setCustomReminderSaved(false);
   };
 
   const handleSelectCustomReminder = () => {
@@ -121,6 +125,7 @@ function BookPage() {
     const safeVal = Math.max(1, val);
     setCustomReminderVal(safeVal);
     setCustomReminderUnit(unit);
+    setCustomReminderSaved(false);
     const m =
       unit === "days"
         ? safeVal * 1440
@@ -129,6 +134,33 @@ function BookPage() {
           : safeVal;
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
+  };
+
+  const handleSaveCustomReminder = async () => {
+    const safeVal = Math.max(1, customReminderVal);
+    setCustomReminderVal(safeVal);
+    const m =
+      customReminderUnit === "days"
+        ? safeVal * 1440
+        : customReminderUnit === "hours"
+          ? safeVal * 60
+          : safeVal;
+    setReminderMinutes(m);
+    localStorage.setItem("salon_reminder_pref", String(m));
+    setSavingCustomReminder(true);
+    try {
+      const u = getUser();
+      if (u) {
+        await api.updateProfile({ default_reminder_minutes: m }).catch(() => {});
+      }
+      setCustomReminderSaved(true);
+      toast.success(`Reminder set to ${formatReminderLabel(m)}`);
+      setTimeout(() => setCustomReminderSaved(false), 2500);
+    } catch {
+      toast.success(`Reminder set to ${formatReminderLabel(m)}`);
+    } finally {
+      setSavingCustomReminder(false);
+    }
   };
 
   // Sync reminder preference with user profile if authenticated
@@ -739,36 +771,69 @@ function BookPage() {
 
               {/* Inline Custom Time Entry (displayed when Custom is selected) */}
               {isCustomReminder && (
-                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in">
-                  <span className="font-medium text-foreground shrink-0">Remind me:</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
-                    value={customReminderVal}
-                    onChange={(e) =>
-                      handleUpdateCustomReminder(Number(e.target.value) || 1, customReminderUnit)
-                    }
-                    className="h-8 w-16 text-center text-xs font-semibold bg-background border-border"
-                  />
-                  <div className="flex rounded-lg border border-border bg-background p-0.5">
-                    {(["mins", "hours", "days"] as const).map((unit) => (
-                      <button
-                        key={unit}
-                        type="button"
-                        onClick={() => handleUpdateCustomReminder(customReminderVal, unit)}
-                        className={cn(
-                          "px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer select-none",
-                          customReminderUnit === unit
-                            ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {unit === "mins" ? "Mins" : unit === "hours" ? "Hours" : "Days"}
-                      </button>
-                    ))}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground shrink-0">Remind me:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
+                      value={customReminderVal}
+                      onChange={(e) =>
+                        handleUpdateCustomReminder(Number(e.target.value) || 1, customReminderUnit)
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSaveCustomReminder();
+                        }
+                      }}
+                      className="h-8 w-16 text-center text-xs font-semibold bg-background border-border"
+                    />
+                    <div className="flex rounded-lg border border-border bg-background p-0.5">
+                      {(["mins", "hours", "days"] as const).map((unit) => (
+                        <button
+                          key={unit}
+                          type="button"
+                          onClick={() => handleUpdateCustomReminder(customReminderVal, unit)}
+                          className={cn(
+                            "px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer select-none",
+                            customReminderUnit === unit
+                              ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          {unit === "mins" ? "Mins" : unit === "hours" ? "Hours" : "Days"}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-muted-foreground shrink-0">before appointment</span>
                   </div>
-                  <span className="text-muted-foreground shrink-0">before appointment</span>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveCustomReminder}
+                    disabled={savingCustomReminder}
+                    className="h-8 px-3.5 text-xs font-semibold rounded-lg shrink-0 gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer ml-auto"
+                  >
+                    {savingCustomReminder ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Saving…</span>
+                      </>
+                    ) : customReminderSaved ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-300" />
+                        <span>Saved</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Save</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
