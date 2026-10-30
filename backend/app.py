@@ -1323,7 +1323,7 @@ def _generate_reminders(db, user_id: int):
                     client_name = (appt.get("client_name") or "Valued Client").strip()
                     fb_title = "How was your visit? 🌸"
                     fb_body = f"Thank you for choosing Hemangi Glam Salon, {client_name}. We’d appreciate a quick moment of your time to share feedback on your recent treatment!"
-                    in_app_msg = f"{fb_body} Tap to share your review: https://g.page/r/HemAngiGlamSalon/review"
+                    in_app_msg = f"{fb_body} Tap to share your review: /feedback"
                     cur.execute(
                         "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'post_treatment_feedback', %s, %s)",
                         (user_id, in_app_msg, appt["id"]),
@@ -1335,13 +1335,13 @@ def _generate_reminders(db, user_id: int):
                             user_id,
                             fb_title,
                             fb_body,
-                            "https://g.page/r/HemAngiGlamSalon/review",
-                            notif_type="feedback",
+                            "/feedback",
+                            notif_type="post_treatment_feedback",
                             actions=[
-                                {"action": "leave_review", "title": "⭐ Leave Review", "url": "https://g.page/r/HemAngiGlamSalon/review"},
+                                {"action": "leave_review", "title": "⭐ Leave Review", "url": "/feedback"},
                                 {"action": "open", "title": "View Booking", "url": "/my-bookings"}
                             ],
-                            review_url="https://g.page/r/HemAngiGlamSalon/review",
+                            review_url="/feedback",
                         )
                     except Exception:
                         pass
@@ -2253,7 +2253,7 @@ def admin_update_booking_status(booking_id: int):
                 fb_body = f"Thank you for choosing Hemangi Glam Salon, {client_name}. We’d appreciate a quick moment of your time to share feedback on your recent treatment!"
                 in_app_msg = (
                     f"{fb_body} We hope you loved your {booking['service_name']} session on {booking['date']}. "
-                    f"Tap to share your review: https://g.page/r/HemAngiGlamSalon/review"
+                    f"Tap to share your review: /feedback"
                 )
                 cur.execute(
                     "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, %s, %s, %s)",
@@ -2266,13 +2266,13 @@ def admin_update_booking_status(booking_id: int):
                     booking["user_id"],
                     fb_title,
                     fb_body,
-                    "https://g.page/r/HemAngiGlamSalon/review",
-                    notif_type="feedback",
+                    "/feedback",
+                    notif_type="post_treatment_feedback",
                     actions=[
-                        {"action": "leave_review", "title": "⭐ Leave Review", "url": "https://g.page/r/HemAngiGlamSalon/review"},
+                        {"action": "leave_review", "title": "⭐ Leave Review", "url": "/feedback"},
                         {"action": "open", "title": "View Booking", "url": "/my-bookings"}
                     ],
-                    review_url="https://g.page/r/HemAngiGlamSalon/review",
+                    review_url="/feedback",
                 )
             else:
                 status_labels = {
@@ -3193,7 +3193,7 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                             client_name = (p_appt.get("user_name") or "Valued Client").strip()
                             fb_title = "How was your visit? 🌸"
                             fb_body = f"Thank you for choosing Hemangi Glam Salon, {client_name}. We’d appreciate a quick moment of your time to share feedback on your recent treatment!"
-                            in_app_msg = f"{fb_body} Tap to share your review: https://g.page/r/HemAngiGlamSalon/review"
+                            in_app_msg = f"{fb_body} Tap to share your review: /feedback"
                             cur.execute(
                                 "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'post_treatment_feedback', %s, %s)",
                                 (p_appt["user_id"], in_app_msg, p_appt["id"]),
@@ -3205,13 +3205,13 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                                     p_appt["user_id"],
                                     fb_title,
                                     fb_body,
-                                    "https://g.page/r/HemAngiGlamSalon/review",
+                                    "/feedback",
                                     notif_type="post_treatment_feedback",
                                     actions=[
-                                        {"action": "leave_review", "title": "⭐ Leave Review", "url": "https://g.page/r/HemAngiGlamSalon/review"},
+                                        {"action": "leave_review", "title": "⭐ Leave Review", "url": "/feedback"},
                                         {"action": "open", "title": "View Booking", "url": "/my-bookings"}
                                     ],
-                                    review_url="https://g.page/r/HemAngiGlamSalon/review",
+                                    review_url="/feedback",
                                 )
                             except Exception as pe:
                                 print(f"[scheduler] Auto-feedback push error: {pe}")

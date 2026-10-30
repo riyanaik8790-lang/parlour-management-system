@@ -38,7 +38,7 @@ self.addEventListener("push", function (event) {
   let actions = [
     { action: "open", title: "View Details" },
   ];
-  let reviewUrl = "https://g.page/r/HemAngiGlamSalon/review";
+  let reviewUrl = APP_ORIGIN + "/feedback";
 
   if (event.data) {
     try {
@@ -119,14 +119,14 @@ self.addEventListener("notificationclick", function (event) {
 
   // If user clicked the "Leave Review" action button directly
   if (event.action === "leave_review") {
-    targetUrl = notifData.review_url || "https://g.page/r/HemAngiGlamSalon/review";
+    targetUrl = notifData.review_url || APP_ORIGIN + "/feedback";
   } else if (event.action === "open") {
     targetUrl = notifData.url || APP_ORIGIN + "/my-bookings";
   } else if (!event.action) {
     // Tapping the main notification body:
     // If it's a feedback notification, navigate directly to review URL
     if (notifData.type === "feedback" || notifData.type === "post_treatment_feedback") {
-      targetUrl = notifData.review_url || notifData.url || "https://g.page/r/HemAngiGlamSalon/review";
+      targetUrl = notifData.review_url || notifData.url || APP_ORIGIN + "/feedback";
     }
   }
 
