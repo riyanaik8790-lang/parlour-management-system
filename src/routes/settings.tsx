@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api, clearSession, getUser, setSession, getToken, getAdminToken, type AppNotification } from "@/lib/api";
+import { api, clearSession, getUser, setSession, getToken, getAdminToken, getAdminUser, setAdminSession, type AppNotification } from "@/lib/api";
 import { supabase, AVATAR_BUCKET, AVATAR_MAX_BYTES } from "@/lib/supabase";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import {
@@ -197,16 +197,17 @@ function SettingsPage() {
 
   const handleDeleteNotification = async (id: number) => {
     setDeletingNotifId(id);
+    // 1. Optimistic removal - disappears immediately
+    setHistoryNotifications((prev) => prev.filter((n) => n.id !== id));
+    toast.success("Notification removed");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("notifications-changed"));
+    }
+    // 2. Persist deletion to localStorage & backend
     try {
       await api.deleteNotification(id);
-      setHistoryNotifications((prev) => prev.filter((n) => n.id !== id));
-      toast.success("Notification removed");
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("notifications-changed"));
-      }
     } catch (e) {
-      console.error("Failed to delete notification:", e);
-      toast.error(e instanceof Error ? e.message : "Failed to delete notification");
+      console.warn("Failed to sync notification deletion to backend:", e);
     } finally {
       setDeletingNotifId(null);
     }
@@ -214,17 +215,19 @@ function SettingsPage() {
 
   const handleClearHistory = async () => {
     setClearingHistory(true);
+    const allIds = historyNotifications.map((n) => n.id);
+    // 1. Optimistic removal - disappears immediately
+    setHistoryNotifications([]);
+    setShowClearConfirm(false);
+    toast.success("Notification history cleared");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("notifications-changed"));
+    }
+    // 2. Persist clear to localStorage & backend
     try {
-      await api.clearAllNotifications();
-      setHistoryNotifications([]);
-      setShowClearConfirm(false);
-      toast.success("Notification history cleared");
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("notifications-changed"));
-      }
+      await api.clearAllNotifications(allIds);
     } catch (e) {
-      console.error("Failed to clear notification history:", e);
-      toast.error(e instanceof Error ? e.message : "Failed to clear notification history");
+      console.warn("Failed to sync notification clear to backend:", e);
     } finally {
       setClearingHistory(false);
     }
@@ -562,6 +565,9 @@ function SettingsPage() {
 
       setAvatarUrl(`${publicUrl}?t=${Date.now()}`);
       setIsAvatarMenuOpen(false);
+      window.dispatchEvent(new Event("salon-profile-updated"));
+      window.dispatchEvent(new Event("salon-auth-change"));
+      window.dispatchEvent(new Event("salon-admin-auth-change"));
       toast.success("Profile photo updated!");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed";
@@ -621,6 +627,9 @@ function SettingsPage() {
 
       // 3. Update React state immediately so UI switches back to initials fallback
       setAvatarUrl(null);
+      window.dispatchEvent(new Event("salon-profile-updated"));
+      window.dispatchEvent(new Event("salon-auth-change"));
+      window.dispatchEvent(new Event("salon-admin-auth-change"));
       toast.success("Profile photo removed");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to remove photo";
@@ -649,14 +658,24 @@ function SettingsPage() {
     try {
       const res = await api.updateProfile({ name: trimName, phone: trimPhone });
       const stored = getUser();
+      const adminStored = getAdminUser();
       const token = getAdminToken() ?? getToken() ?? "";
-      if (stored)
+      if (stored) {
         setSession(
           token,
-          { ...stored, name: res.user.name },
+          { ...stored, name: res.user.name, avatar_url: res.profile.avatar_url ?? stored.avatar_url },
           localStorage.getItem("salon_remember") === "1",
         );
+      }
+      if (adminStored) {
+        setAdminSession(
+          token,
+          { ...adminStored, name: res.user.name, avatar_url: res.profile.avatar_url ?? adminStored.avatar_url },
+        );
+      }
+      window.dispatchEvent(new Event("salon-profile-updated"));
       window.dispatchEvent(new Event("salon-auth-change"));
+      window.dispatchEvent(new Event("salon-admin-auth-change"));
       setName(res.profile.name);
       setPhone(res.profile.phone);
       setInfoSuccess(true);

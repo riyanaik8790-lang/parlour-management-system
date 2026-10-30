@@ -310,6 +310,20 @@ function AdminUsersPage() {
 
   useEffect(() => {
     loadUsers();
+
+    const handleProfileUpdate = () => {
+      loadUsers();
+    };
+    window.addEventListener("salon-profile-updated", handleProfileUpdate);
+    window.addEventListener("salon-auth-change", handleProfileUpdate);
+    window.addEventListener("salon-admin-auth-change", handleProfileUpdate);
+    window.addEventListener("storage", handleProfileUpdate);
+    return () => {
+      window.removeEventListener("salon-profile-updated", handleProfileUpdate);
+      window.removeEventListener("salon-auth-change", handleProfileUpdate);
+      window.removeEventListener("salon-admin-auth-change", handleProfileUpdate);
+      window.removeEventListener("storage", handleProfileUpdate);
+    };
   }, []);
 
   function openConfirm(user: AdminUser, action: "promote" | "demote" | "delete") {
@@ -578,14 +592,25 @@ function AdminUsersPage() {
                       <div key={u.id} className="p-4 space-y-3">
                         <div className="flex items-start gap-3">
                           <div
-                            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold overflow-hidden shadow-sm ring-1 ring-[oklch(0.88_0.030_82)]"
                             style={{
                               background:
                                 "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
                               color: "oklch(0.99 0.01 85)",
                             }}
                           >
-                            {u.name[0]?.toUpperCase()}
+                            {u.avatar_url ? (
+                              <img
+                                src={u.avatar_url}
+                                alt={u.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              u.name[0]?.toUpperCase()
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p
@@ -779,14 +804,25 @@ function AdminUsersPage() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div
-                                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md"
+                                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md overflow-hidden ring-1 ring-[oklch(0.88_0.030_82)]"
                                   style={{
                                     background:
                                       "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
                                     color: "oklch(0.99 0.01 85)",
                                   }}
                                 >
-                                  {u.name[0]?.toUpperCase()}
+                                  {u.avatar_url ? (
+                                    <img
+                                      src={u.avatar_url}
+                                      alt={u.name}
+                                      className="h-full w-full object-cover"
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLElement).style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    u.name[0]?.toUpperCase()
+                                  )}
                                 </div>
                                 <div>
                                   <p

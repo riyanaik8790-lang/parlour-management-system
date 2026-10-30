@@ -201,6 +201,9 @@ function ProfilePage() {
       // ── 7. Update local UI state immediately ─────────────────────────────
       // Append a cache-busting timestamp so the browser fetches the new image
       setAvatarUrl(`${publicUrl}?t=${Date.now()}`);
+      window.dispatchEvent(new Event("salon-profile-updated"));
+      window.dispatchEvent(new Event("salon-auth-change"));
+      window.dispatchEvent(new Event("salon-admin-auth-change"));
       toast.success("Profile photo updated!");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed";
@@ -242,6 +245,9 @@ function ProfilePage() {
           { ...stored, name: res.user.name },
           window.localStorage.getItem("salon_remember") === "1",
         );
+      window.dispatchEvent(new Event("salon-profile-updated"));
+      window.dispatchEvent(new Event("salon-auth-change"));
+      window.dispatchEvent(new Event("salon-admin-auth-change"));
       setName(res.profile.name);
       setPhone(res.profile.phone);
       setInfoSuccess(true);

@@ -63,10 +63,12 @@ export function Navbar() {
     sync();
     window.addEventListener("salon-auth-change", sync);
     window.addEventListener("salon-admin-auth-change", sync);
+    window.addEventListener("salon-profile-updated", sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("salon-auth-change", sync);
       window.removeEventListener("salon-admin-auth-change", sync);
+      window.removeEventListener("salon-profile-updated", sync);
       window.removeEventListener("storage", sync);
     };
   }, []);

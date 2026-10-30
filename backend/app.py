@@ -1233,7 +1233,8 @@ def _generate_reminders(db, user_id: int):
                FROM appointments a
                JOIN services s ON s.id = a.service_id
                WHERE a.user_id = %s AND a.status = 'confirmed'
-                 AND a.date >= CURRENT_DATE""",
+                 AND a.date >= CURRENT_DATE
+                 AND (a.reminder_sent IS FALSE OR a.reminder_sent IS NULL)""",
             (user_id,),
         )
         upcoming = cur.fetchall()
@@ -1282,6 +1283,7 @@ def _generate_reminders(db, user_id: int):
                JOIN services s ON s.id = a.service_id
                WHERE a.user_id = %s AND a.date <= CURRENT_DATE
                  AND a.status IN ('confirmed', 'completed')
+                 AND (a.feedback_sent IS FALSE OR a.feedback_sent IS NULL)
                  AND NOT EXISTS (
                      SELECT 1 FROM notifications n
                      WHERE n.booking_id = a.id AND n.type = 'post_treatment_feedback'
@@ -1304,6 +1306,7 @@ def _generate_reminders(db, user_id: int):
                         "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'post_treatment_feedback', %s, %s)",
                         (user_id, fb_msg, appt["id"]),
                     )
+                    cur.execute("UPDATE appointments SET feedback_sent = true WHERE id = %s", (appt["id"],))
                     try:
                         _send_push(
                             db,
@@ -1414,6 +1417,13 @@ def delete_notification(notification_id):
     try:
         db = get_db()
         cur = db.cursor()
+        # Mark associated appointment so reminders / feedback don't regenerate
+        cur.execute(
+            """UPDATE appointments
+               SET feedback_sent = TRUE, reminder_sent = TRUE
+               WHERE id = (SELECT booking_id FROM notifications WHERE id = %s)""",
+            (notification_id,),
+        )
         if g.current_user.get("role") == "ADMIN":
             cur.execute("DELETE FROM notifications WHERE id = %s", (notification_id,))
         else:
@@ -1434,6 +1444,13 @@ def clear_all_notifications():
     try:
         db = get_db()
         cur = db.cursor()
+        # Mark all past appointments for this user so feedback / reminders don't regenerate
+        cur.execute(
+            """UPDATE appointments
+               SET feedback_sent = TRUE, reminder_sent = TRUE
+               WHERE user_id = %s AND date <= CURRENT_DATE""",
+            (user_id,),
+        )
         cur.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
         deleted = cur.rowcount
         db.commit()
@@ -1823,7 +1840,7 @@ def list_skin_analyses():
 def admin_list_users():
     try:
         cur = get_db().cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id, name, email, phone, role, created_at FROM users ORDER BY created_at DESC")
+        cur.execute("SELECT id, name, email, phone, role, avatar_url, created_at FROM users ORDER BY created_at DESC")
         rows = cur.fetchall()
         cur.close()
         for row in rows:
@@ -1977,6 +1994,7 @@ def admin_list_bookings():
                        COALESCE(a.offline_name, u.name, 'Unknown')  AS user_name,
                        COALESCE(u.email, '')                        AS user_email,
                        COALESCE(a.offline_phone, u.phone, '')       AS user_phone,
+                       u.avatar_url                                 AS user_avatar_url,
                        s.id AS service_id, s.name AS service_name, s.price AS service_price, s.category
                 FROM appointments a
                 LEFT JOIN users u ON u.id = a.user_id
@@ -1995,6 +2013,7 @@ def admin_list_bookings():
                        COALESCE(a.offline_name, u.name, 'Unknown')  AS user_name,
                        COALESCE(u.email, '')                        AS user_email,
                        COALESCE(a.offline_phone, u.phone, '')       AS user_phone,
+                       u.avatar_url                                 AS user_avatar_url,
                        s.id AS service_id, s.name AS service_name, s.price AS service_price, s.category
                 FROM appointments a
                 LEFT JOIN users u ON u.id = a.user_id
@@ -3142,6 +3161,7 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                                 "INSERT INTO notifications (user_id, type, message, booking_id) VALUES (%s, 'post_treatment_feedback', %s, %s)",
                                 (p_appt["user_id"], fb_msg, p_appt["id"]),
                             )
+                            cur.execute("UPDATE appointments SET feedback_sent = true WHERE id = %s", (p_appt["id"],))
                             if p_appt.get("push_enabled"):
                                 try:
                                     _send_push(

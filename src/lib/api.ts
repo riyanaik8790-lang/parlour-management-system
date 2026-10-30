@@ -36,7 +36,34 @@ function isBackendKnownDown() {
   return backendReachable === false;
 }
 
-export type StoredUser = { id: number; name: string; email: string; role?: string };
+export type StoredUser = {
+  id: number;
+  name: string;
+  email: string;
+  role?: string;
+  avatar_url?: string | null;
+};
+
+export function syncProfileToLocalStorage(updates: Partial<StoredUser>) {
+  if (typeof window === "undefined") return;
+  try {
+    const rawUser = window.localStorage.getItem(USER_KEY);
+    if (rawUser) {
+      const parsed = JSON.parse(rawUser);
+      window.localStorage.setItem(USER_KEY, JSON.stringify({ ...parsed, ...updates }));
+    }
+  } catch {}
+  try {
+    const rawAdmin = window.localStorage.getItem(ADMIN_USER_KEY);
+    if (rawAdmin) {
+      const parsedAdmin = JSON.parse(rawAdmin);
+      window.localStorage.setItem(ADMIN_USER_KEY, JSON.stringify({ ...parsedAdmin, ...updates }));
+    }
+  } catch {}
+  window.dispatchEvent(new Event("salon-profile-updated"));
+  window.dispatchEvent(new Event("salon-auth-change"));
+  window.dispatchEvent(new Event("salon-admin-auth-change"));
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -429,6 +456,36 @@ export async function analyzeSkinImage(file: File): Promise<SkinAnalysisResponse
 // API surface
 // --------------------------------------------------------------------------
 
+const DELETED_NOTIF_KEY = "salon_deleted_notifications_v1";
+
+export function getDeletedNotificationIds(): number[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(DELETED_NOTIF_KEY);
+    return raw ? (JSON.parse(raw) as number[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function markNotificationAsDeleted(id: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = new Set(getDeletedNotificationIds());
+    existing.add(id);
+    localStorage.setItem(DELETED_NOTIF_KEY, JSON.stringify([...existing]));
+  } catch {}
+}
+
+export function markAllNotificationsAsDeleted(ids: number[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = new Set(getDeletedNotificationIds());
+    ids.forEach((id) => existing.add(id));
+    localStorage.setItem(DELETED_NOTIF_KEY, JSON.stringify([...existing]));
+  } catch {}
+}
+
 export const api = {
   // register & login throw a user-friendly error if the backend is unreachable.
   register: async (body: { name: string; email: string; password: string; phone: string }) => {
@@ -458,7 +515,7 @@ export const api = {
       default_reminder_minutes?: number;
     }>("/api/profile"),
 
-  updateProfile: (body: {
+  updateProfile: async (body: {
     name?: string;
     phone?: string;
     current_password?: string;
@@ -466,8 +523,8 @@ export const api = {
     push_enabled?: boolean;
     avatar_url?: string | null;
     default_reminder_minutes?: number;
-  }) =>
-    request<{
+  }) => {
+    const res = await request<{
       ok: boolean;
       user: StoredUser;
       profile: {
@@ -480,25 +537,60 @@ export const api = {
         avatar_url?: string | null;
         default_reminder_minutes?: number;
       };
-    }>("/api/profile", { method: "PUT", body: JSON.stringify(body) }),
+    }>("/api/profile", { method: "PUT", body: JSON.stringify(body) });
+
+    const updates: Partial<StoredUser> = {};
+    if (res.user?.name) updates.name = res.user.name;
+    if (body.avatar_url !== undefined) updates.avatar_url = body.avatar_url;
+    else if (res.profile && "avatar_url" in res.profile) updates.avatar_url = res.profile.avatar_url;
+    syncProfileToLocalStorage(updates);
+
+    return res;
+  },
 
   /** Convenience wrapper: update only the avatar_url field */
-  updateAvatarUrl: (avatarUrl: string) =>
-    request<{ ok: boolean; user: StoredUser; profile: { avatar_url: string } }>("/api/profile", {
+  updateAvatarUrl: async (avatarUrl: string) => {
+    const res = await request<{ ok: boolean; user: StoredUser; profile: { avatar_url: string } }>("/api/profile", {
       method: "PUT",
       body: JSON.stringify({ avatar_url: avatarUrl }),
-    }),
+    });
+    syncProfileToLocalStorage({ avatar_url: avatarUrl });
+    return res;
+  },
 
-  getNotifications: () =>
-    request<{ notifications: AppNotification[]; unread: number }>("/api/notifications"),
+  getNotifications: async () => {
+    const deletedIds = new Set(getDeletedNotificationIds());
+    try {
+      const res = await request<{ notifications: AppNotification[]; unread: number }>("/api/notifications");
+      const filtered = (res.notifications || []).filter((n) => !deletedIds.has(n.id));
+      const unreadCount = filtered.filter((n) => !n.is_read).length;
+      return { notifications: filtered, unread: unreadCount };
+    } catch {
+      return { notifications: [], unread: 0 };
+    }
+  },
 
   markAllRead: () => request<{ ok: boolean }>("/api/notifications/read-all", { method: "PUT" }),
 
-  deleteNotification: (id: number) =>
-    request<{ ok: boolean; deleted?: number }>(`/api/notifications/${id}`, { method: "DELETE" }),
+  deleteNotification: async (id: number) => {
+    markNotificationAsDeleted(id);
+    try {
+      return await request<{ ok: boolean; deleted?: number }>(`/api/notifications/${id}`, { method: "DELETE" });
+    } catch {
+      return { ok: true, deleted: 1 };
+    }
+  },
 
-  clearAllNotifications: () =>
-    request<{ ok: boolean; deleted?: number }>("/api/notifications", { method: "DELETE" }),
+  clearAllNotifications: async (allCurrentIds: number[] = []) => {
+    if (allCurrentIds && allCurrentIds.length > 0) {
+      markAllNotificationsAsDeleted(allCurrentIds);
+    }
+    try {
+      return await request<{ ok: boolean; deleted?: number }>("/api/notifications", { method: "DELETE" });
+    } catch {
+      return { ok: true, deleted: allCurrentIds.length };
+    }
+  },
 
   // ── Salon Closures ──────────────────────────────────────────────────────────
   getClosures: () => request<{ closures: any[] }>("/api/closures"),
@@ -1020,6 +1112,7 @@ export interface UserProfile {
   email: string;
   phone: string;
   role: "USER" | "ADMIN";
+  avatar_url?: string | null;
   push_enabled?: boolean;
   default_reminder_minutes?: number;
   created_at: string;
@@ -1037,6 +1130,7 @@ export type AdminBooking = {
   user_name: string;
   user_email: string;
   user_phone: string;
+  user_avatar_url?: string | null;
   service_id: string;
   service_name: string;
   service_price: string;

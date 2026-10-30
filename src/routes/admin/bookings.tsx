@@ -198,6 +198,17 @@ function AdminBookingsPage() {
 
   useEffect(() => {
     loadBookings();
+    const handleSync = () => {
+      loadBookings();
+    };
+    window.addEventListener("salon-profile-updated", handleSync);
+    window.addEventListener("salon-auth-change", handleSync);
+    window.addEventListener("salon-admin-auth-change", handleSync);
+    return () => {
+      window.removeEventListener("salon-profile-updated", handleSync);
+      window.removeEventListener("salon-auth-change", handleSync);
+      window.removeEventListener("salon-admin-auth-change", handleSync);
+    };
   }, []);
 
   async function handleStatusUpdate(id: number, status: string) {
@@ -292,39 +303,6 @@ function AdminBookingsPage() {
               Refresh
             </button>
           </div>
-        </div>
-
-        {/* 100% Free Background Automation Status Banner */}
-        <div
-          className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl p-3 sm:p-4 text-xs sm:text-sm shadow-sm"
-          style={{
-            background: "linear-gradient(135deg, oklch(0.98 0.015 85), oklch(0.96 0.025 88))",
-            border: "1px solid oklch(0.88 0.030 82)",
-            color: "oklch(0.35 0.08 40)",
-          }}
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            <span className="font-semibold" style={{ color: "oklch(0.30 0.12 145)" }}>
-              Free Background Automation Active
-            </span>
-            <span className="text-muted-foreground hidden md:inline">
-              • APScheduler runs every 60s in background to send Web Push reminders & post-treatment review alerts with zero manual admin clicks.
-            </span>
-          </div>
-          <span
-            className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
-            style={{
-              background: "#25D36618",
-              color: "#16a34a",
-              border: "1px solid #25D36640",
-            }}
-          >
-            100% Free Tier
-          </span>
         </div>
 
         {/* Status filter chips - Horizontal swipeable/scrollable bar */}
@@ -501,7 +479,7 @@ function AdminBookingsPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold overflow-hidden"
                             style={{
                               background: b.offline_name
                                 ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
@@ -509,7 +487,20 @@ function AdminBookingsPage() {
                               color: "oklch(0.99 0.01 85)",
                             }}
                           >
-                            {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
+                            {b.offline_name ? (
+                              "🚶"
+                            ) : b.user_avatar_url ? (
+                              <img
+                                src={b.user_avatar_url}
+                                alt={b.user_name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              b.user_name[0]?.toUpperCase()
+                            )}
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -647,7 +638,7 @@ function AdminBookingsPage() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div
-                                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md"
+                                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md overflow-hidden"
                                 style={{
                                   background: b.offline_name
                                     ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
@@ -655,7 +646,20 @@ function AdminBookingsPage() {
                                   color: "oklch(0.99 0.01 85)",
                                 }}
                               >
-                                {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
+                                {b.offline_name ? (
+                                  "🚶"
+                                ) : b.user_avatar_url ? (
+                                  <img
+                                    src={b.user_avatar_url}
+                                    alt={b.user_name}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : (
+                                  b.user_name[0]?.toUpperCase()
+                                )}
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5">
