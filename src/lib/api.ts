@@ -122,9 +122,16 @@ export function setSession(token: string, user: StoredUser, remember = true) {
   }
 
   window.dispatchEvent(new Event("salon-auth-change"));
+  // Sync push subscription to current authenticated user
+  if (typeof window !== "undefined") {
+    import("./push").then((m) => m.syncPushSubscriptionWithCurrentUser?.()).catch(() => {});
+  }
 }
 
 export function clearSession() {
+  if (typeof window !== "undefined") {
+    import("./push").then((m) => m.detachPushSubscriptionFromCurrentUser?.()).catch(() => {});
+  }
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
   window.localStorage.removeItem(REMEMBER_KEY);
@@ -156,9 +163,15 @@ export function setAdminSession(token: string, user: StoredUser) {
   window.localStorage.setItem(ADMIN_TOKEN_KEY, token);
   window.localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
   window.dispatchEvent(new Event("salon-admin-auth-change"));
+  if (typeof window !== "undefined") {
+    import("./push").then((m) => m.syncPushSubscriptionWithCurrentUser?.()).catch(() => {});
+  }
 }
 
 export function clearAdminSession() {
+  if (typeof window !== "undefined") {
+    import("./push").then((m) => m.detachPushSubscriptionFromCurrentUser?.()).catch(() => {});
+  }
   window.localStorage.removeItem(ADMIN_TOKEN_KEY);
   window.localStorage.removeItem(ADMIN_USER_KEY);
   window.dispatchEvent(new Event("salon-admin-auth-change"));

@@ -1226,6 +1226,7 @@ def _send_push(
         "body": body,
         "url": url,
         "type": notif_type,
+        "target_user_id": user_id,
         "icon": "/logo.png",
         "badge": "/badge.png",
         "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),

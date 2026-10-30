@@ -13,7 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { registerSW } from "@/lib/push";
+import { registerSW, syncPushSubscriptionWithCurrentUser } from "@/lib/push";
+import { AccountMismatchBanner } from "@/components/AccountMismatchBanner";
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -138,15 +139,21 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   // Register the push service worker once on startup (non-blocking, graceful fallback)
+  // and sync browser subscription to currently logged in user
   useEffect(() => {
-    registerSW().catch(() => {
-      /* silently ignore if SW fails to register */
-    });
+    registerSW()
+      .then(() => {
+        syncPushSubscriptionWithCurrentUser();
+      })
+      .catch(() => {
+        /* silently ignore if SW fails to register */
+      });
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex min-h-screen flex-col">
+        <AccountMismatchBanner />
         <Navbar />
         <main className="flex-1">
           <Outlet />

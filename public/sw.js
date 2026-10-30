@@ -40,6 +40,8 @@ self.addEventListener("push", function (event) {
   ];
   let reviewUrl = APP_ORIGIN + "/feedback";
 
+  let targetUserId = null;
+
   if (event.data) {
     try {
       const data = event.data.json();
@@ -48,6 +50,7 @@ self.addEventListener("push", function (event) {
         if (data.body)   body   = data.body;
         if (data.url)    url    = data.url;
         if (data.type)   type   = data.type;
+        if (data.target_user_id) targetUserId = data.target_user_id;
         if (data.icon)   icon   = data.icon.startsWith("http") ? data.icon : APP_ORIGIN + (data.icon.startsWith("/") ? "" : "/") + data.icon;
         if (data.badge)  badge  = data.badge.startsWith("http") ? data.badge : APP_ORIGIN + (data.badge.startsWith("/") ? "" : "/") + data.badge;
         if (Array.isArray(data.actions) && data.actions.length > 0) {
@@ -84,7 +87,7 @@ self.addEventListener("push", function (event) {
     renotify:          true,
     requireInteraction: needsInteraction,
     vibrate:           [200, 100, 200],
-    data:              { url: url, review_url: reviewUrl, type: type },
+    data:              { url: url, review_url: reviewUrl, type: type, target_user_id: targetUserId },
     actions:           actions,
   };
 
@@ -118,10 +121,18 @@ self.addEventListener("notificationclick", function (event) {
   let targetUrl = notifData.url || APP_ORIGIN + "/my-bookings";
 
   // Normalize relative paths to absolute URLs so clients.openWindow / clients.matchAll works reliably
+  // and append target_user_id param so client app can verify logged-in account
   const resolveUrl = function (u) {
-    if (!u) return APP_ORIGIN + "/my-bookings";
-    if (/^https?:\/\//i.test(u)) return u;
-    return APP_ORIGIN + (u.startsWith("/") ? "" : "/") + u;
+    if (!u) u = APP_ORIGIN + "/my-bookings";
+    let fullUrl = /^https?:\/\//i.test(u) ? u : (APP_ORIGIN + (u.startsWith("/") ? "" : "/") + u);
+    if (notifData.target_user_id && fullUrl.startsWith(APP_ORIGIN)) {
+      try {
+        const parsed = new URL(fullUrl);
+        parsed.searchParams.set("notif_user_id", String(notifData.target_user_id));
+        fullUrl = parsed.toString();
+      } catch (_) {}
+    }
+    return fullUrl;
   };
 
   // If user clicked the "Leave Review" action button directly

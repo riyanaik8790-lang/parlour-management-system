@@ -210,6 +210,61 @@ export async function unsubscribeFromPush(): Promise<void> {
   }
 }
 
+// ── Multi-Account Device Subscription Re-sync ─────────────────────────────────
+
+/**
+ * When a user logs in, switches accounts, or boots the app, check if this browser
+ * device already has an active push subscription. If yes, re-bind it to the active
+ * user account on the backend so notifications route to the current authenticated user
+ * instead of a previous user who used this device/browser.
+ */
+export async function syncPushSubscriptionWithCurrentUser(): Promise<void> {
+  if (!isPushSupported()) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    const reg = await getSWReg();
+    if (!reg) return;
+    const existing = await reg.pushManager.getSubscription();
+    if (!existing) return;
+
+    const json = existing.toJSON();
+    const p256dh = json.keys?.p256dh || "";
+    const auth = json.keys?.auth || "";
+
+    if (json.endpoint && p256dh && auth) {
+      console.log("[push] Syncing browser subscription with backend for current user...");
+      await api.subscribePush({
+        endpoint: json.endpoint,
+        p256dh,
+        auth,
+      });
+      console.log("[push] Device push subscription securely tied to active user session ✔");
+    }
+  } catch (err) {
+    console.warn("[push] syncPushSubscriptionWithCurrentUser failed (non-fatal):", err);
+  }
+}
+
+/**
+ * On user logout: unregister this device endpoint from backend push subscriptions
+ * so notifications for that user stop immediately on this browser.
+ */
+export async function detachPushSubscriptionFromCurrentUser(): Promise<void> {
+  if (!isPushSupported()) return;
+  try {
+    const reg = await getSWReg();
+    if (!reg) return;
+    const existing = await reg.pushManager.getSubscription();
+    if (!existing) return;
+
+    console.log("[push] Detaching device endpoint from backend on logout...");
+    await api.unsubscribePush(existing.endpoint);
+    console.log("[push] Backend push endpoint detached on logout ✔");
+  } catch (err) {
+    console.warn("[push] detachPushSubscriptionFromCurrentUser error (non-fatal):", err);
+  }
+}
+
 // ── Convenience: is the current browser already subscribed? ──────────────────
 
 export async function isSubscribed(): Promise<boolean> {
