@@ -3093,7 +3093,8 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         """Check for upcoming appointments due for reminder according to their custom window (e.g. 15m, 30m, 1h, 2h, 24h)."""
         try:
             # We must create a fresh DB connection because this runs in a background thread, outside Flask's app context.
-            db_url = os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DATABASE_URL")
+            # Use the same sanitised DSN the main app uses (strips surrounding quotes, adds sslmode=require).
+            db_url = DB_DSN
             if not db_url: return
 
             db = psycopg2.connect(db_url)
@@ -3151,12 +3152,11 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                             (appt["user_id"], msg, appt["id"]),
                         )
 
-                        if appt.get("push_enabled"):
-                            try:
-                                title = "Appointment Starting Soon ⏰" if remind_mins <= 60 else "Appointment Reminder 🔔"
-                                _send_push(db, appt["user_id"], title, msg, "/my-bookings")
-                            except Exception as pe:
-                                print(f"[scheduler] Push error for user {appt['user_id']}: {pe}")
+                        try:
+                            title = "Appointment Starting Soon ⏰" if remind_mins <= 60 else "Appointment Reminder 🔔"
+                            _send_push(db, appt["user_id"], title, msg, "/my-bookings", notif_type="appointment_reminder")
+                        except Exception as pe:
+                            print(f"[scheduler] Push error for user {appt['user_id']}: {pe}")
                 except Exception as ex:
                     print(f"[scheduler] Error evaluating reminder for appointment {appt.get('id')}: {ex}")
 
@@ -3199,23 +3199,22 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                                 (p_appt["user_id"], in_app_msg, p_appt["id"]),
                             )
                             cur.execute("UPDATE appointments SET feedback_sent = true WHERE id = %s", (p_appt["id"],))
-                            if p_appt.get("push_enabled"):
-                                try:
-                                    _send_push(
-                                        db,
-                                        p_appt["user_id"],
-                                        fb_title,
-                                        fb_body,
-                                        "https://g.page/r/HemAngiGlamSalon/review",
-                                        notif_type="feedback",
-                                        actions=[
-                                            {"action": "leave_review", "title": "⭐ Leave Review", "url": "https://g.page/r/HemAngiGlamSalon/review"},
-                                            {"action": "open", "title": "View Booking", "url": "/my-bookings"}
-                                        ],
-                                        review_url="https://g.page/r/HemAngiGlamSalon/review",
-                                    )
-                                except Exception as pe:
-                                    print(f"[scheduler] Auto-feedback push error: {pe}")
+                            try:
+                                _send_push(
+                                    db,
+                                    p_appt["user_id"],
+                                    fb_title,
+                                    fb_body,
+                                    "https://g.page/r/HemAngiGlamSalon/review",
+                                    notif_type="post_treatment_feedback",
+                                    actions=[
+                                        {"action": "leave_review", "title": "⭐ Leave Review", "url": "https://g.page/r/HemAngiGlamSalon/review"},
+                                        {"action": "open", "title": "View Booking", "url": "/my-bookings"}
+                                    ],
+                                    review_url="https://g.page/r/HemAngiGlamSalon/review",
+                                )
+                            except Exception as pe:
+                                print(f"[scheduler] Auto-feedback push error: {pe}")
                     except Exception as p_ex:
                         print(f"[scheduler] Error evaluating past appointment {p_appt.get('id')}: {p_ex}")
             except Exception as fb_err:
@@ -3251,7 +3250,7 @@ if SCHEDULER_AVAILABLE and not os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         ARCHIVE_THRESHOLD_MB = 400   # trigger archiving above this size
         ARCHIVE_BATCH_SIZE   = 10_000  # rows to archive per run
 
-        db_url = os.getenv("DATABASE_URL")
+        db_url = DB_DSN
         if not db_url:
             print("[archive] DATABASE_URL not set — skipping.")
             return
