@@ -48,8 +48,8 @@ self.addEventListener("push", function (event) {
         if (data.body)   body   = data.body;
         if (data.url)    url    = data.url;
         if (data.type)   type   = data.type;
-        if (data.icon)   icon   = data.icon;
-        if (data.badge)  badge  = data.badge;
+        if (data.icon)   icon   = data.icon.startsWith("http") ? data.icon : APP_ORIGIN + (data.icon.startsWith("/") ? "" : "/") + data.icon;
+        if (data.badge)  badge  = data.badge.startsWith("http") ? data.badge : APP_ORIGIN + (data.badge.startsWith("/") ? "" : "/") + data.badge;
         if (Array.isArray(data.actions) && data.actions.length > 0) {
           actions = data.actions;
         }

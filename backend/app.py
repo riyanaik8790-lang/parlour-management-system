@@ -1139,6 +1139,9 @@ def _send_push(
         "body": body,
         "url": url,
         "type": notif_type,
+        "icon": "/logo.png",
+        "badge": "/badge.png",
+        "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
     }
     if actions:
         payload_dict["actions"] = actions
@@ -1147,6 +1150,12 @@ def _send_push(
 
     payload = _json.dumps(payload_dict)
     stale_endpoints = []
+
+    # Mobile OS Push headers (Urgency: high for heads-up alert, Topic for grouping)
+    push_headers = {
+        "Urgency": "high",
+        "Topic": (notif_type or "salon-alert").replace("_", "-")[:32],
+    }
 
     # Broadcast to all registered devices
     for sub in all_subs:
@@ -1161,6 +1170,8 @@ def _send_push(
                 data=payload,
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
+                ttl=86400,
+                headers=push_headers,
             )
             print(f"[push] ✔ Push sent successfully to device {ep[:60]}")
         except WebPushException as e:
