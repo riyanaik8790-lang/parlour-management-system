@@ -117,20 +117,30 @@ self.addEventListener("notificationclick", function (event) {
   const notifData = event.notification.data || {};
   let targetUrl = notifData.url || APP_ORIGIN + "/my-bookings";
 
+  // Normalize relative paths to absolute URLs so clients.openWindow / clients.matchAll works reliably
+  const resolveUrl = function (u) {
+    if (!u) return APP_ORIGIN + "/my-bookings";
+    if (/^https?:\/\//i.test(u)) return u;
+    return APP_ORIGIN + (u.startsWith("/") ? "" : "/") + u;
+  };
+
   // If user clicked the "Leave Review" action button directly
   if (event.action === "leave_review") {
-    targetUrl = notifData.review_url || APP_ORIGIN + "/feedback";
+    targetUrl = resolveUrl(notifData.review_url || "/feedback");
   } else if (event.action === "open") {
-    targetUrl = notifData.url || APP_ORIGIN + "/my-bookings";
+    targetUrl = resolveUrl(notifData.url || "/my-bookings");
   } else if (!event.action) {
     // Tapping the main notification body:
-    // If it's a feedback notification, navigate directly to review URL
     if (notifData.type === "feedback" || notifData.type === "post_treatment_feedback") {
-      targetUrl = notifData.review_url || notifData.url || APP_ORIGIN + "/feedback";
+      targetUrl = resolveUrl(notifData.review_url || notifData.url || "/feedback");
+    } else {
+      targetUrl = resolveUrl(notifData.url || "/my-bookings");
     }
+  } else {
+    targetUrl = resolveUrl(notifData.url || "/my-bookings");
   }
 
-  // Check if target is external link (e.g. Google review)
+  // Check if target is external link
   const isExternal = /^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith(APP_ORIGIN);
 
   event.waitUntil(
@@ -138,18 +148,26 @@ self.addEventListener("notificationclick", function (event) {
       .matchAll({ type: "window", includeUncontrolled: true })
       .then(function (windowClients) {
         if (!isExternal) {
-          // Focus and navigate an existing app tab if possible
+          // If an existing window/tab of the salon app is open, focus it and navigate
           for (let i = 0; i < windowClients.length; i++) {
             const client = windowClients[i];
             if (client.url.startsWith(APP_ORIGIN) && "focus" in client) {
               if ("navigate" in client && client.url !== targetUrl) {
-                client.navigate(targetUrl);
+                return client.navigate(targetUrl).then(function (c) {
+                  return c ? c.focus() : client.focus();
+                });
               }
               return client.focus();
             }
           }
         }
-        // Otherwise open a new tab/window directly to the target URL
+        // If app is closed or target is external, reliably open a new tab/window via clients.openWindow
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })
+      .catch(function (err) {
+        console.error("[sw] notificationclick error:", err);
         if (clients.openWindow) {
           return clients.openWindow(targetUrl);
         }
