@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BookRouteImport } from './routes/book'
-import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyBookingsRouteImport } from './routes/my-bookings'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -24,7 +23,6 @@ import { Route as AdminLayoutRouteImport } from './routes/admin/_layout'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
 import { Route as AdminClosuresRouteImport } from './routes/admin/closures'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
-import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminServicesRouteImport } from './routes/admin/services'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 
@@ -36,11 +34,6 @@ const IndexRoute = IndexRouteImport.update({
 const BookRoute = BookRouteImport.update({
   id: '/book',
   path: '/book',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FeedbackRoute = FeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -103,11 +96,6 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminReviewsRoute = AdminReviewsRouteImport.update({
-  id: '/admin/reviews',
-  path: '/admin/reviews',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminServicesRoute = AdminServicesRouteImport.update({
   id: '/admin/services',
   path: '/admin/services',
@@ -122,7 +110,6 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/book': typeof BookRoute
-  '/feedback': typeof FeedbackRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/profile': typeof ProfileRoute
@@ -134,7 +121,6 @@ export interface FileRoutesByFullPath {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/closures': typeof AdminClosuresRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/reviews': typeof AdminReviewsRoute
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
@@ -142,7 +128,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/book': typeof BookRoute
-  '/feedback': typeof FeedbackRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/profile': typeof ProfileRoute
@@ -154,7 +139,6 @@ export interface FileRoutesByTo {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/closures': typeof AdminClosuresRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/reviews': typeof AdminReviewsRoute
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
 }
@@ -162,7 +146,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/book': typeof BookRoute
-  '/feedback': typeof FeedbackRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/profile': typeof ProfileRoute
@@ -174,7 +157,6 @@ export interface FileRoutesById {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/closures': typeof AdminClosuresRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/reviews': typeof AdminReviewsRoute
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
@@ -184,7 +166,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/book'
-    | '/feedback'
     | '/login'
     | '/my-bookings'
     | '/profile'
@@ -196,7 +177,6 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/closures'
     | '/admin/login'
-    | '/admin/reviews'
     | '/admin/services'
     | '/admin/users'
     | '/admin/'
@@ -204,7 +184,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/book'
-    | '/feedback'
     | '/login'
     | '/my-bookings'
     | '/profile'
@@ -216,14 +195,12 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/closures'
     | '/admin/login'
-    | '/admin/reviews'
     | '/admin/services'
     | '/admin/users'
   id:
     | '__root__'
     | '/'
     | '/book'
-    | '/feedback'
     | '/login'
     | '/my-bookings'
     | '/profile'
@@ -235,7 +212,6 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/closures'
     | '/admin/login'
-    | '/admin/reviews'
     | '/admin/services'
     | '/admin/users'
     | '/admin/'
@@ -244,7 +220,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BookRoute: typeof BookRoute
-  FeedbackRoute: typeof FeedbackRoute
   LoginRoute: typeof LoginRoute
   MyBookingsRoute: typeof MyBookingsRoute
   ProfileRoute: typeof ProfileRoute
@@ -256,7 +231,6 @@ export interface RootRouteChildren {
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminClosuresRoute: typeof AdminClosuresRoute
   AdminLoginRoute: typeof AdminLoginRoute
-  AdminReviewsRoute: typeof AdminReviewsRoute
   AdminServicesRoute: typeof AdminServicesRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -276,13 +250,6 @@ declare module '@tanstack/react-router' {
       path: '/book'
       fullPath: '/book'
       preLoaderRoute: typeof BookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/feedback': {
-      id: '/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -369,13 +336,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/reviews': {
-      id: '/admin/reviews'
-      path: '/admin/reviews'
-      fullPath: '/admin/reviews'
-      preLoaderRoute: typeof AdminReviewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/services': {
       id: '/admin/services'
       path: '/admin/services'
@@ -396,7 +356,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BookRoute: BookRoute,
-  FeedbackRoute: FeedbackRoute,
   LoginRoute: LoginRoute,
   MyBookingsRoute: MyBookingsRoute,
   ProfileRoute: ProfileRoute,
@@ -408,7 +367,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminBookingsRoute: AdminBookingsRoute,
   AdminClosuresRoute: AdminClosuresRoute,
   AdminLoginRoute: AdminLoginRoute,
-  AdminReviewsRoute: AdminReviewsRoute,
   AdminServicesRoute: AdminServicesRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,

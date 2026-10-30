@@ -7,7 +7,7 @@
  *  2. ALSO notify any open foreground tabs via postMessage so the in-app bell
  *     can refresh — but postMessage failure must NEVER cancel the OS popup.
  *  3. Each notification gets a unique tag so multiple rapid pushes all appear.
- *  4. Reminders and feedback requests use requireInteraction so they don't
+ *  4. Appointment reminders use requireInteraction so they don't
  *     auto-dismiss after a few seconds.
  */
 
@@ -31,14 +31,13 @@ self.addEventListener("push", function (event) {
   let title = "New Appointment!";
   let body  = "A new appointment has been booked.";
   let url   = APP_ORIGIN + "/admin";
-  let type  = ""; // e.g. "reminder" | "feedback" | "new_booking"
+  let type  = ""; // e.g. "reminder" | "appointment_reminder" | "new_booking"
   let icon  = LOGO_ICON;
   let badge = STATUS_BADGE;
 
   let actions = [
     { action: "open", title: "View Details" },
   ];
-  let reviewUrl = APP_ORIGIN + "/feedback";
 
   let targetUserId = null;
 
@@ -56,7 +55,6 @@ self.addEventListener("push", function (event) {
         if (Array.isArray(data.actions) && data.actions.length > 0) {
           actions = data.actions;
         }
-        if (data.review_url) reviewUrl = data.review_url;
       }
     } catch (_) {
       // Plain-text fallback
@@ -64,20 +62,12 @@ self.addEventListener("push", function (event) {
     }
   }
 
-  // If this is a feedback notification and no specific actions provided, ensure direct review action
-  if ((type === "feedback" || type === "post_treatment_feedback") && actions.length === 1 && actions[0].action === "open") {
-    actions = [
-      { action: "leave_review", title: "⭐ Leave Review" },
-      { action: "open", title: "View Booking" }
-    ];
-  }
-
   // ── 2. Build unique tag so every push shows (not collapses) ───────────────
   const tag = "hemangi-" + (type || "notification") + "-" + Date.now();
 
   // ── 3. requireInteraction for time-sensitive push types ───────────────────
   const needsInteraction =
-    type === "reminder" || type === "feedback" || type === "post_treatment_feedback" || type === "appointment_reminder";
+    type === "reminder" || type === "appointment_reminder";
 
   const notifOptions = {
     body:              body,
@@ -87,7 +77,7 @@ self.addEventListener("push", function (event) {
     renotify:          true,
     requireInteraction: needsInteraction,
     vibrate:           [200, 100, 200],
-    data:              { url: url, review_url: reviewUrl, type: type, target_user_id: targetUserId },
+    data:              { url: url, type: type, target_user_id: targetUserId },
     actions:           actions,
   };
 
@@ -135,21 +125,7 @@ self.addEventListener("notificationclick", function (event) {
     return fullUrl;
   };
 
-  // If user clicked the "Leave Review" action button directly
-  if (event.action === "leave_review") {
-    targetUrl = resolveUrl(notifData.review_url || "/feedback");
-  } else if (event.action === "open") {
-    targetUrl = resolveUrl(notifData.url || "/my-bookings");
-  } else if (!event.action) {
-    // Tapping the main notification body:
-    if (notifData.type === "feedback" || notifData.type === "post_treatment_feedback") {
-      targetUrl = resolveUrl(notifData.review_url || notifData.url || "/feedback");
-    } else {
-      targetUrl = resolveUrl(notifData.url || "/my-bookings");
-    }
-  } else {
-    targetUrl = resolveUrl(notifData.url || "/my-bookings");
-  }
+  targetUrl = resolveUrl(targetUrl);
 
   // Check if target is external link
   const isExternal = /^https?:\/\//i.test(targetUrl) && !targetUrl.startsWith(APP_ORIGIN);

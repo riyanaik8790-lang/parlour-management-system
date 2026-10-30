@@ -21,7 +21,6 @@ import {
   Shield,
   Layers,
   CalendarX,
-  MessageSquareHeart,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/_layout")({
@@ -34,7 +33,6 @@ const NAV_LINKS = [
   { to: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
   { to: "/admin/services", label: "Services", icon: Layers },
   { to: "/admin/closures", label: "Closures", icon: CalendarX },
-  { to: "/admin/reviews", label: "Reviews", icon: MessageSquareHeart },
 ];
 
 function AdminLayout() {
