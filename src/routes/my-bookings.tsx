@@ -6,7 +6,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api, getUser, clearSession } from "@/lib/api";
 import { toast } from "sonner";
-import { CalendarIcon, Loader2, Pencil, Trash2, X, Check, Bell } from "lucide-react";
+import { CalendarIcon, Loader2, Pencil, Trash2, X, Check, Bell, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIME_SLOTS, ALL_SERVICES, REMINDER_OPTIONS, formatReminderLabel } from "@/lib/services-data";
 import {
@@ -31,6 +31,13 @@ export const Route = createFileRoute("/my-bookings")({
 const BURGUNDY = "oklch(0.35 0.15 22)";
 const GOLD = "oklch(0.68 0.13 68)";
 const BORDER = "oklch(0.88 0.030 82)";
+const SALON_WHATSAPP = "918208576165"; // Hemangi Glam Salon
+
+/** Open WhatsApp click-to-chat with pre-filled text (no API needed) */
+function openWhatsApp(phone: string, text: string) {
+  const encoded = encodeURIComponent(text);
+  window.open(`https://wa.me/${phone}?text=${encoded}`, "_blank", "noopener,noreferrer");
+}
 
 type B = {
   id: number;
@@ -650,6 +657,63 @@ function MyBookingsPage() {
                   >
                     {b.status}
                   </span>
+
+                  {/* WhatsApp: Confirmed → Share appointment details */}
+                  {b.status === "confirmed" && (
+                    <button
+                      type="button"
+                      id={`wa-confirm-${b.id}`}
+                      title="Share appointment on WhatsApp"
+                      onClick={() =>
+                        openWhatsApp(
+                          SALON_WHATSAPP,
+                          `Hi! I'd like a reminder for my upcoming appointment at Hemangi Glam Salon:\n\n` +
+                          `📋 Service: ${b.service_name}\n` +
+                          `📅 Date: ${b.date}\n` +
+                          `🕐 Time: ${b.time}\n\n` +
+                          `Please confirm my booking. Thank you! 🙏`,
+                        )
+                      }
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border transition-all hover:scale-105 active:scale-95 shrink-0"
+                      style={{
+                        background: "#25D366",
+                        borderColor: "#1ebe5e",
+                        color: "white",
+                        boxShadow: "0 2px 8px #25D36640",
+                      }}
+                      aria-label="Share appointment on WhatsApp"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                  )}
+
+                  {/* WhatsApp: Completed → Request feedback */}
+                  {b.status === "completed" && (
+                    <button
+                      type="button"
+                      id={`wa-feedback-${b.id}`}
+                      title="Share feedback on WhatsApp"
+                      onClick={() =>
+                        openWhatsApp(
+                          SALON_WHATSAPP,
+                          `Hi Hemangi Glam Salon! 🌸 I recently visited for ${b.service_name} on ${b.date}.\n\n` +
+                          `I'd love to share my experience! Overall it was a wonderful visit. ✨\n\n` +
+                          `Keep up the amazing work! 💖`,
+                        )
+                      }
+                      className="flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 shrink-0"
+                      style={{
+                        background: "#25D366",
+                        borderColor: "#1ebe5e",
+                        color: "white",
+                        boxShadow: "0 2px 8px #25D36640",
+                      }}
+                      aria-label="Share feedback on WhatsApp"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Feedback</span>
+                    </button>
+                  )}
 
                   {b.status === "confirmed" && (
                     <Button

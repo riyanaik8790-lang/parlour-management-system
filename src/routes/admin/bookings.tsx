@@ -11,6 +11,7 @@ import {
   Clock,
   UserX,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +19,86 @@ export const Route = createFileRoute("/admin/bookings")({
   head: () => ({ meta: [{ title: "Bookings - Admin" }] }),
   component: AdminBookingsPage,
 });
+
+const SALON_WHATSAPP = "918208576165"; // Hemangi Glam Salon
+
+/** Strip non-digits and ensure country code for wa.me */
+function normalizePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`; // Indian mobile
+  if (digits.length >= 11) return digits;
+  return null;
+}
+
+/** Open WhatsApp click-to-chat with pre-filled text */
+function openWhatsApp(phone: string, text: string) {
+  const encoded = encodeURIComponent(text);
+  window.open(`https://wa.me/${phone}?text=${encoded}`, "_blank", "noopener,noreferrer");
+}
+
+/** WhatsApp Reminder button – for confirmed bookings */
+function WaReminderBtn({ booking }: { booking: AdminBooking }) {
+  const phone = normalizePhone(booking.offline_phone ?? booking.user_phone) ?? SALON_WHATSAPP;
+  const name = booking.offline_name ?? booking.user_name;
+  const text =
+    `Hi ${name}! This is a friendly reminder from Hemangi Glam Salon 🌸\n\n` +
+    `📋 Your Upcoming Appointment:\n` +
+    `• Service: ${booking.service_name}\n` +
+    `• Date: ${new Date(booking.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}\n` +
+    `• Time: ${booking.time}\n\n` +
+    `We look forward to seeing you! If you have any questions, reply to this message. 😊`;
+  return (
+    <button
+      type="button"
+      id={`admin-wa-remind-${booking.id}`}
+      title="Send WhatsApp reminder to customer"
+      onClick={() => openWhatsApp(phone, text)}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 min-h-[38px] cursor-pointer"
+      style={{
+        background: "#25D366",
+        color: "white",
+        border: "1px solid #1ebe5e",
+        boxShadow: "0 2px 8px #25D36630",
+      }}
+      aria-label="Send WhatsApp reminder"
+    >
+      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+      <span>Remind</span>
+    </button>
+  );
+}
+
+/** WhatsApp Feedback button – for completed bookings */
+function WaFeedbackBtn({ booking }: { booking: AdminBooking }) {
+  const phone = normalizePhone(booking.offline_phone ?? booking.user_phone) ?? SALON_WHATSAPP;
+  const name = booking.offline_name ?? booking.user_name;
+  const text =
+    `Hi ${name}! Thank you for visiting Hemangi Glam Salon 💖\n\n` +
+    `We hope you loved your ${booking.service_name} session!\n\n` +
+    `We'd really appreciate it if you could leave us a Google review – it helps us serve you better:\n` +
+    `🔗 https://g.page/r/HemAngiGlamSalon/review\n\n` +
+    `Your feedback means the world to us! ✨`;
+  return (
+    <button
+      type="button"
+      id={`admin-wa-feedback-${booking.id}`}
+      title="Request feedback via WhatsApp"
+      onClick={() => openWhatsApp(phone, text)}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 min-h-[38px] cursor-pointer"
+      style={{
+        background: "#25D366",
+        color: "white",
+        border: "1px solid #1ebe5e",
+        boxShadow: "0 2px 8px #25D36630",
+      }}
+      aria-label="Request feedback via WhatsApp"
+    >
+      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+      <span>Feedback</span>
+    </button>
+  );
+}
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses", color: "text-white/60" },
@@ -556,8 +637,12 @@ function AdminBookingsPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      {statusBadge(b.status)}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {statusBadge(b.status)}
+                        {b.status === "confirmed" && <WaReminderBtn booking={b} />}
+                        {b.status === "completed" && <WaFeedbackBtn booking={b} />}
+                      </div>
                       <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
                     </div>
                   </div>
@@ -693,7 +778,11 @@ function AdminBookingsPage() {
                           })}
                         </td>
                         <td className="px-6 py-4">
-                          <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
+                          <div className="flex flex-col gap-2">
+                            {b.status === "confirmed" && <WaReminderBtn booking={b} />}
+                            {b.status === "completed" && <WaFeedbackBtn booking={b} />}
+                            <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -83,13 +83,13 @@ function BookPage() {
 
   const isPresetReminder = REMINDER_OPTIONS.some((o) => o.value === reminderMinutes);
   const [isCustomReminder, setIsCustomReminder] = useState<boolean>(!isPresetReminder);
-  const [customReminderVal, setCustomReminderVal] = useState<number>(() => {
+  const [customReminderVal, setCustomReminderVal] = useState<string>(() => {
     if (!isPresetReminder) {
-      if (reminderMinutes >= 1440 && reminderMinutes % 1440 === 0) return reminderMinutes / 1440;
-      if (reminderMinutes >= 60 && reminderMinutes % 60 === 0) return reminderMinutes / 60;
-      return reminderMinutes;
+      if (reminderMinutes >= 1440 && reminderMinutes % 1440 === 0) return String(Math.round(reminderMinutes / 1440));
+      if (reminderMinutes >= 60 && reminderMinutes % 60 === 0) return String(Math.round(reminderMinutes / 60));
+      return String(reminderMinutes);
     }
-    return 45;
+    return "45";
   });
   const [customReminderUnit, setCustomReminderUnit] = useState<"mins" | "hours" | "days">(() => {
     if (!isPresetReminder) {
@@ -101,6 +101,7 @@ function BookPage() {
 
   const [savingCustomReminder, setSavingCustomReminder] = useState(false);
   const [customReminderSaved, setCustomReminderSaved] = useState(false);
+  const [customReminderError, setCustomReminderError] = useState<string | null>(null);
 
   const applyReminder = (m: number) => {
     if (!m || isNaN(m) || m <= 0) return;
@@ -110,13 +111,13 @@ function BookPage() {
     if (!preset) {
       setIsCustomReminder(true);
       if (m >= 1440 && m % 1440 === 0) {
-        setCustomReminderVal(Math.round(m / 1440));
+        setCustomReminderVal(String(Math.round(m / 1440)));
         setCustomReminderUnit("days");
       } else if (m >= 60 && m % 60 === 0) {
-        setCustomReminderVal(Math.round(m / 60));
+        setCustomReminderVal(String(Math.round(m / 60)));
         setCustomReminderUnit("hours");
       } else {
-        setCustomReminderVal(m);
+        setCustomReminderVal(String(m));
         setCustomReminderUnit("mins");
       }
     } else {
@@ -145,31 +146,44 @@ function BookPage() {
     window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
   };
 
-  const handleUpdateCustomReminder = (val: number, unit: "mins" | "hours" | "days") => {
-    const safeVal = Math.max(1, val);
-    setCustomReminderVal(safeVal);
+  const handleUpdateCustomReminder = (raw: string, unit: "mins" | "hours" | "days") => {
     setCustomReminderUnit(unit);
+    setCustomReminderVal(raw);
     setCustomReminderSaved(false);
-    const m =
-      unit === "days"
-        ? safeVal * 1440
-        : unit === "hours"
-          ? safeVal * 60
-          : safeVal;
-    setReminderMinutes(m);
-    localStorage.setItem("salon_reminder_pref", String(m));
-    window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
+    setCustomReminderError(null);
+    const numVal = Number(raw);
+    if (raw !== "" && !isNaN(numVal) && numVal >= 1) {
+      const m =
+        unit === "days"
+          ? numVal * 1440
+          : unit === "hours"
+            ? numVal * 60
+            : numVal;
+      setReminderMinutes(m);
+      localStorage.setItem("salon_reminder_pref", String(m));
+      window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
+    }
   };
 
   const handleSaveCustomReminder = async () => {
-    const safeVal = Math.max(1, customReminderVal);
-    setCustomReminderVal(safeVal);
+    const numVal = Number(customReminderVal);
+    if (customReminderVal === "" || isNaN(numVal) || numVal < 1) {
+      setCustomReminderError("Please enter a valid number (minimum 1).");
+      return;
+    }
+    const max = customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440;
+    if (numVal > max) {
+      setCustomReminderError(`Maximum is ${max} ${customReminderUnit}.`);
+      return;
+    }
+    setCustomReminderError(null);
+    setCustomReminderVal(String(numVal));
     const m =
       customReminderUnit === "days"
-        ? safeVal * 1440
+        ? numVal * 1440
         : customReminderUnit === "hours"
-          ? safeVal * 60
-          : safeVal;
+          ? numVal * 60
+          : numVal;
     setReminderMinutes(m);
     localStorage.setItem("salon_reminder_pref", String(m));
     window.dispatchEvent(new CustomEvent("salon-reminder-updated", { detail: m }));
@@ -814,22 +828,28 @@ function BookPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-xl border border-primary/20 bg-primary/5 text-xs animate-fade-in">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground shrink-0">Remind me:</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
-                      value={customReminderVal}
-                      onChange={(e) =>
-                        handleUpdateCustomReminder(Number(e.target.value) || 1, customReminderUnit)
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleSaveCustomReminder();
+                    <div className="flex flex-col gap-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={customReminderUnit === "days" ? 30 : customReminderUnit === "hours" ? 72 : 1440}
+                        value={customReminderVal}
+                        onChange={(e) =>
+                          handleUpdateCustomReminder(e.target.value, customReminderUnit)
                         }
-                      }}
-                      className="h-8 w-16 text-center text-xs font-semibold bg-background border-border"
-                    />
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSaveCustomReminder();
+                          }
+                        }}
+                        placeholder="e.g. 30"
+                        className={cn(
+                          "h-8 w-16 text-center text-xs font-semibold bg-background border-border",
+                          customReminderError && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
+                    </div>
                     <div className="flex rounded-lg border border-border bg-background p-0.5">
                       {(["mins", "hours", "days"] as const).map((unit) => (
                         <button
@@ -849,6 +869,11 @@ function BookPage() {
                     </div>
                     <span className="text-muted-foreground shrink-0">before appointment</span>
                   </div>
+                  {customReminderError && (
+                    <p className="w-full text-[11px] font-medium text-destructive mt-0.5">
+                      ⚠ {customReminderError}
+                    </p>
+                  )}
 
                   <Button
                     type="button"
