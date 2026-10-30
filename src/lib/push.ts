@@ -36,7 +36,14 @@ export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
   try {
     console.log("[push] Registering service worker at /sw.js …");
     _swReg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    console.log("[push] SW registered ✔ scope:", _swReg.scope, "state:", _swReg.active?.state);
+    // Force the new SW version to activate immediately (in case an old one is waiting)
+    if (_swReg.waiting) {
+      _swReg.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+    // Wait until the SW is fully active before returning
+    await navigator.serviceWorker.ready;
+    _swReg = await navigator.serviceWorker.getRegistration("/") ?? _swReg;
+    console.log("[push] SW registered & active ✔ scope:", _swReg.scope, "state:", _swReg.active?.state);
     return _swReg;
   } catch (err) {
     console.error("[push] SW registration FAILED:", err);
@@ -45,15 +52,30 @@ export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
 }
 
 async function getSWReg(): Promise<ServiceWorkerRegistration | null> {
-  if (_swReg) return _swReg;
+  if (_swReg && _swReg.active) return _swReg;
   if (!isPushSupported()) return null;
   try {
-    _swReg = (await navigator.serviceWorker.getRegistration("/")) ?? null;
-    console.log("[push] getSWReg() →", _swReg ? ("found: " + _swReg.scope) : "none registered");
+    // navigator.serviceWorker.ready resolves only once a SW is active & controlling
+    const ready = await Promise.race([
+      navigator.serviceWorker.ready,
+      // Timeout after 4 s so we don't hang forever
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("SW ready timeout")), 4000)
+      ),
+    ]) as ServiceWorkerRegistration;
+    _swReg = ready;
+    console.log("[push] getSWReg() → ready SW found:", _swReg.scope, "active state:", _swReg.active?.state);
     return _swReg;
-  } catch (err) {
-    console.error("[push] getSWReg() error:", err);
-    return null;
+  } catch (_readyErr) {
+    // Fallback: just try getRegistration
+    try {
+      _swReg = (await navigator.serviceWorker.getRegistration("/")) ?? null;
+      console.log("[push] getSWReg() fallback →", _swReg ? ("found: " + _swReg.scope) : "none registered");
+      return _swReg;
+    } catch (err) {
+      console.error("[push] getSWReg() error:", err);
+      return null;
+    }
   }
 }
 
@@ -139,12 +161,19 @@ export async function subscribeToPush(): Promise<"granted" | "denied" | "already
     console.log("[push] pushManager.subscribe() success ✔ endpoint:", sub.endpoint.slice(0, 60) + "…");
 
     const json = sub.toJSON();
-    console.log("[push] Sending subscription to backend — p256dh present:", !!json.keys?.p256dh, "auth present:", !!json.keys?.auth);
+    const p256dh = json.keys?.p256dh || "";
+    const auth   = json.keys?.auth   || "";
+    console.log("[push] Sending subscription to backend — p256dh present:", !!p256dh, "auth present:", !!auth);
+
+    if (!p256dh || !auth) {
+      console.error("[push] Subscription is missing crypto keys — not saving to backend (subscription invalid).");
+      return "error";
+    }
 
     await api.subscribePush({
       endpoint: json.endpoint!,
-      p256dh: json.keys?.p256dh || "",
-      auth: json.keys?.auth || "",
+      p256dh,
+      auth,
     });
     console.log("[push] Subscription saved to backend ✔");
 

@@ -11,8 +11,6 @@ import {
   Clock,
   UserX,
   ChevronDown,
-  MessageCircle,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -497,17 +495,17 @@ function AdminBookingsPage() {
                 style={
                   active
                     ? {
-                        background:
-                          "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
-                        color: "#ffffff",
-                        border: "1.5px solid oklch(0.35 0.15 22)",
-                        boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
-                      }
+                      background:
+                        "linear-gradient(135deg, oklch(0.35 0.15 22), oklch(0.45 0.13 25))",
+                      color: "#ffffff",
+                      border: "1.5px solid oklch(0.35 0.15 22)",
+                      boxShadow: "0 4px 14px oklch(0.35 0.15 22 / 25%)",
+                    }
                     : {
-                        background: "oklch(0.998 0.004 85)",
-                        color: "oklch(0.45 0.04 50)",
-                        border: "1px solid oklch(0.84 0.042 80 / 80%)",
-                      }
+                      background: "oklch(0.998 0.004 85)",
+                      color: "oklch(0.45 0.04 50)",
+                      border: "1px solid oklch(0.84 0.042 80 / 80%)",
+                    }
                 }
               >
                 {label}
@@ -516,13 +514,13 @@ function AdminBookingsPage() {
                   style={
                     active
                       ? {
-                          background: "oklch(0.68 0.13 68 / 35%)",
-                          color: "#ffffff",
-                        }
+                        background: "oklch(0.68 0.13 68 / 35%)",
+                        color: "#ffffff",
+                      }
                       : {
-                          background: "oklch(0.92 0.030 83)",
-                          color: "oklch(0.50 0.04 50)",
-                        }
+                        background: "oklch(0.92 0.030 83)",
+                        color: "oklch(0.50 0.04 50)",
+                      }
                   }
                 >
                   {count}
@@ -532,373 +530,373 @@ function AdminBookingsPage() {
           })}
         </div>
 
-      {/* Search */}
-      <div className="relative animate-fade-up delay-200">
-        <Search
-          className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
-          style={{ color: "oklch(0.65 0.04 50)" }}
-        />
-        <input
-          type="text"
-          placeholder="Search by name, email, phone or service…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-xl py-3 pl-11 pr-4 text-sm outline-none transition"
-          style={{
-            background: "oklch(0.998 0.004 85)",
-            border: "1px solid oklch(0.84 0.042 80)",
-            color: "oklch(0.25 0.05 50)",
-          }}
-          onFocus={(e) => {
-            (e.currentTarget as HTMLInputElement).style.borderColor = "oklch(0.68 0.13 68)";
-            (e.currentTarget as HTMLInputElement).style.boxShadow =
-              "0 0 0 3px oklch(0.68 0.13 68 / 12%)";
-          }}
-          onBlur={(e) => {
-            (e.currentTarget as HTMLInputElement).style.borderColor = "oklch(0.84 0.042 80)";
-            (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
-          }}
-        />
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div
-          className="rounded-2xl p-4 text-sm"
-          style={{
-            background: "oklch(0.577 0.245 27.325 / 8%)",
-            border: "1px solid oklch(0.577 0.245 27.325 / 20%)",
-            color: "oklch(0.45 0.18 27)",
-          }}
-        >
-          {error}
+        {/* Search */}
+        <div className="relative animate-fade-up delay-200">
+          <Search
+            className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
+            style={{ color: "oklch(0.65 0.04 50)" }}
+          />
+          <input
+            type="text"
+            placeholder="Search by name, email, phone or service…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full rounded-xl py-3 pl-11 pr-4 text-sm outline-none transition"
+            style={{
+              background: "oklch(0.998 0.004 85)",
+              border: "1px solid oklch(0.84 0.042 80)",
+              color: "oklch(0.25 0.05 50)",
+            }}
+            onFocus={(e) => {
+              (e.currentTarget as HTMLInputElement).style.borderColor = "oklch(0.68 0.13 68)";
+              (e.currentTarget as HTMLInputElement).style.boxShadow =
+                "0 0 0 3px oklch(0.68 0.13 68 / 12%)";
+            }}
+            onBlur={(e) => {
+              (e.currentTarget as HTMLInputElement).style.borderColor = "oklch(0.84 0.042 80)";
+              (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
+            }}
+          />
         </div>
-      )}
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div
-          className="overflow-hidden rounded-2xl"
-          style={{
-            background: "oklch(0.998 0.004 85)",
-            border: "1px solid oklch(0.84 0.042 80 / 60%)",
-          }}
-        >
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-4 px-6 py-4"
-              style={{ borderBottom: "1px solid oklch(0.90 0.030 83)" }}
-            >
+        {/* Error */}
+        {error && (
+          <div
+            className="rounded-2xl p-4 text-sm"
+            style={{
+              background: "oklch(0.577 0.245 27.325 / 8%)",
+              border: "1px solid oklch(0.577 0.245 27.325 / 20%)",
+              color: "oklch(0.45 0.18 27)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div
+            className="overflow-hidden rounded-2xl"
+            style={{
+              background: "oklch(0.998 0.004 85)",
+              border: "1px solid oklch(0.84 0.042 80 / 60%)",
+            }}
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
               <div
-                className="h-9 w-9 animate-pulse rounded-full"
-                style={{ background: "oklch(0.90 0.030 83)" }}
-              />
-              <div className="flex-1 space-y-2">
+                key={i}
+                className="flex items-center gap-4 px-6 py-4"
+                style={{ borderBottom: "1px solid oklch(0.90 0.030 83)" }}
+              >
                 <div
-                  className="h-3 w-40 animate-pulse rounded"
+                  className="h-9 w-9 animate-pulse rounded-full"
+                  style={{ background: "oklch(0.90 0.030 83)" }}
+                />
+                <div className="flex-1 space-y-2">
+                  <div
+                    className="h-3 w-40 animate-pulse rounded"
+                    style={{ background: "oklch(0.90 0.030 83)" }}
+                  />
+                  <div
+                    className="h-2 w-56 animate-pulse rounded"
+                    style={{ background: "oklch(0.93 0.020 83)" }}
+                  />
+                </div>
+                <div
+                  className="h-3 w-24 animate-pulse rounded"
                   style={{ background: "oklch(0.90 0.030 83)" }}
                 />
                 <div
-                  className="h-2 w-56 animate-pulse rounded"
-                  style={{ background: "oklch(0.93 0.020 83)" }}
+                  className="h-5 w-20 animate-pulse rounded-full"
+                  style={{ background: "oklch(0.90 0.030 83)" }}
+                />
+                <div
+                  className="h-7 w-16 animate-pulse rounded-lg"
+                  style={{ background: "oklch(0.90 0.030 83)" }}
                 />
               </div>
-              <div
-                className="h-3 w-24 animate-pulse rounded"
-                style={{ background: "oklch(0.90 0.030 83)" }}
-              />
-              <div
-                className="h-5 w-20 animate-pulse rounded-full"
-                style={{ background: "oklch(0.90 0.030 83)" }}
-              />
-              <div
-                className="h-7 w-16 animate-pulse rounded-lg"
-                style={{ background: "oklch(0.90 0.030 83)" }}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {/* Table / Cards */}
-      {!loading && !error && (
-        <div
-          className="overflow-hidden rounded-2xl animate-fade-up delay-300"
-          style={{
-            background: "oklch(0.998 0.004 85)",
-            border: "1px solid oklch(0.84 0.042 80 / 60%)",
-            boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
-          }}
-        >
-          {filtered.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center gap-3 py-20"
-              style={{ color: "oklch(0.70 0.04 50)" }}
-            >
-              <CalendarCheck className="h-12 w-12" style={{ color: "oklch(0.80 0.030 83)" }} />
-              <p className="text-sm">
-                {query
-                  ? "No bookings match your search."
-                  : statusFilter !== "all"
-                    ? `No ${statusFilter} bookings.`
-                    : "No bookings yet."}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Mobile card layout (hidden on sm+) */}
-              <div className="sm:hidden divide-y" style={{ borderColor: "oklch(0.93 0.020 83)" }}>
-                {filtered.map((b) => (
-                  <div key={b.id} className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                          style={{
-                            background: b.offline_name
-                              ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
-                              : "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
-                            color: "oklch(0.99 0.01 85)",
-                          }}
-                        >
-                          {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p
-                              className="text-sm font-semibold"
-                              style={{ color: "oklch(0.25 0.05 50)" }}
-                            >
-                              {b.offline_name ?? b.user_name}
-                            </p>
-                            {b.offline_name && (
-                              <span
-                                className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                                style={{
-                                  background: "oklch(0.68 0.13 68 / 15%)",
-                                  color: "oklch(0.50 0.12 65)",
-                                }}
-                              >
-                                Walk-in
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
-                            {b.offline_phone ?? b.user_email}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-mono text-xs" style={{ color: "oklch(0.70 0.04 50)" }}>
-                        #{b.id}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span
-                          className="block font-semibold uppercase tracking-wide"
-                          style={{ color: "oklch(0.65 0.04 50)" }}
-                        >
-                          Service
-                        </span>
-                        <span style={{ color: "oklch(0.30 0.05 50)" }}>{b.service_name}</span>
-                      </div>
-                      <div>
-                        <span
-                          className="block font-semibold uppercase tracking-wide"
-                          style={{ color: "oklch(0.65 0.04 50)" }}
-                        >
-                          Date
-                        </span>
-                        <span style={{ color: "oklch(0.30 0.05 50)" }}>
-                          {new Date(b.date).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
-                      <div>
-                        <span
-                          className="block font-semibold uppercase tracking-wide"
-                          style={{ color: "oklch(0.65 0.04 50)" }}
-                        >
-                          Time
-                        </span>
-                        <span style={{ color: "oklch(0.30 0.05 50)" }}>{b.time}</span>
-                      </div>
-                      <div>
-                        <span
-                          className="block font-semibold uppercase tracking-wide"
-                          style={{ color: "oklch(0.65 0.04 50)" }}
-                        >
-                          Price
-                        </span>
-                        <span style={{ color: "oklch(0.45 0.04 50)" }}>
-                          {b.service_price === "On request" ? (
-                            <em>On request</em>
-                          ) : (
-                            `₹${b.service_price}`
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        {statusBadge(b.status)}
-                        {b.status === "confirmed" && <WaReminderBtn booking={b} />}
-                        {b.status === "completed" && <WaFeedbackBtn booking={b} />}
-                      </div>
-                      <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
-                    </div>
-                  </div>
-                ))}
+        {/* Table / Cards */}
+        {!loading && !error && (
+          <div
+            className="overflow-hidden rounded-2xl animate-fade-up delay-300"
+            style={{
+              background: "oklch(0.998 0.004 85)",
+              border: "1px solid oklch(0.84 0.042 80 / 60%)",
+              boxShadow: "0 4px 24px oklch(0.35 0.15 22 / 6%)",
+            }}
+          >
+            {filtered.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center gap-3 py-20"
+                style={{ color: "oklch(0.70 0.04 50)" }}
+              >
+                <CalendarCheck className="h-12 w-12" style={{ color: "oklch(0.80 0.030 83)" }} />
+                <p className="text-sm">
+                  {query
+                    ? "No bookings match your search."
+                    : statusFilter !== "all"
+                      ? `No ${statusFilter} bookings.`
+                      : "No bookings yet."}
+                </p>
               </div>
-              {/* Desktop table (hidden on mobile) */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid oklch(0.90 0.030 83)" }}>
-                      {[
-                        "#",
-                        "Customer",
-                        "Service",
-                        "Date & Time",
-                        "Price",
-                        "Status",
-                        "Booked On",
-                        "Action",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-widest"
-                          style={{ color: "oklch(0.65 0.04 50)" }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((b) => (
-                      <tr
-                        key={b.id}
-                        className="group transition-colors"
-                        style={{ borderBottom: "1px solid oklch(0.93 0.020 83)" }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLTableRowElement).style.background =
-                            "oklch(0.96 0.018 83 / 50%)";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLTableRowElement).style.background = "transparent";
-                        }}
-                      >
-                        <td
-                          className="px-6 py-4 font-mono text-xs"
-                          style={{ color: "oklch(0.70 0.04 50)" }}
-                        >
-                          #{b.id}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md"
-                              style={{
-                                background: b.offline_name
-                                  ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
-                                  : "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
-                                color: "oklch(0.99 0.01 85)",
-                              }}
-                            >
-                              {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-medium" style={{ color: "oklch(0.25 0.05 50)" }}>
-                                  {b.offline_name ?? b.user_name}
-                                </p>
-                                {b.offline_name && (
-                                  <span
-                                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                                    style={{
-                                      background: "oklch(0.68 0.13 68 / 15%)",
-                                      color: "oklch(0.50 0.12 65)",
-                                    }}
-                                  >
-                                    Walk-in
-                                  </span>
-                                )}
-                              </div>
-                              {b.offline_name ? (
-                                <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
-                                  {b.offline_phone ? `📞 ${b.offline_phone}` : "No phone"}
-                                </p>
-                              ) : (
-                                <>
-                                  <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
-                                    {b.user_email}
-                                  </p>
-                                  <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>
-                                    {b.user_phone}
-                                  </p>
-                                </>
+            ) : (
+              <>
+                {/* Mobile card layout (hidden on sm+) */}
+                <div className="sm:hidden divide-y" style={{ borderColor: "oklch(0.93 0.020 83)" }}>
+                  {filtered.map((b) => (
+                    <div key={b.id} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                            style={{
+                              background: b.offline_name
+                                ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
+                                : "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
+                              color: "oklch(0.99 0.01 85)",
+                            }}
+                          >
+                            {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p
+                                className="text-sm font-semibold"
+                                style={{ color: "oklch(0.25 0.05 50)" }}
+                              >
+                                {b.offline_name ?? b.user_name}
+                              </p>
+                              {b.offline_name && (
+                                <span
+                                  className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{
+                                    background: "oklch(0.68 0.13 68 / 15%)",
+                                    color: "oklch(0.50 0.12 65)",
+                                  }}
+                                >
+                                  Walk-in
+                                </span>
                               )}
                             </div>
+                            <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                              {b.offline_phone ?? b.user_email}
+                            </p>
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-medium" style={{ color: "oklch(0.30 0.05 50)" }}>
-                            {b.service_name}
-                          </p>
-                          <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>
-                            {b.category}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-medium" style={{ color: "oklch(0.30 0.05 50)" }}>
+                        </div>
+                        <span className="font-mono text-xs" style={{ color: "oklch(0.70 0.04 50)" }}>
+                          #{b.id}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span
+                            className="block font-semibold uppercase tracking-wide"
+                            style={{ color: "oklch(0.65 0.04 50)" }}
+                          >
+                            Service
+                          </span>
+                          <span style={{ color: "oklch(0.30 0.05 50)" }}>{b.service_name}</span>
+                        </div>
+                        <div>
+                          <span
+                            className="block font-semibold uppercase tracking-wide"
+                            style={{ color: "oklch(0.65 0.04 50)" }}
+                          >
+                            Date
+                          </span>
+                          <span style={{ color: "oklch(0.30 0.05 50)" }}>
                             {new Date(b.date).toLocaleDateString("en-IN", {
                               day: "2-digit",
                               month: "short",
                               year: "numeric",
                             })}
-                          </p>
-                          <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
-                            {b.time}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4" style={{ color: "oklch(0.45 0.04 50)" }}>
-                          {b.service_price === "On request" ? (
-                            <span className="italic" style={{ color: "oklch(0.65 0.04 50)" }}>
-                              On request
-                            </span>
-                          ) : (
-                            `₹${b.service_price}`
-                          )}
-                        </td>
-                        <td className="px-6 py-4">{statusBadge(b.status)}</td>
-                        <td className="px-6 py-4 text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
-                          {new Date(b.created_at).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col gap-2">
-                            {b.status === "confirmed" && <WaReminderBtn booking={b} />}
-                            {b.status === "completed" && <WaFeedbackBtn booking={b} />}
-                            <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
-                          </div>
-                        </td>
+                          </span>
+                        </div>
+                        <div>
+                          <span
+                            className="block font-semibold uppercase tracking-wide"
+                            style={{ color: "oklch(0.65 0.04 50)" }}
+                          >
+                            Time
+                          </span>
+                          <span style={{ color: "oklch(0.30 0.05 50)" }}>{b.time}</span>
+                        </div>
+                        <div>
+                          <span
+                            className="block font-semibold uppercase tracking-wide"
+                            style={{ color: "oklch(0.65 0.04 50)" }}
+                          >
+                            Price
+                          </span>
+                          <span style={{ color: "oklch(0.45 0.04 50)" }}>
+                            {b.service_price === "On request" ? (
+                              <em>On request</em>
+                            ) : (
+                              `₹${b.service_price}`
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {statusBadge(b.status)}
+                          {b.status === "confirmed" && <WaReminderBtn booking={b} />}
+                          {b.status === "completed" && <WaFeedbackBtn booking={b} />}
+                        </div>
+                        <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table (hidden on mobile) */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid oklch(0.90 0.030 83)" }}>
+                        {[
+                          "#",
+                          "Customer",
+                          "Service",
+                          "Date & Time",
+                          "Price",
+                          "Status",
+                          "Booked On",
+                          "Action",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-widest"
+                            style={{ color: "oklch(0.65 0.04 50)" }}
+                          >
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+                    </thead>
+                    <tbody>
+                      {filtered.map((b) => (
+                        <tr
+                          key={b.id}
+                          className="group transition-colors"
+                          style={{ borderBottom: "1px solid oklch(0.93 0.020 83)" }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLTableRowElement).style.background =
+                              "oklch(0.96 0.018 83 / 50%)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLTableRowElement).style.background = "transparent";
+                          }}
+                        >
+                          <td
+                            className="px-6 py-4 font-mono text-xs"
+                            style={{ color: "oklch(0.70 0.04 50)" }}
+                          >
+                            #{b.id}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-md"
+                                style={{
+                                  background: b.offline_name
+                                    ? "linear-gradient(135deg, oklch(0.68 0.13 68), oklch(0.55 0.11 65))"
+                                    : "linear-gradient(135deg, oklch(0.45 0.13 240), oklch(0.40 0.15 255))",
+                                  color: "oklch(0.99 0.01 85)",
+                                }}
+                              >
+                                {b.offline_name ? "🚶" : b.user_name[0]?.toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-medium" style={{ color: "oklch(0.25 0.05 50)" }}>
+                                    {b.offline_name ?? b.user_name}
+                                  </p>
+                                  {b.offline_name && (
+                                    <span
+                                      className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                      style={{
+                                        background: "oklch(0.68 0.13 68 / 15%)",
+                                        color: "oklch(0.50 0.12 65)",
+                                      }}
+                                    >
+                                      Walk-in
+                                    </span>
+                                  )}
+                                </div>
+                                {b.offline_name ? (
+                                  <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                                    {b.offline_phone ? `📞 ${b.offline_phone}` : "No phone"}
+                                  </p>
+                                ) : (
+                                  <>
+                                    <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                                      {b.user_email}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>
+                                      {b.user_phone}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="font-medium" style={{ color: "oklch(0.30 0.05 50)" }}>
+                              {b.service_name}
+                            </p>
+                            <p className="text-xs" style={{ color: "oklch(0.65 0.04 50)" }}>
+                              {b.category}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="font-medium" style={{ color: "oklch(0.30 0.05 50)" }}>
+                              {new Date(b.date).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                            <p className="text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                              {b.time}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4" style={{ color: "oklch(0.45 0.04 50)" }}>
+                            {b.service_price === "On request" ? (
+                              <span className="italic" style={{ color: "oklch(0.65 0.04 50)" }}>
+                                On request
+                              </span>
+                            ) : (
+                              `₹${b.service_price}`
+                            )}
+                          </td>
+                          <td className="px-6 py-4">{statusBadge(b.status)}</td>
+                          <td className="px-6 py-4 text-xs" style={{ color: "oklch(0.55 0.04 50)" }}>
+                            {new Date(b.created_at).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-2">
+                              {b.status === "confirmed" && <WaReminderBtn booking={b} />}
+                              {b.status === "completed" && <WaFeedbackBtn booking={b} />}
+                              <StatusDropdown booking={b} onUpdate={handleStatusUpdate} />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
